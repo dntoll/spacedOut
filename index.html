@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#04070f" />
+    <title>Spaced Out</title>
+  </head>
+  <body>
+    <canvas id="game" aria-label="Spaced Out asteroid flight game"></canvas>
+    <div class="hud">
+      <header>
+        <span class="brand">SPACED <b>OUT</b></span>
+        <span class="status"><i></i> FLIGHT SYSTEM ONLINE</span>
+      </header>
+      <div class="speed"><span id="speed">000</span><small>m/s</small></div>
+      <div class="hint" id="hint">
+        <strong>HOLD TO THRUST</strong>
+        <span>Point to steer · momentum carries you</span>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
