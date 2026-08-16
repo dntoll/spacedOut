@@ -11,7 +11,11 @@ export class AsteroidBelt {
   private readonly collisionObservers = new Set<CollisionObserver>();
   private nextId = 0;
 
-  constructor(center: Vec2) {
+  constructor(center: Vec2, initialAsteroids?: Asteroid[]) {
+    if (initialAsteroids) {
+      this.asteroids.push(...initialAsteroids);
+      return;
+    }
     for (let i = 0; i < 34; i++) {
       this.asteroids.push(this.createAsteroid(center, i < 8 ? 260 : 500, 1600));
     }
@@ -28,6 +32,10 @@ export class AsteroidBelt {
 
   forEach(visitor: (asteroid: Asteroid) => void): void {
     this.asteroids.forEach(visitor);
+  }
+
+  collideWith(body: PhysicsBody): void {
+    for (const asteroid of this.asteroids) this.collide(body, asteroid);
   }
 
   addCollisionObserver(observer: CollisionObserver): void {

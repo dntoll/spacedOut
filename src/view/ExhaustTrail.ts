@@ -1,6 +1,7 @@
 import { add, random, scale } from '../math';
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
+import type { Drawing } from './Drawing';
 import { ExhaustParticle } from './ExhaustParticle';
 
 export class ExhaustTrail {
@@ -13,8 +14,16 @@ export class ExhaustTrail {
     this.particles = this.particles.filter((particle) => particle.isAlive);
   }
 
-  forEach(visitor: (particle: ExhaustParticle) => void): void {
-    this.particles.forEach(visitor);
+  draw(drawing: Drawing): void {
+    drawing.withAdditiveBlend(() => {
+      for (const particle of this.particles) {
+        const life = particle.life / particle.maxLife;
+        const color = life > 0.55
+          ? `rgba(160,245,255,${life})`
+          : `rgba(63,135,255,${life * 0.65})`;
+        drawing.circle(particle.position, particle.size * life, color);
+      }
+    });
   }
 
   private emit(dt: number, ship: Model.Ship): void {

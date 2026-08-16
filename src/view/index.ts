@@ -1,6 +1,14 @@
+export { AsteroidBelt } from './AsteroidBelt';
+export { Camera } from './Camera';
 export { CollisionEffects } from './CollisionEffects';
 export { CollisionParticle } from './CollisionParticle';
+export { Drawing } from './Drawing';
 export { ExhaustParticle } from './ExhaustParticle';
 export { ExhaustTrail } from './ExhaustTrail';
 export { Game } from './Game';
+export { Hud } from './Hud';
+export { PlayerInput } from './PlayerInput';
+export { Ship } from './Ship';
+export { SpaceBackground } from './SpaceBackground';
 export { StarField } from './StarField';
+export { SupplyField } from './SupplyField';

@@ -1,4 +1,5 @@
 import type { Vec2 } from '../types';
+import type { Drawing } from './Drawing';
 
 interface Star {
   x: number;
@@ -20,14 +21,14 @@ export class StarField {
     }));
   }
 
-  draw(ctx: CanvasRenderingContext2D, width: number, height: number, camera: Vec2): void {
+  draw(drawing: Drawing, camera: Vec2): void {
+    const { width, height } = drawing.size;
     const driftX = camera.x * 0.025;
     const driftY = camera.y * 0.025;
     for (const star of this.stars) {
       const x = ((star.x * width - driftX) % width + width) % width;
       const y = ((star.y * height - driftY) % height + height) % height;
-      ctx.fillStyle = `rgba(190,220,255,${star.alpha})`;
-      ctx.fillRect(x, y, star.size, star.size);
+      drawing.rectangle({ x, y }, { width: star.size, height: star.size }, `rgba(190,220,255,${star.alpha})`);
     }
   }
 }

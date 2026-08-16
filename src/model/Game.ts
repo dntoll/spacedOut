@@ -2,10 +2,12 @@ import type { Vec2 } from '../types';
 import { AsteroidBelt } from './AsteroidBelt';
 import type { CollisionObserver } from './CollisionObserver';
 import { Ship } from './Ship';
+import { SupplyField } from './SupplyField';
 
 export class Game {
   readonly ship = new Ship();
   readonly asteroidBelt = new AsteroidBelt(this.ship.position);
+  readonly supplyField = new SupplyField(this.ship.position);
   elapsed = 0;
 
   get speed(): number { return this.ship.speed; }
@@ -21,9 +23,11 @@ export class Game {
   update(dt: number): void {
     dt = Math.min(dt, 0.033);
     this.elapsed += dt;
+    this.ship.updateLifeSupport(dt);
     this.ship.applyControls(dt);
 
     this.ship.integrate(dt);
     this.asteroidBelt.update(dt, this.ship);
+    this.supplyField.update(dt, this.ship, this.asteroidBelt);
   }
 }

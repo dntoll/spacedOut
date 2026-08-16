@@ -1,6 +1,7 @@
 import { random, scale } from '../math';
 import type * as Model from '../model';
 import { CollisionParticle } from './CollisionParticle';
+import type { Drawing } from './Drawing';
 
 export class CollisionEffects {
   private particles: CollisionParticle[] = [];
@@ -29,18 +30,15 @@ export class CollisionEffects {
     this.particles = this.particles.filter((particle) => particle.isAlive);
   }
 
-  draw(ctx: CanvasRenderingContext2D): void {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    for (const particle of this.particles) {
-      const life = particle.life / particle.maxLife;
-      ctx.beginPath();
-      ctx.fillStyle = particle.heat > 0.78
-        ? `rgba(220,250,255,${life})`
-        : `rgba(70,180,255,${life * 0.8})`;
-      ctx.arc(particle.position.x, particle.position.y, particle.size * life, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.restore();
+  draw(drawing: Drawing): void {
+    drawing.withAdditiveBlend(() => {
+      for (const particle of this.particles) {
+        const life = particle.life / particle.maxLife;
+        const color = particle.heat > 0.78
+          ? `rgba(220,250,255,${life})`
+          : `rgba(70,180,255,${life * 0.8})`;
+        drawing.circle(particle.position, particle.size * life, color);
+      }
+    });
   }
 }

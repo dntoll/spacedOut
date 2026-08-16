@@ -1,7 +1,7 @@
 import type { Vec2 } from '../types';
 
 export interface Size { width: number; height: number }
-export interface PointerPosition extends Vec2 { pointerId: number }
+export interface PointerPosition extends Vec2 { pointerId: number; pointerType: string }
 export interface GradientStop { offset: number; color: string }
 export interface RadialPaint {
   from: Vec2;
@@ -82,11 +82,16 @@ export class Drawing {
     this.context.fillRect(position.x, position.y, size.width, size.height);
   }
 
-  circle(position: Vec2, radius: number, fill: Paint): void {
+  circle(position: Vec2, radius: number, fill: Paint, stroke?: string, lineWidth = 1): void {
     this.context.beginPath();
     this.context.arc(position.x, position.y, radius, 0, Math.PI * 2);
     this.context.fillStyle = this.resolvePaint(fill);
     this.context.fill();
+    if (stroke) {
+      this.context.strokeStyle = stroke;
+      this.context.lineWidth = lineWidth;
+      this.context.stroke();
+    }
   }
 
   polygon(points: Vec2[], fill: Paint, stroke?: string, lineWidth = 1): void {
@@ -134,7 +139,7 @@ export class Drawing {
   private onPointer(type: 'pointermove' | 'pointerdown' | 'pointerup', listener: (pointer: PointerPosition) => void): void {
     this.canvas.addEventListener(type, (event) => {
       event.preventDefault();
-      listener({ x: event.clientX, y: event.clientY, pointerId: event.pointerId });
+      listener({ x: event.clientX, y: event.clientY, pointerId: event.pointerId, pointerType: event.pointerType });
     });
   }
 }

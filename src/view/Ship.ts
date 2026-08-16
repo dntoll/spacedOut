@@ -8,7 +8,7 @@ export class Ship {
 
       drawing.withShadow('#7ee9ff', 15, () => {
         drawing.polygon(
-          [{ x: 22, y: 0 }, { x: -14, y: 13 }, { x: -8, y: 0 }, { x: -14, y: -13 }],
+          [{ x: 22, y: 0 }, { x: -14, y: 13 }, { x: -14, y: -13 }],
           '#d9f7ff',
           '#72dff5',
           1.4,
