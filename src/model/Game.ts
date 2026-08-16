@@ -13,6 +13,7 @@ export class Game {
   readonly supplyField = new SupplyField(this.ship.position);
   readonly massiveAsteroidField = new MassiveAsteroidField(this.ship.position, this.ship.radius);
   private readonly shipCollisions = new ShipCollisionSystem();
+  private spawnExclusionRadius = 1500;
   elapsed = 0;
 
   get speed(): number { return this.ship.speed; }
@@ -22,6 +23,7 @@ export class Game {
   setThrustTarget(target: Vec2): void { this.ship.aimAt(target); }
   startThrust(): void { this.ship.startThrust(); }
   stopThrust(): void { this.ship.stopThrust(); }
+  setSpawnExclusionRadius(radius: number): void { this.spawnExclusionRadius = Math.max(0, radius); }
   addCollisionObserver(observer: CollisionObserver): void {
     this.asteroidBelt.addCollisionObserver(observer);
     this.massiveAsteroidField.addCollisionObserver(observer);
@@ -40,13 +42,15 @@ export class Game {
     this.ship.applyControls(dt);
 
     this.ship.integrate(dt);
-    this.asteroidBelt.update(dt, this.ship.position);
-    this.supplyField.update(dt, this.ship, this.asteroidBelt);
+    const spawnBoundary = this.spawnExclusionRadius + this.ship.speed * 1.2;
+    this.asteroidBelt.update(dt, this.ship.position, spawnBoundary);
+    this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary);
+    this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary);
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
 
     const obstacles: PolygonObstacle[] = [];
     this.asteroidBelt.forEach((asteroid) => obstacles.push(asteroid));
-    this.massiveAsteroidField.forEach((asteroid) => obstacles.push(asteroid));
+    this.massiveAsteroidField.forEachActive((asteroid) => obstacles.push(asteroid));
     this.shipCollisions.resolve(this.ship, obstacles, dt);
   }
 }

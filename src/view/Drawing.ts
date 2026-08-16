@@ -77,6 +77,15 @@ export class Drawing {
     });
   }
 
+  withClipRectangle(position: Vec2, size: Size, draw: () => void): void {
+    this.withState(() => {
+      this.context.beginPath();
+      this.context.rect(position.x, position.y, size.width, size.height);
+      this.context.clip();
+      draw();
+    });
+  }
+
   rectangle(position: Vec2, size: Size, fill: Paint): void {
     this.context.fillStyle = this.resolvePaint(fill);
     this.context.fillRect(position.x, position.y, size.width, size.height);

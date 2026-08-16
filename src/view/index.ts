@@ -1,13 +1,15 @@
 export { AsteroidBelt } from './AsteroidBelt';
-export { Camera } from './Camera';
+export { Camera, type WorldBounds } from './Camera';
 export { CollisionEffects } from './CollisionEffects';
 export { CollisionParticle } from './CollisionParticle';
 export { Drawing } from './Drawing';
 export { ExhaustParticle } from './ExhaustParticle';
 export { ExhaustTrail } from './ExhaustTrail';
+export { ExplorationMap } from './ExplorationMap';
 export { Game } from './Game';
 export { Hud } from './Hud';
 export { MassiveAsteroidField } from './MassiveAsteroidField';
+export { Minimap } from './Minimap';
 export { PlayerInput } from './PlayerInput';
 export { Ship } from './Ship';
 export { SpaceBackground } from './SpaceBackground';

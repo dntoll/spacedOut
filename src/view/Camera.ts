@@ -2,6 +2,13 @@ import { clamp } from '../math';
 import type { Vec2 } from '../types';
 import type { Drawing } from './Drawing';
 
+export interface WorldBounds {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
 export class Camera {
   private position: Vec2 = { x: 0, y: 0 };
   private zoomLevel = 1;
@@ -20,6 +27,21 @@ export class Camera {
       x: this.position.x + (point.x - viewport.width / 2) / this.zoomLevel,
       y: this.position.y + (point.y - viewport.height / 2) / this.zoomLevel,
     };
+  }
+
+  getVisibleWorldBounds(viewport: { width: number; height: number }): WorldBounds {
+    const halfWidth = viewport.width / (2 * this.zoomLevel);
+    const halfHeight = viewport.height / (2 * this.zoomLevel);
+    return {
+      left: this.position.x - halfWidth,
+      top: this.position.y - halfHeight,
+      right: this.position.x + halfWidth,
+      bottom: this.position.y + halfHeight,
+    };
+  }
+
+  getVisibleWorldRadius(viewport: { width: number; height: number }): number {
+    return Math.hypot(viewport.width, viewport.height) / (2 * this.zoomLevel);
   }
 
   drawWorld(drawing: Drawing, draw: () => void): void {

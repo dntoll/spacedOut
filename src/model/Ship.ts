@@ -1,5 +1,6 @@
 import { add, clamp, length, scale, sub } from '../math';
 import type { Vec2 } from '../types';
+import { BodyMass } from './BodyMass';
 import { PhysicsBody } from './PhysicsBody';
 
 export class Ship extends PhysicsBody {
@@ -9,7 +10,15 @@ export class Ship extends PhysicsBody {
   private fuelLevel = 100;
 
   constructor() {
-    super({ x: 0, y: 0 }, { x: 0, y: 0 }, 18, 1.8, -Math.PI / 2, 0);
+    const radius = 18;
+    super(
+      { x: 0, y: 0 },
+      { x: 0, y: 0 },
+      radius,
+      BodyMass.fromRadius(radius, 0.011),
+      -Math.PI / 2,
+      0,
+    );
   }
 
   get speed(): number { return length(this.velocity); }

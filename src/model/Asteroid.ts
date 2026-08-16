@@ -1,4 +1,5 @@
 import type { Vec2 } from '../types';
+import { BodyMass } from './BodyMass';
 import { PhysicsBody } from './PhysicsBody';
 
 export class Asteroid extends PhysicsBody {
@@ -12,6 +13,6 @@ export class Asteroid extends PhysicsBody {
     public readonly vertices: number[],
     public readonly shade: number,
   ) {
-    super(position, velocity, radius, radius * radius * 0.012, angle, angularVelocity);
+    super(position, velocity, radius, BodyMass.fromRadius(radius, 0.0038), angle, angularVelocity);
   }
 }

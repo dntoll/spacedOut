@@ -10,12 +10,36 @@ import type { SupplyContainer } from './SupplyContainer';
 describe('SupplyField', () => {
   it('REQ-14 randomly spreads collectible air and fuel containers', () => {
     const containers: SupplyContainer[] = [];
-    new SupplyField({ x: 0, y: 0 }).forEach((container) => containers.push(container));
+    new SupplyField({ x: 0, y: 0 }, undefined, 1234).forEachActive((container) => containers.push(container));
 
-    expect(containers).toHaveLength(20);
+    expect(containers).toHaveLength(98);
     expect(containers.some((container) => container instanceof AirContainer)).toBe(true);
     expect(containers.some((container) => container instanceof FuelContainer)).toBe(true);
     expect(new Set(containers.map((container) => `${container.position.x},${container.position.y}`)).size).toBeGreaterThan(1);
+  });
+
+  it('REQ-14 generates stable supplies in distant reached regions', () => {
+    const ship = new Ship();
+    ship.position = { x: 7200, y: -4800 };
+    const first = new SupplyField({ x: 0, y: 0 }, undefined, 9876);
+    const second = new SupplyField({ x: 0, y: 0 }, undefined, 9876);
+    const emptyBelt = new AsteroidBelt(ship.position, []);
+
+    first.update(0, ship, emptyBelt);
+    second.update(0, ship, emptyBelt);
+    const positions = (field: SupplyField) => {
+      const values: string[] = [];
+      field.forEachActive((container) => values.push(
+        `${container.constructor.name}:${container.position.x.toFixed(4)},${container.position.y.toFixed(4)}`,
+      ));
+      return values.sort();
+    };
+
+    expect(positions(first)).toEqual(positions(second));
+    expect(positions(first)).toHaveLength(98);
+    const distant: SupplyContainer[] = [];
+    first.forEachActive((container) => distant.push(container));
+    expect(distant.every((container) => Math.hypot(container.position.x, container.position.y) > 3500)).toBe(true);
   });
 
   it('REQ-14 collects containers when the ship reaches them', () => {
@@ -26,15 +50,18 @@ describe('SupplyField', () => {
     ship.applyControls(1);
     const airBefore = ship.air;
     const fuelBefore = ship.fuel;
-    const field = new SupplyField(ship.position, [
-      new AirContainer({ ...ship.position }, 10),
-      new FuelContainer({ ...ship.position }, 10),
-    ]);
+    const air = new AirContainer({ ...ship.position }, 10);
+    const fuel = new FuelContainer({ ...ship.position }, 10);
+    const field = new SupplyField(ship.position, [air, fuel]);
 
     field.update(0, ship, new AsteroidBelt(ship.position, []));
 
     expect(ship.air).toBeGreaterThan(airBefore);
     expect(ship.fuel).toBeGreaterThan(fuelBefore);
+    const known: SupplyContainer[] = [];
+    field.forEachKnown((container) => known.push(container));
+    expect(known).not.toContain(air);
+    expect(known).not.toContain(fuel);
   });
 
   it('REQ-18 physically collides containers with asteroids', () => {

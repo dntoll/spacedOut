@@ -8,7 +8,7 @@ export class MassiveAsteroidField {
   draw(drawing: Drawing, field: Model.MassiveAsteroidField, shipPosition: Vec2, camera: Camera): void {
     const { width, height } = drawing.size;
     const visibleRange = Math.hypot(width, height) / camera.zoom * 0.7;
-    field.forEach((asteroid) => {
+    field.forEachActive((asteroid) => {
       if (length(sub(asteroid.position, shipPosition)) <= visibleRange + asteroid.radius) {
         this.drawAsteroid(drawing, asteroid, camera.zoom);
       }

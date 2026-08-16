@@ -14,6 +14,7 @@ export class Game {
     const dt = (time - this.lastTime) / 1000;
     this.lastTime = time;
     this.model.setThrustTarget(this.view.getThrustTarget());
+    this.model.setSpawnExclusionRadius(this.view.getSpawnExclusionRadius());
     if (this.view.isPlayerThrusting) this.model.startThrust();
     else this.model.stopThrust();
     this.model.update(dt);

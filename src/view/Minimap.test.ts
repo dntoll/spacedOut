@@ -1,0 +1,60 @@
+import { describe, expect, it, vi } from 'vitest';
+import * as Model from '../model';
+import type { Drawing } from './Drawing';
+import { Camera } from './Camera';
+import { ExplorationMap } from './ExplorationMap';
+import { Minimap } from './Minimap';
+
+describe('Minimap', () => {
+  it('REQ-23 shows explored space and discovered massive asteroids and collectables', () => {
+    const ship = new Model.Ship();
+    const air = new Model.AirContainer({ x: 100, y: 0 });
+    const fuel = new Model.FuelContainer({ x: 1000, y: 0 });
+    const supplyField = new Model.SupplyField(ship.position, [air, fuel], 1);
+    const massive = new Model.MassiveAsteroid(
+      1, { x: -100, y: 0 }, 50, 0, [1, 1, 1, 1], [], 0.5,
+    );
+    const model = {
+      ship,
+      supplyField,
+      massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, [massive]),
+    } as Model.Game;
+    const exploration = new ExplorationMap();
+    exploration.observe({ left: -250, top: -250, right: 250, bottom: 250 });
+    const circle = vi.fn();
+    const polygon = vi.fn();
+    const withTransform = vi.fn((_position, _angle, draw: () => void) => draw());
+    const drawing = {
+      size: { width: 1000, height: 700 },
+      rectangle: vi.fn(),
+      circle,
+      polygon,
+      withClipRectangle: vi.fn((_position, _size, draw: () => void) => draw()),
+      withTransform,
+    } as unknown as Drawing;
+    const camera = new Camera();
+    camera.update(ship.position, 0, 1);
+
+    new Minimap().draw(drawing, exploration, model, camera);
+
+    expect(polygon).toHaveBeenCalledWith(
+      expect.arrayContaining([expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) })]),
+      'rgba(90,112,132,.74)',
+      'rgba(157,203,220,.82)',
+      1,
+    );
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#62e6ff');
+    expect(circle).not.toHaveBeenCalledWith(expect.any(Object), 2.2, '#ffc35c');
+    expect(withTransform).toHaveBeenCalledWith({ x: 870, y: 162 }, ship.angle, expect.any(Function));
+
+    ship.position = { x: 1000, y: 0 };
+    camera.update(ship.position, 0, 1);
+    exploration.observe(camera.getVisibleWorldBounds(drawing.size));
+    circle.mockClear();
+    withTransform.mockClear();
+    new Minimap().draw(drawing, exploration, model, camera);
+
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#ffc35c');
+    expect(withTransform).toHaveBeenCalledWith({ x: 870, y: 162 }, ship.angle, expect.any(Function));
+  });
+});

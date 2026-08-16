@@ -12,16 +12,73 @@ describe('MassiveAsteroidField', () => {
   it('REQ-20 creates immovable asteroids 30–100 ship radii across with concavities and cavities', () => {
     const ship = new Ship();
     const massive: MassiveAsteroid[] = [];
-    new MassiveAsteroidField(ship.position, ship.radius).forEach((asteroid) => massive.push(asteroid));
+    new MassiveAsteroidField(ship.position, ship.radius, undefined, 123).forEachActive((asteroid) => massive.push(asteroid));
 
-    expect(massive).toHaveLength(4);
+    expect(massive).toHaveLength(9);
     for (const asteroid of massive) {
       expect(asteroid.radius).toBeGreaterThanOrEqual(ship.radius * 30);
       expect(asteroid.radius).toBeLessThanOrEqual(ship.radius * 100);
       expect(asteroid.mass).toBe(Number.POSITIVE_INFINITY);
       expect(asteroid.vertices.some((variation) => variation < 0.55)).toBe(true);
-      expect(asteroid.cavities.length).toBeGreaterThanOrEqual(4);
+      expect(asteroid.cavities.length).toBeGreaterThanOrEqual(9);
+      const craterFractions = asteroid.cavities.map((cavity) => cavity.radius / asteroid.radius);
+      expect(craterFractions.some((size) => size < 0.05)).toBe(true);
+      expect(craterFractions.some((size) => size >= 0.08 && size <= 0.12)).toBe(true);
+      expect(craterFractions.some((size) => size >= 0.14)).toBe(true);
+      expect(craterFractions.filter((size) => size < 0.09).length)
+        .toBeGreaterThan(craterFractions.filter((size) => size >= 0.14).length);
+      const polygon = asteroid.vertices.map((variation, index) => {
+        const angle = index / asteroid.vertices.length * Math.PI * 2;
+        return {
+          x: Math.cos(angle) * asteroid.radius * variation,
+          y: Math.sin(angle) * asteroid.radius * variation,
+        };
+      });
+      for (const cavity of asteroid.cavities) {
+        let nearestEdge = Number.POSITIVE_INFINITY;
+        for (let index = 0; index < polygon.length; index++) {
+          const start = polygon[index];
+          const end = polygon[(index + 1) % polygon.length];
+          const edge = { x: end.x - start.x, y: end.y - start.y };
+          const edgeLengthSquared = edge.x * edge.x + edge.y * edge.y;
+          const amount = Math.max(0, Math.min(1,
+            ((cavity.position.x - start.x) * edge.x + (cavity.position.y - start.y) * edge.y)
+              / edgeLengthSquared,
+          ));
+          nearestEdge = Math.min(nearestEdge, Math.hypot(
+            cavity.position.x - (start.x + edge.x * amount),
+            cavity.position.y - (start.y + edge.y * amount),
+          ));
+        }
+        expect(nearestEdge).toBeGreaterThan(cavity.radius);
+      }
+      expect(asteroid.cavities.some((cavity) => Math.hypot(cavity.position.x, cavity.position.y) > asteroid.radius * 0.3))
+        .toBe(true);
     }
+  });
+
+  it('REQ-24 stably spreads massive asteroids through distant world regions', () => {
+    const ship = new Ship();
+    const field = new MassiveAsteroidField(ship.position, ship.radius, undefined, 456);
+    const positions = (active: boolean) => {
+      const values: string[] = [];
+      const visit = (asteroid: MassiveAsteroid) => values.push(
+        `${asteroid.position.x.toFixed(3)},${asteroid.position.y.toFixed(3)}`,
+      );
+      if (active) field.forEachActive(visit);
+      else field.forEachKnown(visit);
+      return values.sort();
+    };
+    const origin = positions(true);
+
+    field.prepareAround({ x: 18000, y: 0 }, 1500);
+    const distant = positions(true);
+    const knownAfterTravel = positions(false);
+    field.prepareAround(ship.position, 1500);
+
+    expect(distant.every((position) => Number(position.split(',')[0]) > 10000)).toBe(true);
+    expect(knownAfterTravel.length).toBeGreaterThan(origin.length);
+    expect(positions(true)).toEqual(origin);
   });
 
   it('REQ-20 remains fixed while ship, asteroid, and container bounce from it', () => {

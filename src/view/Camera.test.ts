@@ -21,4 +21,26 @@ describe('Camera', () => {
     fast.update({ x: 0, y: 0 }, 600, 1);
     expect(fast.zoom).toBeLessThan(slow.zoom);
   });
+
+  it('REQ-23 exposes the camera-visible world bounds for exploration', () => {
+    const camera = new Camera();
+    camera.update({ x: 100, y: 50 }, 0, 1);
+
+    const bounds = camera.getVisibleWorldBounds({ width: 230, height: 115 });
+
+    expect(bounds.left).toBeCloseTo(0);
+    expect(bounds.top).toBeCloseTo(0);
+    expect(bounds.right).toBeCloseTo(200);
+    expect(bounds.bottom).toBeCloseTo(100);
+  });
+
+  it('REQ-25 exposes the zoomed visible radius for offscreen spawning', () => {
+    const slow = new Camera();
+    const fast = new Camera();
+    slow.update({ x: 0, y: 0 }, 0, 1);
+    fast.update({ x: 0, y: 0 }, 600, 1);
+
+    expect(fast.getVisibleWorldRadius({ width: 1000, height: 600 }))
+      .toBeGreaterThan(slow.getVisibleWorldRadius({ width: 1000, height: 600 }));
+  });
 });

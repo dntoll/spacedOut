@@ -21,12 +21,12 @@ export class AsteroidBelt {
     }
   }
 
-  update(dt: number, center: Vec2): void {
+  update(dt: number, center: Vec2, spawnExclusionRadius = 1450): void {
     for (const asteroid of this.asteroids) {
       asteroid.integrate(dt);
     }
     this.resolveInternalCollisions();
-    this.recycleDistantAsteroids(center);
+    this.recycleDistantAsteroids(center, spawnExclusionRadius);
   }
 
   forEach(visitor: (asteroid: Asteroid) => void): void {
@@ -62,10 +62,12 @@ export class AsteroidBelt {
     );
   }
 
-  private recycleDistantAsteroids(center: Vec2): void {
+  private recycleDistantAsteroids(center: Vec2, spawnExclusionRadius: number): void {
+    const spawnInnerRadius = Math.max(1050, spawnExclusionRadius + 180);
+    const recycleRadius = spawnInnerRadius + 800;
     for (let i = 0; i < this.asteroids.length; i++) {
-      if (length(sub(this.asteroids[i].position, center)) > 1900) {
-        this.asteroids[i] = this.createAsteroid(center, 1050, 1450);
+      if (length(sub(this.asteroids[i].position, center)) > recycleRadius) {
+        this.asteroids[i] = this.createAsteroid(center, spawnInnerRadius, spawnInnerRadius + 500);
       }
     }
   }
