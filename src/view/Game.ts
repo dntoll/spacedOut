@@ -6,6 +6,7 @@ import { CollisionEffects } from './CollisionEffects';
 import { Drawing } from './Drawing';
 import { ExhaustTrail } from './ExhaustTrail';
 import { Hud } from './Hud';
+import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { PlayerInput } from './PlayerInput';
 import { Ship } from './Ship';
 import { SpaceBackground } from './SpaceBackground';
@@ -19,6 +20,7 @@ export class Game implements Model.CollisionObserver {
   private readonly background = new SpaceBackground();
   private readonly ship = new Ship();
   private readonly asteroidBelt = new AsteroidBelt();
+  private readonly massiveAsteroidField = new MassiveAsteroidField();
   private readonly supplyField = new SupplyField();
   private readonly exhaustTrail = new ExhaustTrail();
   private readonly collisionEffects = new CollisionEffects();
@@ -44,6 +46,7 @@ export class Game implements Model.CollisionObserver {
 
     this.background.draw(this.drawing, this.camera.worldPosition);
     this.camera.drawWorld(this.drawing, () => {
+      this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera);
       this.exhaustTrail.draw(this.drawing);
       this.collisionEffects.draw(this.drawing);
       this.supplyField.draw(this.drawing, model.supplyField);

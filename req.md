@@ -17,6 +17,9 @@
 - **REQ-16:** Reduce the ship's fuel while it is thrusting.
 - **REQ-17:** Reduce the ship's air over time.
 - **REQ-18:** Allow air and fuel containers to collide physically with asteroids.
+- **REQ-20:** Include immovable massive asteroids that are 30–100 times the ship radius, have irregular concave silhouettes and cavities, and physically collide with the ship, regular asteroids, and supply containers.
+- **REQ-21:** Match massive-asteroid collisions to their irregular visible outline so concave areas do not create invisible collisions outside the rock.
+- **REQ-22:** Treat the ship as a swept sphere: expand polygon edges by the ship radius, cap original edge corners with ship-radius circles, find the earliest collision along the previous-to-current center path, keep the ship outside the obstacle, and handle simultaneous contacts without penetration.
 
 ## View Requirements
 

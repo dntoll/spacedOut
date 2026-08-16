@@ -1,8 +1,8 @@
-import { add, clamp, dot, length, normalize, random, scale, sub } from '../math';
+import { add, length, random, sub } from '../math';
 import type { Vec2 } from '../types';
 import { Asteroid } from './Asteroid';
-import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
+import { CollisionResolver } from './CollisionResolver';
 import type { PhysicsBody } from './PhysicsBody';
 import type { Ship } from './Ship';
 
@@ -21,13 +21,12 @@ export class AsteroidBelt {
     }
   }
 
-  update(dt: number, ship: Ship): void {
+  update(dt: number, center: Vec2): void {
     for (const asteroid of this.asteroids) {
       asteroid.integrate(dt);
-      this.collide(ship, asteroid);
     }
     this.resolveInternalCollisions();
-    this.recycleDistantAsteroids(ship.position);
+    this.recycleDistantAsteroids(center);
   }
 
   forEach(visitor: (asteroid: Asteroid) => void): void {
@@ -85,33 +84,8 @@ export class AsteroidBelt {
   }
 
   private collide(a: PhysicsBody, b: PhysicsBody): void {
-    const delta = sub(b.position, a.position);
-    const distance = length(delta);
-    const overlap = a.radius + b.radius - distance;
-    if (overlap <= 0) return;
-
-    const normal = distance > 0 ? scale(delta, 1 / distance) : { x: 1, y: 0 };
-    const invA = 1 / a.mass;
-    const invB = 1 / b.mass;
-    const correction = scale(normal, overlap / (invA + invB) * 0.82);
-    a.position = sub(a.position, scale(correction, invA));
-    b.position = add(b.position, scale(correction, invB));
-
-    const relative = sub(b.velocity, a.velocity);
-    const closing = dot(relative, normal);
-    if (closing >= 0) return;
-
-    const impulseSize = -(1 + 0.72) * closing / (invA + invB);
-    const impulse = scale(normal, impulseSize);
-    a.velocity = sub(a.velocity, scale(impulse, invA));
-    b.velocity = add(b.velocity, scale(impulse, invB));
-
-    const tangent = normalize(sub(relative, scale(normal, closing)));
-    const scrape = dot(relative, tangent);
-    b.angularVelocity = clamp(b.angularVelocity - scrape / Math.max(25, b.radius) * 0.35, -2.5, 2.5);
-    a.angularVelocity = clamp(a.angularVelocity + scrape * 0.002, -0.8, 0.8);
-
-    const collision = new Collision(add(a.position, scale(normal, a.radius)), normal, -closing);
+    const collision = CollisionResolver.resolve(a, b);
+    if (!collision) return;
     for (const observer of this.collisionObservers) observer.onCollision(collision);
   }
 }

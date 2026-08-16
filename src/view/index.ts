@@ -7,6 +7,7 @@ export { ExhaustParticle } from './ExhaustParticle';
 export { ExhaustTrail } from './ExhaustTrail';
 export { Game } from './Game';
 export { Hud } from './Hud';
+export { MassiveAsteroidField } from './MassiveAsteroidField';
 export { PlayerInput } from './PlayerInput';
 export { Ship } from './Ship';
 export { SpaceBackground } from './SpaceBackground';
