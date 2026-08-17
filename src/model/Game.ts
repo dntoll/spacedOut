@@ -1,6 +1,6 @@
-import type { ControlTuning, Vec2 } from '../types';
-import { AsteroidBelt } from './AsteroidBelt';
+import type { ControlTuning, Vec2 } from '../types';import { AsteroidBelt } from './AsteroidBelt';
 import type { CollisionObserver } from './CollisionObserver';
+import type { DamageObserver } from './DamageObserver';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
@@ -19,9 +19,13 @@ export class Game {
   get speed(): number { return this.ship.speed; }
   get thrusting(): boolean { return this.ship.isThrusting; }
   get thrustAmount(): number { return this.ship.thrustAmount; }
+  get turnRate(): number { return this.ship.turnRate; }
+  get speedFraction(): number { return this.ship.speedFraction; }
+  get isGameOver(): boolean { return !this.ship.isAlive; }
 
   setThrustTarget(target: Vec2): void { this.ship.aimAt(target); }
   setControlTuning(tuning: ControlTuning): void { this.ship.setControlTuning(tuning); }
+  setDirectionalThrust(vec: Vec2 | null): void { this.ship.setDirectionalThrust(vec); }
   startThrust(): void { this.ship.startThrust(); }
   stopThrust(): void { this.ship.stopThrust(); }
   setSpawnExclusionRadius(radius: number): void { this.spawnExclusionRadius = Math.max(0, radius); }
@@ -35,10 +39,13 @@ export class Game {
     this.massiveAsteroidField.removeCollisionObserver(observer);
     this.shipCollisions.removeCollisionObserver(observer);
   }
+  addDamageObserver(observer: DamageObserver): void { this.shipCollisions.addDamageObserver(observer); }
+  removeDamageObserver(observer: DamageObserver): void { this.shipCollisions.removeDamageObserver(observer); }
 
   update(dt: number): void {
     dt = Math.min(dt, 0.033);
     this.elapsed += dt;
+    if (!this.ship.isAlive) return;
     this.ship.updateLifeSupport(dt);
     this.ship.applyControls(dt);
 

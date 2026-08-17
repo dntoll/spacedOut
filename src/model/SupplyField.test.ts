@@ -3,6 +3,7 @@ import { AirContainer } from './AirContainer';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
 import { FuelContainer } from './FuelContainer';
+import { HpContainer } from './HpContainer';
 import { Ship } from './Ship';
 import { SupplyField } from './SupplyField';
 import type { SupplyContainer } from './SupplyContainer';
@@ -12,9 +13,10 @@ describe('SupplyField', () => {
     const containers: SupplyContainer[] = [];
     new SupplyField({ x: 0, y: 0 }, undefined, 1234).forEachActive((container) => containers.push(container));
 
-    expect(containers).toHaveLength(98);
+    expect(containers).toHaveLength(147);
     expect(containers.some((container) => container instanceof AirContainer)).toBe(true);
     expect(containers.some((container) => container instanceof FuelContainer)).toBe(true);
+    expect(containers.some((container) => container instanceof HpContainer)).toBe(true);
     expect(new Set(containers.map((container) => `${container.position.x},${container.position.y}`)).size).toBeGreaterThan(1);
   });
 
@@ -36,7 +38,7 @@ describe('SupplyField', () => {
     };
 
     expect(positions(first)).toEqual(positions(second));
-    expect(positions(first)).toHaveLength(98);
+    expect(positions(first)).toHaveLength(147);
     const distant: SupplyContainer[] = [];
     first.forEachActive((container) => distant.push(container));
     expect(distant.every((container) => Math.hypot(container.position.x, container.position.y) > 3500)).toBe(true);
@@ -77,5 +79,25 @@ describe('SupplyField', () => {
     expect(container.velocity.x).toBeLessThan(0);
     expect(asteroid.velocity.x).toBeGreaterThan(-30);
     expect(asteroid.angularVelocity).not.toBe(0);
+  });
+
+  it('REQ-34 spreads repair containers that restore hull when collected', () => {
+    const field = new SupplyField({ x: 0, y: 0 }, undefined, 4242);
+    const spread: SupplyContainer[] = [];
+    field.forEachActive((container) => spread.push(container));
+    expect(spread.some((container) => container instanceof HpContainer)).toBe(true);
+
+    const ship = new Ship();
+    ship.takeDamage(40);
+    expect(ship.hp).toBe(60);
+    const hp = new HpContainer({ ...ship.position }, 30);
+    const repairField = new SupplyField(ship.position, [hp]);
+
+    repairField.update(0, ship, new AsteroidBelt(ship.position, []));
+
+    expect(ship.hp).toBe(90);
+    const known: SupplyContainer[] = [];
+    repairField.forEachKnown((container) => known.push(container));
+    expect(known).not.toContain(hp);
   });
 });

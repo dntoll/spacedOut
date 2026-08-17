@@ -89,7 +89,11 @@ export class Minimap {
       drawing.circle(
         this.toMap(container.position, center, position, size),
         2.2,
-        container instanceof Model.AirContainer ? '#62e6ff' : '#ffc35c',
+        container instanceof Model.AirContainer
+          ? '#62e6ff'
+          : container instanceof Model.HpContainer
+            ? '#5dff9a'
+            : '#ffc35c',
       );
     });
   }

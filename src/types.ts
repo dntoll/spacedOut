@@ -5,3 +5,8 @@ export interface ControlTuning {
   thrustAccel: number;
   maxSpeed: number;
 }
+
+export interface DirectionalThrust {
+  vec: Vec2;
+  level: number;
+}

@@ -5,6 +5,8 @@ export class ExplorationMap {
   static readonly cellSize = 250;
   private readonly exploredRows = new Map<number, Set<number>>();
 
+  reset(): void { this.exploredRows.clear(); }
+
   observe(bounds: WorldBounds): void {
     this.forEachCoordinate(bounds, (column, row) => {
       let rows = this.exploredRows.get(column);

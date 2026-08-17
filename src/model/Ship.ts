@@ -1,16 +1,25 @@
 import { add, clamp, dot, length, scale, sub } from '../math';
-import type { ControlTuning, Vec2 } from '../types';
+import type { ControlTuning, DirectionalThrust, Vec2 } from '../types';
 import { BodyMass } from './BodyMass';
 import { PhysicsBody } from './PhysicsBody';
+
+const RAMP_UP = 3;
+const RAMP_DOWN = 6;
 
 export class Ship extends PhysicsBody {
   private aimTarget: Vec2 = { x: 0, y: -100 };
   private throttle = 0;
   private airLevel = 100;
   private fuelLevel = 100;
+  private hpLevel = 100;
+  private invulnerableTime = 0;
+  private alive = true;
   private dampening = 1.5;
   private thrustAccel = 170;
   private maxSpeed = 650;
+  private turningRate = 0;
+  private directionalVec: Vec2 | null = null;
+  private directionalLevel = 0;
 
   constructor() {
     const radius = 18;
@@ -25,10 +34,20 @@ export class Ship extends PhysicsBody {
   }
 
   get speed(): number { return length(this.velocity); }
-  get isThrusting(): boolean { return this.throttle > 0; }
-  get thrustAmount(): number { return this.throttle; }
+  get isThrusting(): boolean { return this.throttle > 0 || this.directionalLevel > 0.0001; }
+  get thrustAmount(): number { return Math.max(this.throttle, this.directionalLevel); }
+  get pointerThrust(): number { return this.throttle; }
   get air(): number { return this.airLevel; }
   get fuel(): number { return this.fuelLevel; }
+  get hp(): number { return this.hpLevel; }
+  get isInvulnerable(): boolean { return this.invulnerableTime > 0; }
+  get isAlive(): boolean { return this.alive; }
+  get turnRate(): number { return this.turningRate; }
+  get speedFraction(): number { return this.maxSpeed > 0 ? clamp(this.speed / this.maxSpeed, 0, 1) : 0; }
+  get directionalThrust(): DirectionalThrust | null {
+    if (this.directionalLevel <= 0.0001 || !this.directionalVec) return null;
+    return { vec: { ...this.directionalVec }, level: this.directionalLevel };
+  }
 
   aimAt(target: Vec2): void { this.aimTarget = { ...target }; }
 
@@ -37,6 +56,8 @@ export class Ship extends PhysicsBody {
     this.thrustAccel = Math.max(0, tuning.thrustAccel);
     this.maxSpeed = Math.max(0, tuning.maxSpeed);
   }
+
+  setDirectionalThrust(vec: Vec2 | null): void { this.directionalVec = vec ? { ...vec } : null; }
 
   startThrust(): void {
     if (this.fuelLevel <= 0) {
@@ -50,25 +71,71 @@ export class Ship extends PhysicsBody {
   stopThrust(): void { this.throttle = 0; }
   collectAir(amount: number): void { this.airLevel = clamp(this.airLevel + amount, 0, 100); }
   collectFuel(amount: number): void { this.fuelLevel = clamp(this.fuelLevel + amount, 0, 100); }
+  takeDamage(amount: number): void {
+    this.hpLevel = Math.max(0, this.hpLevel - amount);
+    if (this.hpLevel === 0) this.alive = false;
+    this.invulnerableTime = 0.5;
+  }
+  repair(amount: number): void {
+    if (!this.alive) return;
+    this.hpLevel = clamp(this.hpLevel + amount, 0, 100);
+  }
 
   updateLifeSupport(dt: number): void {
     this.airLevel = Math.max(0, this.airLevel - dt * 0.7);
+    this.invulnerableTime = Math.max(0, this.invulnerableTime - dt);
   }
 
   applyControls(dt: number): void {
     const aim = sub(this.aimTarget, this.position);
-    if (length(aim) > 3) this.angle = Math.atan2(aim.y, aim.x);
-    if (!this.isThrusting) return;
+    if (length(aim) > 3) {
+      const target = Math.atan2(aim.y, aim.x);
+      const delta = Math.atan2(Math.sin(target - this.angle), Math.cos(target - this.angle));
+      this.angle = target;
+      this.turningRate = dt > 0 ? Math.abs(delta) / dt : 0;
+    } else {
+      this.turningRate = 0;
+    }
+
+    if (this.directionalVec) this.directionalLevel = Math.min(1, this.directionalLevel + RAMP_UP * dt);
+    else this.directionalLevel = Math.max(0, this.directionalLevel - RAMP_DOWN * dt);
+    if (this.directionalLevel <= 0.0001 && !this.directionalVec) this.directionalVec = null;
+
+    const ptrActive = this.throttle > 0;
+    const dirActive = this.directionalLevel > 0.0001 && this.directionalVec !== null;
+    if (!ptrActive && !dirActive) return;
 
     const forward = { x: Math.cos(this.angle), y: Math.sin(this.angle) };
-    const forwardSpeed = Math.max(0, dot(this.velocity, forward));
-    const nonForward = sub(this.velocity, scale(forward, forwardSpeed));
-    const dampFactor = Math.exp(-this.dampening * dt);
-    this.velocity = add(scale(forward, forwardSpeed), scale(nonForward, dampFactor));
+    let thrustDirWorld: Vec2 = { x: 0, y: 0 };
+    if (ptrActive) thrustDirWorld = add(thrustDirWorld, scale(forward, this.throttle));
+    if (dirActive) {
+      const dv = this.directionalVec!;
+      const dirWorld = this.rotate(dv, this.angle);
+      thrustDirWorld = add(thrustDirWorld, scale(dirWorld, this.directionalLevel));
+    }
+    const tmag = length(thrustDirWorld);
+    if (tmag < 0.0001) return;
+    const tdir = scale(thrustDirWorld, 1 / tmag);
+    const tmagClamped = Math.min(1, tmag);
 
-    this.velocity = add(this.velocity, scale(forward, this.thrustAccel * this.throttle * dt));
-    this.fuelLevel = Math.max(0, this.fuelLevel - 5 * this.throttle * dt);
-    if (this.fuelLevel <= 0) this.throttle = 0;
+    const along = Math.max(0, dot(this.velocity, tdir));
+    const across = sub(this.velocity, scale(tdir, along));
+    const dampFactor = Math.exp(-this.dampening * dt);
+    this.velocity = add(scale(tdir, along), scale(across, dampFactor));
+
+    this.velocity = add(this.velocity, scale(tdir, this.thrustAccel * tmagClamped * dt));
+    this.fuelLevel = Math.max(0, this.fuelLevel - 5 * tmagClamped * dt);
+    if (this.fuelLevel <= 0) {
+      this.throttle = 0;
+      this.directionalLevel = 0;
+      this.directionalVec = null;
+    }
     if (this.speed > this.maxSpeed) this.velocity = scale(this.velocity, this.maxSpeed / this.speed);
+  }
+
+  private rotate(v: Vec2, angle: number): Vec2 {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
   }
 }

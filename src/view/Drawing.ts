@@ -120,6 +120,15 @@ export class Drawing {
 
   onResize(listener: () => void): void { window.addEventListener('resize', listener); }
   onBlur(listener: () => void): void { window.addEventListener('blur', listener); }
+  onKeyDown(listener: (key: string) => void): void {
+    window.addEventListener('keydown', (event) => {
+      if (event.repeat) return;
+      listener(event.key);
+    });
+  }
+  onKeyUp(listener: (key: string) => void): void {
+    window.addEventListener('keyup', (event) => { listener(event.key); });
+  }
   onPointerMove(listener: (pointer: PointerPosition) => void): void { this.onPointer('pointermove', listener); }
   onPointerDown(listener: (pointer: PointerPosition) => void): void { this.onPointer('pointerdown', listener); }
   onPointerUp(listener: (pointer: PointerPosition) => void): void { this.onPointer('pointerup', listener); }

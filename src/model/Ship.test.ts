@@ -46,6 +46,38 @@ describe('Ship controls', () => {
     expect(ship.air).toBeLessThan(airBefore);
   });
 
+  it('REQ-33 tracks hull hit-points, damage, and repair', () => {
+    const ship = new Ship();
+    expect(ship.hp).toBe(100);
+    ship.takeDamage(30);
+    expect(ship.hp).toBe(70);
+    ship.takeDamage(50);
+    expect(ship.hp).toBe(20);
+    ship.repair(40);
+    expect(ship.hp).toBe(60);
+    ship.repair(200);
+    expect(ship.hp).toBe(100);
+  });
+
+  it('REQ-35 becomes invulnerable for 0.5s after taking damage', () => {
+    const ship = new Ship();
+    expect(ship.isInvulnerable).toBe(false);
+    ship.takeDamage(10);
+    expect(ship.isInvulnerable).toBe(true);
+    ship.updateLifeSupport(0.4);
+    expect(ship.isInvulnerable).toBe(true);
+    ship.updateLifeSupport(0.2);
+    expect(ship.isInvulnerable).toBe(false);
+  });
+
+  it('REQ-36 dies when hit-points reach zero', () => {
+    const ship = new Ship();
+    expect(ship.isAlive).toBe(true);
+    ship.takeDamage(100);
+    expect(ship.hp).toBe(0);
+    expect(ship.isAlive).toBe(false);
+  });
+
   it('REQ-26 dampens lateral velocity more at higher dampening rates', () => {
     const soft = new Ship();
     soft.setControlTuning({ dampening: 0.5, thrustAccel: 0, maxSpeed: 650 });
@@ -83,5 +115,41 @@ describe('Ship controls', () => {
     ship.startThrust();
     ship.applyControls(0.1);
     expect(ship.velocity.y).toBeCloseTo(25, 5);
+  });
+
+  it('REQ-37 ramps directional thrust up while held and down when released', () => {
+    const ship = new Ship();
+    ship.aimAt({ x: 100, y: 0 });
+    ship.applyControls(0);
+    ship.setDirectionalThrust({ x: 1, y: 0 });
+    ship.applyControls(0.1);
+    expect(ship.directionalThrust?.level).toBeGreaterThan(0);
+    expect(ship.directionalThrust?.level).toBeLessThan(1);
+    ship.applyControls(0.3);
+    expect(ship.directionalThrust?.level).toBeCloseTo(1, 1);
+    ship.setDirectionalThrust(null);
+    ship.applyControls(0.1);
+    expect(ship.directionalThrust).toBeNull();
+  });
+
+  it('REQ-37 thrusts forward along the ship axis when W is held', () => {
+    const ship = new Ship();
+    ship.setControlTuning({ dampening: 0, thrustAccel: 100, maxSpeed: 650 });
+    ship.aimAt({ x: 100, y: 0 });
+    ship.applyControls(0);
+    ship.setDirectionalThrust({ x: 1, y: 0 });
+    for (let i = 0; i < 10; i++) ship.applyControls(0.1);
+    expect(ship.velocity.x).toBeGreaterThan(0);
+    expect(ship.velocity.y).toBeCloseTo(0, 4);
+  });
+
+  it('REQ-37 thrusts sideways when A is held', () => {
+    const ship = new Ship();
+    ship.setControlTuning({ dampening: 0, thrustAccel: 100, maxSpeed: 650 });
+    ship.aimAt({ x: 100, y: 0 });
+    ship.applyControls(0);
+    ship.setDirectionalThrust({ x: 0, y: -1 });
+    for (let i = 0; i < 10; i++) ship.applyControls(0.1);
+    expect(ship.velocity.y).toBeLessThan(0);
   });
 });

@@ -2,6 +2,7 @@ import type { Vec2 } from '../types';
 import { AirContainer } from './AirContainer';
 import type { AsteroidBelt } from './AsteroidBelt';
 import { FuelContainer } from './FuelContainer';
+import { HpContainer } from './HpContainer';
 import { RandomSequence } from './RandomSequence';
 import type { Ship } from './Ship';
 import type { SupplyContainer } from './SupplyContainer';
@@ -29,6 +30,7 @@ export class SupplyRegion {
     this.containers.push(
       new AirContainer(this.createPosition(regionSize, random)),
       new FuelContainer(this.createPosition(regionSize, random)),
+      new HpContainer(this.createPosition(regionSize, random)),
     );
   }
 

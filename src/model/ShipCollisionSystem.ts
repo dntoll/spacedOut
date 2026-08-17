@@ -1,11 +1,16 @@
 import { add, dot, length, normalize, scale, sub } from '../math';
 import type { CollisionObserver } from './CollisionObserver';
 import { CollisionResolver } from './CollisionResolver';
+import { Damage } from './Damage';
+import type { DamageObserver } from './DamageObserver';
+import { DamageCalculator } from './DamageCalculator';
+import { MassiveAsteroid } from './MassiveAsteroid';
 import type { Ship } from './Ship';
 import { SweptCircleCollision, type PolygonObstacle, type SweepHit } from './SweptCircleCollision';
 
 export class ShipCollisionSystem {
   private readonly collisionObservers = new Set<CollisionObserver>();
+  private readonly damageObservers = new Set<DamageObserver>();
 
   resolve(ship: Ship, obstacles: PolygonObstacle[], dt: number): void {
     let start = { ...ship.previousPosition };
@@ -39,6 +44,12 @@ export class ShipCollisionSystem {
         ship.velocity = { ...incomingVelocity };
         const collision = CollisionResolver.resolveSweptContact(ship, hit.obstacle, hit.normal);
         combinedVelocityChange = add(combinedVelocityChange, sub(ship.velocity, incomingVelocity));
+        const damage = DamageCalculator.damageFor(collision.impactSpeed, hit.obstacle instanceof MassiveAsteroid);
+        if (damage > 0 && !ship.isInvulnerable) {
+          ship.takeDamage(damage);
+          const origin = ship.isAlive ? collision.position : ship.position;
+          for (const observer of this.damageObservers) observer.onDamage(new Damage({ ...origin }, damage, !ship.isAlive));
+        }
         for (const observer of this.collisionObservers) observer.onCollision(collision);
       }
       ship.velocity = add(incomingVelocity, combinedVelocityChange);
@@ -58,4 +69,6 @@ export class ShipCollisionSystem {
 
   addCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.add(observer); }
   removeCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.delete(observer); }
+  addDamageObserver(observer: DamageObserver): void { this.damageObservers.add(observer); }
+  removeDamageObserver(observer: DamageObserver): void { this.damageObservers.delete(observer); }
 }

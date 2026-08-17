@@ -9,67 +9,113 @@ import { ExplorationMap } from './ExplorationMap';
 import { Hud } from './Hud';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Minimap } from './Minimap';
+import { MusicSystem } from './MusicSystem';
 import { PlayerInput } from './PlayerInput';
 import { SettingsMenu } from './SettingsMenu';
 import { Ship } from './Ship';
 import { SpaceBackground } from './SpaceBackground';
+import { SpaceDust } from './SpaceDust';
+import { StorageAdapter } from './StorageAdapter';
 import { SupplyField } from './SupplyField';
 
-export class Game implements Model.CollisionObserver {
+export class Game implements Model.CollisionObserver, Model.DamageObserver {
   private readonly drawing: Drawing;
   private readonly camera = new Camera();
   private readonly hud = new Hud();
-  private readonly settings = new SettingsMenu();
+  private readonly settings: SettingsMenu;
   private readonly input: PlayerInput;
   private readonly background = new SpaceBackground();
   private readonly ship = new Ship();
   private readonly asteroidBelt = new AsteroidBelt();
   private readonly massiveAsteroidField = new MassiveAsteroidField();
   private readonly supplyField = new SupplyField();
-  private readonly exhaustTrail = new ExhaustTrail();
+  private readonly spaceDust = new SpaceDust();
+  private readonly exhaustTrail: ExhaustTrail;
   private readonly collisionEffects = new CollisionEffects();
   private readonly explorationMap = new ExplorationMap();
   private readonly minimap = new Minimap();
+  private readonly music = MusicSystem.create();
+  private readonly gameOverNode = document.querySelector<HTMLElement>('#game-over');
+  private restartRequested = false;
 
   constructor(canvasSelector: string) {
     this.drawing = new Drawing(canvasSelector);
+    this.settings = new SettingsMenu(new StorageAdapter(this.localStorage()));
+    this.exhaustTrail = new ExhaustTrail((position, velocity) => this.spaceDust.adopt(position, velocity));
     this.input = new PlayerInput(this.drawing, () => this.hud.dismissHint());
     this.resize();
     this.drawing.onResize(() => this.resize());
+    this.gameOverNode?.addEventListener('click', () => { this.restartRequested = true; });
   }
 
   get isPlayerThrusting(): boolean { return this.input.isThrusting; }
   getThrustTarget(): Vec2 { return this.input.getTarget(this.camera); }
+  getDirectionalThrust(): Vec2 | null { return this.input.getDirectionalThrust(); }
   getSpawnExclusionRadius(): number { return this.camera.getVisibleWorldRadius(this.drawing.size); }
   getControlTuning(): ControlTuning { return this.settings.getControlTuning(); }
+  getMusicLevel(): number { return this.settings.getMusicLevel(); }
 
   onCollision(collision: Model.Collision): void {
     this.collisionEffects.emit(collision);
   }
 
+  onDamage(damage: Model.Damage): void {
+    this.collisionEffects.emitDamageBurst(damage.position);
+    if (damage.lethal) this.collisionEffects.emitExplosion(damage.position);
+  }
+
+  consumeRestartRequest(): boolean {
+    if (this.restartRequested) {
+      this.restartRequested = false;
+      return true;
+    }
+    return false;
+  }
+
+  reset(): void {
+    this.explorationMap.reset();
+    this.spaceDust.reset();
+    this.exhaustTrail.reset();
+    this.collisionEffects.reset();
+  }
+
   render(model: Model.Game, dt: number): void {
     this.camera.update(model.ship.position, model.speed, dt);
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
-    this.exhaustTrail.update(dt, model.ship);
+    this.exhaustTrail.update(dt, model.ship, this.camera, this.drawing.size);
+    this.spaceDust.update(dt, model, this.camera, this.drawing.size);
     this.collisionEffects.update(dt);
+    this.music.setThresholds(this.settings.getMusicThresholds());
+    this.music.update({ thrust: model.thrustAmount, turn: model.turnRate, speed: model.speedFraction }, this.getMusicLevel(), dt);
+    const particleVisibility = this.settings.getParticleVisibility();
+    this.spaceDust.setVisibility(particleVisibility);
+    this.exhaustTrail.setVisibility(particleVisibility);
+    this.collisionEffects.setVisibility(particleVisibility);
 
     this.background.draw(this.drawing, this.camera.worldPosition);
     this.camera.drawWorld(this.drawing, () => {
       this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera);
+      this.spaceDust.draw(this.drawing);
       this.exhaustTrail.draw(this.drawing);
       this.collisionEffects.draw(this.drawing);
       this.supplyField.draw(this.drawing, model.supplyField);
       this.asteroidBelt.draw(this.drawing, model.asteroidBelt, model.ship.position, this.camera);
-      this.ship.draw(this.drawing, model.ship);
+      if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship);
     });
     this.background.drawVignette(this.drawing);
     this.minimap.draw(this.drawing, this.explorationMap, model, this.camera);
     this.hud.updateSpeed(model.speed);
-    this.hud.updateResources(model.ship.air, model.ship.fuel);
+    this.hud.updateResources(model.ship.air, model.ship.fuel, model.ship.hp);
+    if (model.isGameOver) this.gameOverNode?.classList.remove('hidden');
+    else this.gameOverNode?.classList.add('hidden');
   }
 
   private resize(): void {
     this.drawing.resize();
     this.background.resize(this.drawing.size);
+  }
+
+  private localStorage(): Storage | null {
+    try { return window.localStorage; } catch { return null; }
   }
 }

@@ -30,6 +30,26 @@
           <input type="range" id="maxspeed-slider" min="100" max="1500" step="50" value="650" />
           <output id="maxspeed-value">650</output>
         </div>
+        <div class="settings-row">
+          <label for="music-slider">MUSIC</label>
+          <input type="range" id="music-slider" min="0" max="100" step="1" value="50" />
+          <output id="music-value">50</output>
+        </div>
+        <div class="settings-row">
+          <label for="medium-slider">MEDIUM</label>
+          <input type="range" id="medium-slider" min="0" max="100" step="1" value="25" />
+          <output id="medium-value">25</output>
+        </div>
+        <div class="settings-row">
+          <label for="action-slider">ACTION</label>
+          <input type="range" id="action-slider" min="0" max="100" step="1" value="60" />
+          <output id="action-value">60</output>
+        </div>
+        <div class="settings-row">
+          <label for="particle-slider">PARTICLES</label>
+          <input type="range" id="particle-slider" min="0" max="100" step="5" value="100" />
+          <output id="particle-value">100</output>
+        </div>
       </div>
       <div class="speed"><span id="speed">000</span><small>m/s</small></div>
       <div class="resources" aria-label="Ship resources">
@@ -41,11 +61,19 @@
           <div class="resource-label"><span>FUEL</span><b id="fuel-value">100</b></div>
           <div class="resource-track"><i id="fuel-fill"></i></div>
         </div>
+        <div class="resource hp">
+          <div class="resource-label"><span>HULL</span><b id="hp-value">100</b></div>
+          <div class="resource-track"><i id="hp-fill"></i></div>
+        </div>
       </div>
       <div class="hint" id="hint">
         <strong>HOLD TO THRUST</strong>
         <span>Point to steer · momentum carries you</span>
       </div>
+    </div>
+    <div class="game-over hidden" id="game-over">
+      <strong>GAME OVER</strong>
+      <span>click to launch a new flight</span>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

@@ -1,10 +1,15 @@
 import { random, scale } from '../math';
 import type * as Model from '../model';
+import type { Vec2 } from '../types';
 import { CollisionParticle } from './CollisionParticle';
 import type { Drawing } from './Drawing';
 
 export class CollisionEffects {
   private particles: CollisionParticle[] = [];
+  private visibility = 1;
+
+  setVisibility(v: number): void { this.visibility = Math.max(0, v); }
+  reset(): void { this.particles = []; }
 
   emit(collision: Model.Collision): void {
     const count = Math.min(28, Math.max(4, Math.round(collision.impactSpeed * 0.12)));
@@ -25,6 +30,39 @@ export class CollisionEffects {
     }
   }
 
+  emitDamageBurst(position: Vec2): void {
+    this.burst(position, 40, 40, 220, 0.25, 0.7, 1.5, 3.8);
+  }
+
+  emitExplosion(position: Vec2): void {
+    this.burst(position, 150, 30, 380, 0.4, 1.2, 2, 5.5);
+  }
+
+  private burst(
+    position: Vec2,
+    count: number,
+    speedMin: number,
+    speedMax: number,
+    lifeMin: number,
+    lifeMax: number,
+    sizeMin: number,
+    sizeMax: number,
+  ): void {
+    for (let i = 0; i < count; i++) {
+      const angle = random(0, Math.PI * 2);
+      const speed = random(speedMin, speedMax);
+      const life = random(lifeMin, lifeMax);
+      this.particles.push(new CollisionParticle(
+        { ...position },
+        scale({ x: Math.cos(angle), y: Math.sin(angle) }, speed),
+        life,
+        life,
+        random(sizeMin, sizeMax),
+        random(0.6, 1),
+      ));
+    }
+  }
+
   update(dt: number): void {
     for (const particle of this.particles) particle.update(dt);
     this.particles = this.particles.filter((particle) => particle.isAlive);
@@ -35,8 +73,8 @@ export class CollisionEffects {
       for (const particle of this.particles) {
         const life = particle.life / particle.maxLife;
         const color = particle.heat > 0.78
-          ? `rgba(220,250,255,${life})`
-          : `rgba(70,180,255,${life * 0.8})`;
+          ? `rgba(220,250,255,${life * this.visibility})`
+          : `rgba(70,180,255,${life * 0.8 * this.visibility})`;
         drawing.circle(particle.position, particle.size * life, color);
       }
     });
