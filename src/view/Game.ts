@@ -113,7 +113,19 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.sounds.reset();
   }
 
+  private anyHuntingDroneOnScreen(model: Model.Game): boolean {
+    const bounds = this.camera.getVisibleWorldBounds(this.drawing.size);
+    let found = false;
+    model.droneField.forEach((drone) => {
+      if (found || !drone.isHunting) return;
+      if (drone.position.x >= bounds.left && drone.position.x <= bounds.right
+        && drone.position.y >= bounds.top && drone.position.y <= bounds.bottom) found = true;
+    });
+    return found;
+  }
+
   render(model: Model.Game, dt: number): void {
+    this.camera.setBaseZoom(this.settings.getDefaultZoomLevel());
     this.camera.update(model.ship.position, model.speed, dt);
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
     this.particleField.update(dt, model, this.camera, this.drawing.size);
@@ -124,6 +136,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.particleField.setVisibility(particleVisibility);
     this.sounds.setSettings(this.settings.getSfxSettings());
     this.sounds.setThrusting(model.ship.isAlive && model.thrusting);
+    this.sounds.setDroneThrusting(this.anyHuntingDroneOnScreen(model));
     this.sounds.update();
 
     this.background.draw(this.drawing, this.camera.worldPosition);
@@ -140,7 +153,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.minimap.draw(this.drawing, this.explorationMap, model, this.camera);
     this.intensityMeter.draw(this.drawing, this.music.intensity, this.settings.getMusicThresholds(), this.music.activeCategory, this.drawing.size);
     this.hud.updateSpeed(model.speed);
-    this.hud.updateResources(model.ship.air, model.ship.fuel, model.ship.hp, model.ship.ammo);
+    this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);
     if (model.isGameOver) this.gameOverNode?.classList.remove('hidden');
     else this.gameOverNode?.classList.add('hidden');
   }

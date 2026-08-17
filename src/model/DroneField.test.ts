@@ -133,6 +133,50 @@ describe('DroneField', () => {
     expect(field2.has(tough)).toBe(false);
   });
 
+  it('REQ-48 a drone that survives a laser hit instantly becomes a hunter', () => {
+    const asteroid = new Asteroid(1, { x: 400, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const ship = new Ship();
+    const drone = new Drone(asteroid, 0, [1, 1, 1], 3);
+    const field = new DroneField([drone]);
+    field.update(0, ship, belt, emptyMassive(), 0);
+    expect(drone.host).toBe(asteroid);
+
+    field.applyLaserHit(drone, { ...drone.position });
+
+    expect(field.has(drone)).toBe(true);
+    expect(drone.isHunting).toBe(true);
+    expect(drone.hp).toBe(2);
+  });
+
+  it('REQ-48 firing on the same screen as an attached drone awakens it', () => {
+    const ship = new Ship();
+    const asteroid = new Asteroid(1, { x: 600, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const onScreen = new Drone(asteroid, 0, [1, 1, 1], 2);
+    const field = new DroneField([onScreen]);
+    field.update(0, ship, belt, emptyMassive(), 0);
+    expect(onScreen.host).toBe(asteroid);
+
+    field.awakenNearby(ship, 1000);
+
+    expect(onScreen.isHunting).toBe(true);
+  });
+
+  it('REQ-48 leaves attached drones beyond the screen asleep when firing', () => {
+    const ship = new Ship();
+    const asteroid = new Asteroid(1, { x: 2000, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const offScreen = new Drone(asteroid, 0, [1, 1, 1], 2);
+    const field = new DroneField([offScreen]);
+    field.update(0, ship, belt, emptyMassive(), 0);
+
+    field.awakenNearby(ship, 1000);
+
+    expect(offScreen.isHunting).toBe(false);
+    expect(offScreen.host).toBe(asteroid);
+  });
+
   it('REQ-48 spawns drones attached to asteroids beyond the visible boundary', () => {
     const asteroid = new Asteroid(1, { x: 2000, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
     const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);

@@ -31,13 +31,17 @@ interface Harness {
   system: SoundSystem;
   audio: FakeThrustAudio;
   thrust: ThrustSound;
+  droneAudio: FakeThrustAudio;
+  droneThrust: ThrustSound;
 }
 
 function harness(clips: Partial<Record<SfxChannel, SoundClip[]>>, rng: () => number = () => 0): Harness {
   const audio = new FakeThrustAudio();
   const thrust = new ThrustSound(audio, { startFraction: 0.1, endFraction: 0.1 });
-  const system = new SoundSystem(clips, thrust, { rng });
-  return { system, audio, thrust };
+  const droneAudio = new FakeThrustAudio();
+  const droneThrust = new ThrustSound(droneAudio, { startFraction: 0.1, endFraction: 0.1 });
+  const system = new SoundSystem(clips, thrust, { rng, droneThrust });
+  return { system, audio, thrust, droneAudio, droneThrust };
 }
 
 const fullSettings = (overrides: Partial<typeof DEFAULT_SFX_SETTINGS> = {}) => ({ ...DEFAULT_SFX_SETTINGS, ...overrides });
@@ -201,5 +205,30 @@ describe('SoundSystem', () => {
 
     expect(thrust.currentPhase).toBe('idle');
     expect(audio.playing).toBe(false);
+  });
+
+  it('REQ-45 plays the drone thrust sound at a lower volume than the ship thrust', () => {
+    const { system, droneAudio, droneThrust } = harness({});
+    system.unlock();
+    system.setSettings(fullSettings({ master: 1, thrust: 1 }));
+
+    system.setDroneThrusting(true);
+
+    expect(droneThrust.currentPhase).toBe('starting');
+    expect(droneAudio.playing).toBe(true);
+    expect(droneAudio.volume).toBeLessThan(1);
+    expect(droneAudio.volume).toBeGreaterThan(0);
+  });
+
+  it('REQ-45 starts and stops the drone thrust sound independently of the ship thrust', () => {
+    const { system, audio, droneAudio, droneThrust } = harness({});
+    system.unlock();
+
+    system.setDroneThrusting(true);
+    expect(droneAudio.playing).toBe(true);
+    expect(audio.playing).toBe(false);
+
+    system.setDroneThrusting(false);
+    expect(droneThrust.currentPhase).toBe('ending');
   });
 });

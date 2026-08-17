@@ -45,18 +45,23 @@ const ONE_SHOT_CHANNELS: readonly SfxChannel[] = [
   SfxChannel.Collectable,
 ];
 
+const DRONE_THRUST_VOLUME_SCALE = 0.35;
+
 export interface SoundSystemOptions {
   window?: Window;
   rng?: () => number;
+  droneThrust?: ThrustSound;
 }
 
 export class SoundSystem {
   private readonly clips: Record<SfxChannel, SoundClip[]>;
   private readonly thrust: ThrustSound;
+  private readonly droneThrust: ThrustSound;
   private readonly rng: () => number;
   private volumes: SfxSettings = { ...DEFAULT_SFX_SETTINGS };
   private unlocked = false;
   private thrustActive = false;
+  private droneThrustActive = false;
 
   constructor(
     clips: Partial<Record<SfxChannel, SoundClip[]>>,
@@ -69,6 +74,7 @@ export class SoundSystem {
       if (provided) this.clips[channel] = [...provided];
     }
     this.thrust = thrust;
+    this.droneThrust = options?.droneThrust ?? thrust;
     this.rng = options?.rng ?? Math.random;
     if (options?.window) this.attachUnlock(options.window);
   }
@@ -90,7 +96,9 @@ export class SoundSystem {
     }
     const thrustAudio = thrustUrl ? new HtmlThrustAudio(thrustUrl) : new NullThrustAudio();
     const thrust = new ThrustSound(thrustAudio, DEFAULT_THRUST_SPLITS);
-    return new SoundSystem(clips, thrust, { window });
+    const droneAudio = thrustUrl ? new HtmlThrustAudio(thrustUrl) : new NullThrustAudio();
+    const droneThrust = new ThrustSound(droneAudio, DEFAULT_THRUST_SPLITS);
+    return new SoundSystem(clips, thrust, { window, droneThrust });
   }
 
   unlock(): void { this.unlocked = true; }
@@ -98,6 +106,7 @@ export class SoundSystem {
   setSettings(settings: SfxSettings): void {
     this.volumes = clampSettings(settings);
     this.applyThrustVolume();
+    this.applyDroneThrustVolume();
   }
 
   setThrusting(active: boolean): void {
@@ -115,11 +124,28 @@ export class SoundSystem {
     }
   }
 
-  update(): void { this.thrust.update(); }
+  setDroneThrusting(active: boolean): void {
+    if (!this.unlocked) {
+      if (this.droneThrustActive) { this.droneThrust.reset(); this.droneThrustActive = false; }
+      return;
+    }
+    if (active && !this.droneThrustActive) {
+      this.applyDroneThrustVolume();
+      this.droneThrust.start();
+      this.droneThrustActive = true;
+    } else if (!active && this.droneThrustActive) {
+      this.droneThrust.stop();
+      this.droneThrustActive = false;
+    }
+  }
+
+  update(): void { this.thrust.update(); this.droneThrust.update(); }
 
   reset(): void {
     this.thrust.reset();
     this.thrustActive = false;
+    this.droneThrust.reset();
+    this.droneThrustActive = false;
   }
 
   onLaserShot(): void { this.playOneshot(SfxChannel.LaserShot); }
@@ -151,6 +177,10 @@ export class SoundSystem {
 
   private applyThrustVolume(): void {
     this.thrust.setVolume(this.volumes.master * this.volumes.thrust);
+  }
+
+  private applyDroneThrustVolume(): void {
+    this.droneThrust.setVolume(this.volumes.master * this.volumes.thrust * DRONE_THRUST_VOLUME_SCALE);
   }
 
   private attachUnlock(win: Window): void {

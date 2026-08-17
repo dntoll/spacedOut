@@ -12,13 +12,16 @@ export interface WorldBounds {
 export class Camera {
   private position: Vec2 = { x: 0, y: 0 };
   private zoomLevel = 1;
+  private baseZoom = 1.15;
 
   get worldPosition(): Vec2 { return { ...this.position }; }
   get zoom(): number { return this.zoomLevel; }
 
+  setBaseZoom(zoom: number): void { this.baseZoom = clamp(zoom, 0.5, 2); }
+
   update(target: Vec2, speed: number, dt: number): void {
     this.position = { ...target };
-    const targetZoom = clamp(1.15 - speed / 700, 0.42, 1.15);
+    const targetZoom = clamp(this.baseZoom - speed / 700, 0.42, this.baseZoom);
     this.zoomLevel += (targetZoom - this.zoomLevel) * Math.min(1, dt * 2.5);
   }
 

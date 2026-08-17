@@ -48,6 +48,8 @@ function buildDocument(): Map<string, MockElement> {
     ['#decay-value', makeElement()],
     ['#particle-slider', makeElement('100')],
     ['#particle-value', makeElement()],
+    ['#zoom-slider', makeElement('1.15')],
+    ['#zoom-value', makeElement()],
     ['#sfx-master-slider', makeElement('100')],
     ['#sfx-master-value', makeElement()],
     ['#sfx-thrust-slider', makeElement('100')],
@@ -223,6 +225,49 @@ describe('SettingsMenu', () => {
 
     const saved = new StorageAdapter(store).read<number>('particle-visibility');
     expect(saved).toBe(20);
+  });
+
+  it('REQ-50 exposes the default zoom level from the slider', () => {
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
+
+    expect(menu.getDefaultZoomLevel()).toBeCloseTo(1.15, 5);
+  });
+
+  it('REQ-50 reflects zoom slider changes in the level', () => {
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
+
+    elements.get('#zoom-slider')!.value = '1.6';
+
+    expect(menu.getDefaultZoomLevel()).toBeCloseTo(1.6, 5);
+  });
+
+  it('REQ-50 loads persisted zoom level into the slider on startup', () => {
+    const store = new FakeStore();
+    store.setItem('default-zoom', JSON.stringify(1.6));
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(store));
+
+    expect(elements.get('#zoom-slider')!.value).toBe('1.60');
+    expect(elements.get('#zoom-value')!.textContent).toBe('1.60');
+    expect(menu.getDefaultZoomLevel()).toBeCloseTo(1.6, 5);
+  });
+
+  it('REQ-50 saves the zoom level when the slider changes', () => {
+    const store = new FakeStore();
+    const elements = buildDocument();
+    stubDocument(elements);
+    new SettingsMenu(new StorageAdapter(store));
+
+    elements.get('#zoom-slider')!.value = '0.8';
+    elements.get('#zoom-slider')!.handlers.get('input')!();
+
+    const saved = new StorageAdapter(store).read<number>('default-zoom');
+    expect(saved).toBeCloseTo(0.8, 5);
   });
 
   it('REQ-29 exposes the default music thresholds from the sliders', () => {

@@ -7,8 +7,8 @@ import { PhysicsBody } from './PhysicsBody';
 import type { Ship } from './Ship';
 
 const DRONE_RADIUS = 18;
-const HUNT_ACCEL = 220;
-const HUNT_MAX_SPEED = 340;
+const HUNT_ACCEL = 300;
+const HUNT_MAX_SPEED = 480;
 const CLOSE_RANGE = 260;
 const CLOSE_ACCEL_BOOST = 1.9;
 const CLOSE_DAMP_RATE = 5.5;

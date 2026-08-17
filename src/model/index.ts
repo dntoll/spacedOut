@@ -1,4 +1,3 @@
-export { AirContainer } from './AirContainer';
 export { AmmoContainer } from './AmmoContainer';
 export { Asteroid } from './Asteroid';
 export { AsteroidBelt } from './AsteroidBelt';
@@ -38,4 +37,5 @@ export { ShipCollisionSystem } from './ShipCollisionSystem';
 export { SupplyContainer } from './SupplyContainer';
 export { SupplyField } from './SupplyField';
 export { SupplyRegion } from './SupplyRegion';
+export { SupplyChooser, type SupplyMeters, SupplyType } from './SupplyChooser';
 export { SweptCircleCollision, type PolygonObstacle, type SweepHit } from './SweptCircleCollision';

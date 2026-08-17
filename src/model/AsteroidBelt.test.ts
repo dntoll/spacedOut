@@ -12,7 +12,7 @@ describe('AsteroidBelt', () => {
   it('REQ-11 creates a randomized field of asteroids', () => {
     const asteroids: Asteroid[] = [];
     new AsteroidBelt({ x: 0, y: 0 }).forEach((asteroid) => asteroids.push(asteroid));
-    expect(asteroids).toHaveLength(34);
+    expect(asteroids).toHaveLength(60);
     expect(new Set(asteroids.map((asteroid) => asteroid.radius)).size).toBeGreaterThan(1);
     expect(new Set(asteroids.map((asteroid) => `${asteroid.position.x},${asteroid.position.y}`)).size).toBeGreaterThan(1);
   });

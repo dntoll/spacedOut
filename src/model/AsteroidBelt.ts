@@ -29,8 +29,8 @@ export class AsteroidBelt {
       this.asteroids.push(...initialAsteroids);
       return;
     }
-    for (let i = 0; i < 34; i++) {
-      this.asteroids.push(this.createAsteroid(center, i < 8 ? 260 : 500, 1600));
+    for (let i = 0; i < 60; i++) {
+      this.asteroids.push(this.createAsteroid(center, i < 14 ? 260 : 500, 1600));
     }
   }
 

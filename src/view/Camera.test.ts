@@ -22,6 +22,22 @@ describe('Camera', () => {
     expect(fast.zoom).toBeLessThan(slow.zoom);
   });
 
+  it('REQ-50 tunes the resting zoom from the default zoom-in level setting', () => {
+    const close = new Camera();
+    close.setBaseZoom(1.5);
+    close.update({ x: 0, y: 0 }, 0, 1);
+    const far = new Camera();
+    far.setBaseZoom(0.6);
+    far.update({ x: 0, y: 0 }, 0, 1);
+
+    expect(close.zoom).toBeGreaterThan(far.zoom);
+
+    const fast = new Camera();
+    fast.setBaseZoom(1.5);
+    fast.update({ x: 0, y: 0 }, 600, 1);
+    expect(fast.zoom).toBeLessThan(close.zoom);
+  });
+
   it('REQ-23 exposes the camera-visible world bounds for exploration', () => {
     const camera = new Camera();
     camera.update({ x: 100, y: 50 }, 0, 1);

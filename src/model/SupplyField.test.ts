@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { AirContainer } from './AirContainer';
 import { AmmoContainer } from './AmmoContainer';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
@@ -11,12 +10,11 @@ import { SupplyField } from './SupplyField';
 import type { SupplyContainer } from './SupplyContainer';
 
 describe('SupplyField', () => {
-  it('REQ-14 randomly spreads collectible air and fuel containers', () => {
+  it('REQ-14 randomly spreads collectible supply containers', () => {
     const containers: SupplyContainer[] = [];
     new SupplyField({ x: 0, y: 0 }, undefined, 1234).forEachActive((container) => containers.push(container));
 
-    expect(containers).toHaveLength(49);
-    expect(containers.some((container) => container instanceof AirContainer)).toBe(true);
+    expect(containers).toHaveLength(25);
     expect(containers.some((container) => container instanceof FuelContainer)).toBe(true);
     expect(containers.some((container) => container instanceof HpContainer)).toBe(true);
     expect(containers.some((container) => container instanceof AmmoContainer)).toBe(true);
@@ -41,7 +39,7 @@ describe('SupplyField', () => {
     };
 
     expect(positions(first)).toEqual(positions(second));
-    expect(positions(first)).toHaveLength(49);
+    expect(positions(first)).toHaveLength(25);
     const distant: SupplyContainer[] = [];
     first.forEachActive((container) => distant.push(container));
     expect(distant.every((container) => Math.hypot(container.position.x, container.position.y) > 3500)).toBe(true);
@@ -49,24 +47,24 @@ describe('SupplyField', () => {
 
   it('REQ-14 collects containers when the ship reaches them', () => {
     const ship = new Ship();
-    ship.updateLifeSupport(20);
+    ship.consumeAmmo(40);
     ship.aimAt({ x: 500, y: 0 });
     ship.startThrust();
     ship.applyControls(1);
-    const airBefore = ship.air;
     const fuelBefore = ship.fuel;
-    const air = new AirContainer({ ...ship.position }, 10);
+    const ammoBefore = ship.ammo;
     const fuel = new FuelContainer({ ...ship.position }, 10);
-    const field = new SupplyField(ship.position, [air, fuel]);
+    const ammo = new AmmoContainer({ ...ship.position }, 10);
+    const field = new SupplyField(ship.position, [fuel, ammo]);
 
     field.update(0, ship, new AsteroidBelt(ship.position, []));
 
-    expect(ship.air).toBeGreaterThan(airBefore);
     expect(ship.fuel).toBeGreaterThan(fuelBefore);
+    expect(ship.ammo).toBeGreaterThan(ammoBefore);
     const known: SupplyContainer[] = [];
     field.forEachKnown((container) => known.push(container));
-    expect(known).not.toContain(air);
     expect(known).not.toContain(fuel);
+    expect(known).not.toContain(ammo);
   });
 
   it('REQ-18 physically collides containers with asteroids', () => {
@@ -143,7 +141,7 @@ describe('SupplyField', () => {
   it('REQ-47 attracts a nearby container toward the ship', () => {
     const ship = new Ship();
     ship.position = { x: 0, y: 0 };
-    const container = new AirContainer({ x: 60, y: 0 }, 10);
+    const container = new FuelContainer({ x: 60, y: 0 }, 10);
     const field = new SupplyField(ship.position, [container]);
 
     field.update(0, ship, new AsteroidBelt(ship.position, []));
@@ -155,7 +153,7 @@ describe('SupplyField', () => {
   it('REQ-47 leaves containers beyond three ship lengths stationary', () => {
     const ship = new Ship();
     ship.position = { x: 0, y: 0 };
-    const container = new AirContainer({ x: 200, y: 0 }, 10);
+    const container = new FuelContainer({ x: 200, y: 0 }, 10);
     const field = new SupplyField(ship.position, [container]);
 
     field.update(0, ship, new AsteroidBelt(ship.position, []));
@@ -167,7 +165,7 @@ describe('SupplyField', () => {
   it('REQ-47 pulls a nearby container in until it is collected', () => {
     const ship = new Ship();
     ship.position = { x: 0, y: 0 };
-    const container = new AirContainer({ x: 80, y: 0 }, 10);
+    const container = new FuelContainer({ x: 80, y: 0 }, 10);
     const field = new SupplyField(ship.position, [container]);
     const belt = new AsteroidBelt(ship.position, []);
 
@@ -180,7 +178,7 @@ describe('SupplyField', () => {
 
   it('REQ-45 notifies observers when a region container is collected', () => {
     const ship = new Ship();
-    const container = new AirContainer({ ...ship.position }, 10);
+    const container = new FuelContainer({ ...ship.position }, 10);
     const field = new SupplyField(ship.position, [container]);
     const events: CollectablePickup[] = [];
     field.addCollectablePickupObserver({ onCollectablePickup(event) { events.push(event); } });
@@ -193,7 +191,7 @@ describe('SupplyField', () => {
   it('REQ-45 notifies observers when a dropped container is collected', () => {
     const ship = new Ship();
     const field = new SupplyField(ship.position, []);
-    const drop = new AirContainer({ ...ship.position }, 10);
+    const drop = new FuelContainer({ ...ship.position }, 10);
     field.drop(drop);
     const events: CollectablePickup[] = [];
     field.addCollectablePickupObserver({ onCollectablePickup(event) { events.push(event); } });
@@ -201,5 +199,45 @@ describe('SupplyField', () => {
     field.update(0, ship, new AsteroidBelt(ship.position, []));
 
     expect(events).toHaveLength(1);
+  });
+
+  it('REQ-51 favors the lowest ship meter when spawning reached-region containers', () => {
+    const ship = new Ship();
+    ship.aimAt({ x: 1e9, y: 0 });
+    ship.startThrust();
+    for (let i = 0; i < 400 && ship.fuel > 0; i++) ship.applyControls(0.1);
+    expect(ship.fuel).toBe(0);
+    ship.position = { x: 50000, y: 0 };
+
+    const field = new SupplyField({ x: 0, y: 0 }, undefined, 1234);
+    field.update(0, ship, new AsteroidBelt(ship.position, []), 1500, 1500);
+
+    const containers: SupplyContainer[] = [];
+    field.forEachActive((container) => containers.push(container));
+
+    expect(containers).toHaveLength(25);
+    expect(containers.every((container) => container instanceof FuelContainer)).toBe(true);
+  });
+
+  it('REQ-51 favors the next meter when the lowest is already visible on screen', () => {
+    const ship = new Ship();
+    ship.aimAt({ x: 1e9, y: 0 });
+    ship.startThrust();
+    for (let i = 0; i < 400 && ship.fuel > 0; i++) ship.applyControls(0.1);
+    expect(ship.fuel).toBe(0);
+    ship.position = { x: 50000, y: 0 };
+
+    const field = new SupplyField({ x: 0, y: 0 }, undefined, 1234);
+    const visibleFuel = new FuelContainer({ x: 50000 + 100, y: 0 }, 10);
+    field.drop(visibleFuel);
+    field.update(0, ship, new AsteroidBelt(ship.position, []), 1500, 1500);
+
+    const containers: SupplyContainer[] = [];
+    field.forEachActive((container) => containers.push(container));
+    const spawned = containers.filter((container) => container !== visibleFuel);
+
+    expect(spawned).toHaveLength(25);
+    expect(spawned.every((container) => container instanceof HpContainer || container instanceof AmmoContainer)).toBe(true);
+    expect(spawned.some((container) => container instanceof FuelContainer)).toBe(false);
   });
 });

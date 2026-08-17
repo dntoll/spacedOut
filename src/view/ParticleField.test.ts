@@ -25,6 +25,7 @@ function stubModel(ship: Ship, asteroids: Asteroid[] = [], massives: MassiveAste
     ship,
     asteroidBelt: { forEach: (fn: (a: Asteroid) => void) => asteroids.forEach(fn) },
     massiveAsteroidField: { forEachActive: (fn: (a: MassiveAsteroid) => void) => massives.forEach(fn) },
+    droneField: { forEach: () => {} },
   } as unknown as Model.Game;
 }
 

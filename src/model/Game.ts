@@ -1,5 +1,4 @@
 import type { ControlTuning, Vec2 } from '../types';
-import { AirContainer } from './AirContainer';
 import { AmmoContainer } from './AmmoContainer';
 import { AsteroidBelt } from './AsteroidBelt';
 import { AsteroidDestroyed } from './AsteroidDestroyed';
@@ -18,6 +17,7 @@ import type { LaserShotObserver } from './LaserShotObserver';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
+import { SupplyChooser, SupplyType } from './SupplyChooser';
 import { SupplyContainer } from './SupplyContainer';
 import { SupplyField } from './SupplyField';
 import type { PolygonObstacle } from './SweptCircleCollision';
@@ -52,7 +52,10 @@ export class Game implements AsteroidDestroyedObserver {
   setDirectionalThrust(vec: Vec2 | null): void { this.ship.setDirectionalThrust(vec); }
   startThrust(): void { this.ship.startThrust(); }
   stopThrust(): void { this.ship.stopThrust(); }
-  fireLaser(): void { this.laserField.fire(this.ship); }
+  fireLaser(): void {
+    this.laserField.fire(this.ship);
+    this.droneField.awakenNearby(this.ship, this.spawnExclusionRadius);
+  }
   setSpawnExclusionRadius(radius: number): void { this.spawnExclusionRadius = Math.max(0, radius); }
   addCollisionObserver(observer: CollisionObserver): void {
     this.asteroidBelt.addCollisionObserver(observer);
@@ -103,10 +106,14 @@ export class Game implements AsteroidDestroyedObserver {
   }
 
   private createDrop(position: Vec2): SupplyContainer {
-    const roll = Math.floor(Math.random() * 4);
-    if (roll === 0) return new AirContainer({ ...position }, DROP_AMOUNT);
-    if (roll === 1) return new FuelContainer({ ...position }, DROP_AMOUNT);
-    if (roll === 2) return new HpContainer({ ...position }, DROP_AMOUNT);
+    const visible = this.supplyField.visibleTypes(this.ship, this.spawnExclusionRadius);
+    const type = SupplyChooser.choose({ fuel: this.ship.fuel, hp: this.ship.hp, ammo: this.ship.ammo }, visible, Math.random);
+    return this.createSupply(type, position);
+  }
+
+  private createSupply(type: SupplyType, position: Vec2): SupplyContainer {
+    if (type === SupplyType.Fuel) return new FuelContainer({ ...position }, DROP_AMOUNT);
+    if (type === SupplyType.Hp) return new HpContainer({ ...position }, DROP_AMOUNT);
     return new AmmoContainer({ ...position }, DROP_AMOUNT);
   }
 
@@ -114,14 +121,14 @@ export class Game implements AsteroidDestroyedObserver {
     dt = Math.min(dt, 0.033);
     this.elapsed += dt;
     if (!this.ship.isAlive) return;
-    this.ship.updateLifeSupport(dt);
+    this.ship.updateInvulnerability(dt);
     this.ship.updateEmergencyReload(dt);
     this.ship.applyControls(dt);
 
     this.ship.integrate(dt);
     const spawnBoundary = this.spawnExclusionRadius + this.ship.speed * 1.2;
     this.asteroidBelt.update(dt, this.ship.position, spawnBoundary);
-    this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary);
+    this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary, this.spawnExclusionRadius);
     this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary);
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
     this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary);

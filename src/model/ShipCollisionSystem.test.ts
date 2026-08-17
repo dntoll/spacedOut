@@ -113,7 +113,7 @@ describe('ShipCollisionSystem', () => {
       ship.position = { x: -100, y: 0 };
       ship.velocity = { x: -2000, y: 0 };
       system.resolve(ship, [obstacle], 1);
-      ship.updateLifeSupport(1);
+      ship.updateInvulnerability(1);
     }
     expect(ship.isAlive).toBe(false);
     expect(ship.hp).toBe(0);

@@ -11,7 +11,7 @@ import type { MassiveAsteroidField } from './MassiveAsteroidField';
 import type { PhysicsBody } from './PhysicsBody';
 import type { Ship } from './Ship';
 
-const TARGET_POPULATION = 8;
+const TARGET_POPULATION = 24;
 const DETACH_RANGE_RADII = 12;
 const DRONE_IMPACT_DAMAGE = 20;
 const MENACE_RANGE = 700;
@@ -53,7 +53,10 @@ export class DroneField {
     const index = this.drones.indexOf(drone);
     if (index < 0) return;
     const killed = drone.takeLaserHit();
-    if (!killed) return;
+    if (!killed) {
+      drone.detach();
+      return;
+    }
     this.drones.splice(index, 1);
     const event = new DroneDestroyed({ ...position });
     for (const observer of this.destroyedObservers) observer.onDroneDestroyed(event);
@@ -92,6 +95,16 @@ export class DroneField {
       const dx = drone.position.x - ship.position.x;
       const dy = drone.position.y - ship.position.y;
       if (dx * dx + dy * dy <= rangeSq) drone.detach();
+    }
+  }
+
+  awakenNearby(ship: Ship, radius: number): void {
+    const radiusSq = radius * radius;
+    for (const drone of this.drones) {
+      if (!drone.host) continue;
+      const dx = drone.position.x - ship.position.x;
+      const dy = drone.position.y - ship.position.y;
+      if (dx * dx + dy * dy <= radiusSq) drone.detach();
     }
   }
 

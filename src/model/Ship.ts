@@ -12,7 +12,6 @@ const EMERGENCY_RELOAD_AMOUNT = 1;
 export class Ship extends PhysicsBody {
   private aimTarget: Vec2 = { x: 0, y: -100 };
   private throttle = 0;
-  private airLevel = 100;
   private fuelLevel = 100;
   private hpLevel = 100;
   private ammoLevel = 100;
@@ -43,7 +42,6 @@ export class Ship extends PhysicsBody {
   get isThrusting(): boolean { return this.throttle > 0 || this.directionalLevel > 0.0001; }
   get thrustAmount(): number { return Math.max(this.throttle, this.directionalLevel); }
   get pointerThrust(): number { return this.throttle; }
-  get air(): number { return this.airLevel; }
   get fuel(): number { return this.fuelLevel; }
   get hp(): number { return this.hpLevel; }
   get ammo(): number { return this.ammoLevel; }
@@ -76,7 +74,6 @@ export class Ship extends PhysicsBody {
   }
 
   stopThrust(): void { this.throttle = 0; }
-  collectAir(amount: number): void { this.airLevel = clamp(this.airLevel + amount, 0, 100); }
   collectFuel(amount: number): void { this.fuelLevel = clamp(this.fuelLevel + amount, 0, 100); }
   collectAmmo(amount: number): void { this.ammoLevel = clamp(this.ammoLevel + amount, 0, MAX_AMMO); }
   consumeAmmo(amount: number): boolean {
@@ -94,8 +91,7 @@ export class Ship extends PhysicsBody {
     this.hpLevel = clamp(this.hpLevel + amount, 0, 100);
   }
 
-  updateLifeSupport(dt: number): void {
-    this.airLevel = Math.max(0, this.airLevel - dt * 0.7);
+  updateInvulnerability(dt: number): void {
     this.invulnerableTime = Math.max(0, this.invulnerableTime - dt);
   }
 

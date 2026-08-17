@@ -8,11 +8,13 @@ import { Minimap } from './Minimap';
 describe('Minimap', () => {
   it('REQ-23 shows explored space and discovered massive asteroids and collectables', () => {
     const ship = new Model.Ship();
-    const air = new Model.AirContainer({ x: 100, y: 0 });
     const hp = new Model.HpContainer({ x: -100, y: 100 });
     const fuel = new Model.FuelContainer({ x: 1000, y: 0 });
     const ammo = new Model.AmmoContainer({ x: 1000, y: 100 });
-    const supplyField = new Model.SupplyField(ship.position, [air, hp, fuel, ammo], 1);
+    const supplyField = new Model.SupplyField({ x: 100000, y: 0 }, undefined, 1);
+    supplyField.drop(hp);
+    supplyField.drop(fuel);
+    supplyField.drop(ammo);
     const massive = new Model.MassiveAsteroid(
       1, { x: -100, y: 0 }, 50, 0, [1, 1, 1, 1], [], 0.5,
     );
@@ -49,7 +51,6 @@ describe('Minimap', () => {
       'rgba(157,203,220,.82)',
       1,
     );
-    expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#62e6ff');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#5dff9a');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.0, '#7dff5e');

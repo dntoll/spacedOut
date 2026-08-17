@@ -39,13 +39,6 @@ describe('Ship controls', () => {
     expect(ship.fuel).toBeLessThan(fuelBefore);
   });
 
-  it('REQ-17 consumes air as time passes', () => {
-    const ship = new Ship();
-    const airBefore = ship.air;
-    ship.updateLifeSupport(10);
-    expect(ship.air).toBeLessThan(airBefore);
-  });
-
   it('REQ-33 tracks hull hit-points, damage, and repair', () => {
     const ship = new Ship();
     expect(ship.hp).toBe(100);
@@ -96,9 +89,9 @@ describe('Ship controls', () => {
     expect(ship.isInvulnerable).toBe(false);
     ship.takeDamage(10);
     expect(ship.isInvulnerable).toBe(true);
-    ship.updateLifeSupport(0.4);
+    ship.updateInvulnerability(0.4);
     expect(ship.isInvulnerable).toBe(true);
-    ship.updateLifeSupport(0.2);
+    ship.updateInvulnerability(0.2);
     expect(ship.isInvulnerable).toBe(false);
   });
 

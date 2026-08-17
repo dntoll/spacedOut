@@ -9,6 +9,7 @@ const MUSIC_THRESHOLD_STORAGE_KEY = 'music-thresholds';
 const MUSIC_DECAY_STORAGE_KEY = 'music-decay';
 const PARTICLE_STORAGE_KEY = 'particle-visibility';
 const SFX_STORAGE_KEY = 'sfx-settings';
+const ZOOM_STORAGE_KEY = 'default-zoom';
 const DEFAULT_MUSIC_PERCENT = 50;
 const DEFAULT_MEDIUM_PERCENT = 25;
 const DEFAULT_ACTION_PERCENT = 60;
@@ -17,6 +18,9 @@ const DECAY_MIN_SECONDS = 0;
 const DECAY_MAX_SECONDS = 10;
 const DEFAULT_PARTICLE_PERCENT = 100;
 const DEFAULT_SFX_PERCENT = 100;
+const DEFAULT_ZOOM = 1.15;
+const ZOOM_MIN = 0.5;
+const ZOOM_MAX = 2;
 const DEFAULT_TUNING: ControlTuning = { dampening: 1.5, thrustAccel: 170, maxSpeed: 650 };
 
 interface SfxSliderConfig {
@@ -55,6 +59,8 @@ export class SettingsMenu {
   private readonly decayValue: HTMLElement | null;
   private readonly particleSlider: HTMLInputElement | null;
   private readonly particleValue: HTMLElement | null;
+  private readonly zoomSlider: HTMLInputElement | null;
+  private readonly zoomValue: HTMLElement | null;
   private readonly sfxSliders = new Map<SfxChannel, HTMLInputElement | null>();
   private readonly sfxValues = new Map<SfxChannel, HTMLElement | null>();
 
@@ -77,6 +83,8 @@ export class SettingsMenu {
     this.decayValue = document.querySelector<HTMLElement>('#decay-value');
     this.particleSlider = document.querySelector<HTMLInputElement>('#particle-slider');
     this.particleValue = document.querySelector<HTMLElement>('#particle-value');
+    this.zoomSlider = document.querySelector<HTMLInputElement>('#zoom-slider');
+    this.zoomValue = document.querySelector<HTMLElement>('#zoom-value');
     for (const cfg of SFX_SLIDERS) {
       this.sfxSliders.set(cfg.channel, document.querySelector<HTMLInputElement>(`#${cfg.sliderId}`));
       this.sfxValues.set(cfg.channel, document.querySelector<HTMLElement>(`#${cfg.valueId}`));
@@ -92,6 +100,8 @@ export class SettingsMenu {
     if (persistedDecay != null) this.applyDecay(persistedDecay);
     const persistedParticle = this.storage.read<number>(PARTICLE_STORAGE_KEY);
     if (persistedParticle != null) this.applyParticle(persistedParticle);
+    const persistedZoom = this.storage.read<number>(ZOOM_STORAGE_KEY);
+    if (persistedZoom != null) this.applyZoom(persistedZoom);
     const persistedSfx = this.storage.read<Partial<Record<keyof SfxSettings, number>>>(SFX_STORAGE_KEY) ?? {};
     this.applySfx(persistedSfx);
 
@@ -104,6 +114,7 @@ export class SettingsMenu {
     this.actionSlider?.addEventListener('input', () => this.onThresholdChange());
     this.decaySlider?.addEventListener('input', () => this.onDecayChange());
     this.particleSlider?.addEventListener('input', () => this.onParticleChange());
+    this.zoomSlider?.addEventListener('input', () => this.onZoomChange());
     for (const cfg of SFX_SLIDERS) {
       this.sfxSliders.get(cfg.channel)?.addEventListener('input', () => this.onSfxChange());
     }
@@ -141,6 +152,12 @@ export class SettingsMenu {
     const raw = Number(this.particleSlider?.value);
     const percent = Number.isFinite(raw) ? raw : DEFAULT_PARTICLE_PERCENT;
     return Math.max(0, Math.min(1, percent / 100));
+  }
+
+  getDefaultZoomLevel(): number {
+    const raw = Number(this.zoomSlider?.value);
+    const value = Number.isFinite(raw) ? raw : DEFAULT_ZOOM;
+    return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
   }
 
   getSfxSettings(): SfxSettings {
@@ -191,6 +208,15 @@ export class SettingsMenu {
     if (this.particleValue) this.particleValue.textContent = clamped;
   }
 
+  private applyZoom(value: number): void {
+    let clamped = Number(value);
+    if (!Number.isFinite(clamped)) clamped = DEFAULT_ZOOM;
+    clamped = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, clamped));
+    const text = clamped.toFixed(2);
+    if (this.zoomSlider) this.zoomSlider.value = text;
+    if (this.zoomValue) this.zoomValue.textContent = text;
+  }
+
   private applySfx(percents: Partial<Record<keyof SfxSettings, number>>): void {
     for (const cfg of SFX_SLIDERS) {
       const stored = percents[cfg.field];
@@ -233,6 +259,11 @@ export class SettingsMenu {
   private onParticleChange(): void {
     if (this.particleValue && this.particleSlider) this.particleValue.textContent = this.particleSlider.value;
     this.storage.write(PARTICLE_STORAGE_KEY, Number(this.particleSlider?.value));
+  }
+
+  private onZoomChange(): void {
+    this.syncLabel(this.zoomValue, this.zoomSlider, 2);
+    this.storage.write(ZOOM_STORAGE_KEY, Number(this.zoomSlider?.value));
   }
 
   private onSfxChange(): void {

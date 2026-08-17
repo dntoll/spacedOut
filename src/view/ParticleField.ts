@@ -25,10 +25,11 @@ const IMPACT_COOL_ALPHA = 0.8;
 export class ParticleField {
   private particles: Particle[] = [];
   private emissionCarry = 0;
+  private droneEmissionCarry = 0;
   private visibility = 1;
 
   setVisibility(v: number): void { this.visibility = Math.max(0, v); }
-  reset(): void { this.particles = []; this.emissionCarry = 0; }
+  reset(): void { this.particles = []; this.emissionCarry = 0; this.droneEmissionCarry = 0; }
 
   adopt(position: Vec2, velocity: Vec2): void {
     if (this.particles.length >= MAX_POPULATION) return;
@@ -101,6 +102,7 @@ export class ParticleField {
 
   update(dt: number, model: Model.Game, camera: Camera, viewport: Size): void {
     if (model.ship.isThrusting && model.ship.isAlive) this.emitExhaust(dt, model.ship);
+    this.emitDroneExhaust(dt, model);
     for (const particle of this.particles) particle.update(dt);
     this.bounce(model);
     this.cull(camera, viewport);
@@ -139,6 +141,37 @@ export class ParticleField {
         this.particles.push(this.createExhaustParticle(ship, forward, nozzle));
       }
     }
+  }
+
+  private emitDroneExhaust(dt: number, model: Model.Game): void {
+    model.droneField.forEach((drone) => {
+      if (!drone.isHunting) return;
+      this.droneEmissionCarry += dt * 22;
+      while (this.droneEmissionCarry >= 1) {
+        this.droneEmissionCarry--;
+        this.particles.push(this.createDroneExhaustParticle(drone));
+      }
+    });
+  }
+
+  private createDroneExhaustParticle(drone: Model.Drone): Particle {
+    const back = { x: -Math.cos(drone.angle), y: -Math.sin(drone.angle) };
+    const side = { x: -back.y, y: back.x };
+    const jitter = random(-1, 1);
+    const burn = random(0.3, 0.55);
+    const offset = add(scale(back, drone.radius * 0.5), scale(side, jitter * 2));
+    return new Particle(
+      add(drone.position, offset),
+      add(
+        scale(drone.velocity, 0.08),
+        add(scale(back, random(120, 200)), scale(side, jitter * 14)),
+      ),
+      random(1.2, 3),
+      burn,
+      burn,
+      FUEL_COLOR,
+      HOT_ALPHA,
+    );
   }
 
   private createExhaustParticle(ship: Model.Ship, forward: Vec2, nozzle: { offset: Vec2; emit: Vec2; power: number }): Particle {

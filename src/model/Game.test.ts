@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
-import { AirContainer } from './AirContainer';
+import { describe, expect, it, vi } from 'vitest';
+import { AsteroidDestroyed } from './AsteroidDestroyed';
+import { AsteroidTier } from './AsteroidTier';
 import { CollectablePickup } from './CollectablePickup';
+import { FuelContainer } from './FuelContainer';
 import { Game } from './Game';
 import { LaserShot } from './LaserShot';
+import type { SupplyContainer } from './SupplyContainer';
 
 describe('Game', () => {
   it('REQ-36 reports game over and freezes the simulation when the ship is destroyed', () => {
@@ -36,11 +39,29 @@ describe('Game', () => {
     const game = new Game();
     const events: CollectablePickup[] = [];
     game.addCollectablePickupObserver({ onCollectablePickup(event) { events.push(event); } });
-    const air = new AirContainer({ ...game.ship.position }, 10);
-    game.supplyField.drop(air);
+    const fuel = new FuelContainer({ ...game.ship.position }, 10);
+    game.supplyField.drop(fuel);
 
     game.update(0);
 
     expect(events).toHaveLength(1);
+  });
+
+  it('REQ-51 drops the lowest-meter resource from destroyed asteroids', () => {
+    const game = new Game();
+    game.ship.aimAt({ x: 1e9, y: 0 });
+    game.ship.startThrust();
+    for (let i = 0; i < 400 && game.ship.fuel > 0; i++) game.ship.applyControls(0.1);
+    expect(game.ship.fuel).toBe(0);
+    game.ship.position = { x: 100000, y: 0 };
+
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    game.onDestroyed(new AsteroidDestroyed({ ...game.ship.position }, AsteroidTier.Small));
+    random.mockRestore();
+
+    const active: SupplyContainer[] = [];
+    game.supplyField.forEachActive((container) => active.push(container));
+    expect(active.some((container) => container instanceof FuelContainer
+      && container.position.x === 100000 && container.position.y === 0)).toBe(true);
   });
 });

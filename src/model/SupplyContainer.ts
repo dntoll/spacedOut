@@ -1,6 +1,7 @@
 import type { Vec2 } from '../types';
 import { PhysicsBody } from './PhysicsBody';
 import type { Ship } from './Ship';
+import { type SupplyType } from './SupplyChooser';
 
 const ATTRACTION_RANGE_RADII = 6;
 const ATTRACTION_MAX_SPEED = 350;
@@ -13,6 +14,7 @@ export abstract class SupplyContainer extends PhysicsBody {
     super(position, { x: 0, y: 0 }, 13, 6, 0, 0);
   }
 
+  abstract get type(): SupplyType;
   abstract collect(ship: Ship): void;
 
   attractToward(ship: Ship): void {
