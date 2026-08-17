@@ -11,6 +11,7 @@ export { Hud } from './Hud';
 export { MassiveAsteroidField } from './MassiveAsteroidField';
 export { Minimap } from './Minimap';
 export { PlayerInput } from './PlayerInput';
+export { SettingsMenu } from './SettingsMenu';
 export { Ship } from './Ship';
 export { SpaceBackground } from './SpaceBackground';
 export { StarField } from './StarField';

@@ -1,4 +1,4 @@
-import type { Vec2 } from '../types';
+import type { ControlTuning, Vec2 } from '../types';
 import { AsteroidBelt } from './AsteroidBelt';
 import type { CollisionObserver } from './CollisionObserver';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
@@ -21,6 +21,7 @@ export class Game {
   get thrustAmount(): number { return this.ship.thrustAmount; }
 
   setThrustTarget(target: Vec2): void { this.ship.aimAt(target); }
+  setControlTuning(tuning: ControlTuning): void { this.ship.setControlTuning(tuning); }
   startThrust(): void { this.ship.startThrust(); }
   stopThrust(): void { this.ship.stopThrust(); }
   setSpawnExclusionRadius(radius: number): void { this.spawnExclusionRadius = Math.max(0, radius); }

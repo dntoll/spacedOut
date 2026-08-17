@@ -1,5 +1,5 @@
 import type * as Model from '../model';
-import type { Vec2 } from '../types';
+import type { ControlTuning, Vec2 } from '../types';
 import { AsteroidBelt } from './AsteroidBelt';
 import { Camera } from './Camera';
 import { CollisionEffects } from './CollisionEffects';
@@ -10,6 +10,7 @@ import { Hud } from './Hud';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Minimap } from './Minimap';
 import { PlayerInput } from './PlayerInput';
+import { SettingsMenu } from './SettingsMenu';
 import { Ship } from './Ship';
 import { SpaceBackground } from './SpaceBackground';
 import { SupplyField } from './SupplyField';
@@ -18,6 +19,7 @@ export class Game implements Model.CollisionObserver {
   private readonly drawing: Drawing;
   private readonly camera = new Camera();
   private readonly hud = new Hud();
+  private readonly settings = new SettingsMenu();
   private readonly input: PlayerInput;
   private readonly background = new SpaceBackground();
   private readonly ship = new Ship();
@@ -39,6 +41,7 @@ export class Game implements Model.CollisionObserver {
   get isPlayerThrusting(): boolean { return this.input.isThrusting; }
   getThrustTarget(): Vec2 { return this.input.getTarget(this.camera); }
   getSpawnExclusionRadius(): number { return this.camera.getVisibleWorldRadius(this.drawing.size); }
+  getControlTuning(): ControlTuning { return this.settings.getControlTuning(); }
 
   onCollision(collision: Model.Collision): void {
     this.collisionEffects.emit(collision);

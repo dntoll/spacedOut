@@ -13,6 +13,24 @@
         <span class="brand">SPACED <b>OUT</b></span>
         <span class="status"><i></i> FLIGHT SYSTEM ONLINE</span>
       </header>
+      <button class="settings-toggle" id="settings-toggle" type="button">SETTINGS</button>
+      <div class="settings-panel hidden" id="settings-panel" aria-label="Ship control tuning">
+        <div class="settings-row">
+          <label for="dampening-slider">DAMPENING</label>
+          <input type="range" id="dampening-slider" min="0" max="6" step="0.1" value="1.5" />
+          <output id="dampening-value">1.5</output>
+        </div>
+        <div class="settings-row">
+          <label for="thrust-slider">THRUST</label>
+          <input type="range" id="thrust-slider" min="0" max="500" step="10" value="170" />
+          <output id="thrust-value">170</output>
+        </div>
+        <div class="settings-row">
+          <label for="maxspeed-slider">MAX SPEED</label>
+          <input type="range" id="maxspeed-slider" min="100" max="1500" step="50" value="650" />
+          <output id="maxspeed-value">650</output>
+        </div>
+      </div>
       <div class="speed"><span id="speed">000</span><small>m/s</small></div>
       <div class="resources" aria-label="Ship resources">
         <div class="resource air">

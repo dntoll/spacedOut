@@ -9,7 +9,7 @@
 
 - **REQ-02:** Simulate spaceship and asteroid physics.
 - **REQ-06:** Turn the ship directly toward the current mouse or touch position.
-- **REQ-07:** While the mouse or touch is pressed, accelerate the ship toward that position without discarding its existing velocity or direction of travel.
+- **REQ-07:** While the mouse or touch is pressed, accelerate the ship toward that position. The forward component of its existing velocity is preserved; the perpendicular and reverse components are dampened per REQ-26.
 - **REQ-08:** Scale thrust with the distance between the ship and the pointer: nearby input produces little thrust, while distant input produces strong thrust.
 - **REQ-11:** Populate the world with randomized asteroids.
 - **REQ-12:** Give the ship and asteroids area-scaled mass based on their radius, and use their relative masses during physical collisions to determine their resulting directions and speeds while transferring momentum and asteroid spin.
@@ -22,6 +22,7 @@
 - **REQ-22:** Treat the ship as a swept sphere: expand polygon edges by the ship radius, cap original edge corners with ship-radius circles, find the earliest collision along the previous-to-current center path, keep the ship outside the obstacle, and handle simultaneous contacts without penetration.
 - **REQ-24:** Stably spread massive asteroids through distant world regions rather than only around the starting center.
 - **REQ-25:** Spawn newly recycled or region-generated world objects beyond the visible boundary, with additional clearance as ship speed increases.
+- **REQ-26:** While the ship is thrusting, dampen the perpendicular and reverse components of its velocity at a tunable per-second rate, so motion across or against the thrust direction bleeds off while forward motion is retained.
 
 ## View Requirements
 
@@ -33,3 +34,4 @@
 - **REQ-13:** Display visual particles when collisions occur.
 - **REQ-15:** Display UI indicators showing the ship's collected air and fuel levels.
 - **REQ-23:** Display a ship-centered scrolling minimap of camera-explored space, discovered air and fuel containers, and discovered massive asteroids represented by their irregular outlines.
+- **REQ-27:** Provide a settings menu with sliders to tune the ship's lateral dampening rate, thrust power, and maximum speed at runtime.
