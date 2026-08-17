@@ -59,13 +59,14 @@ export class DroneField {
     asteroidBelt: AsteroidBelt,
     massiveAsteroidField: MassiveAsteroidField,
     spawnExclusionRadius: number,
+    spawnEnabled = true,
   ): void {
     this.releaseLostHosts(asteroidBelt, massiveAsteroidField);
     this.detachInRange(ship);
     this.rideAndHunt(dt, ship, massiveAsteroidField);
     this.resolveShipImpacts(ship);
     this.recycleDistant(ship.position, spawnExclusionRadius);
-    this.spawnToTarget(ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
+    if (spawnEnabled) this.spawnToTarget(ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
   }
 
   private releaseLostHosts(asteroidBelt: AsteroidBelt, massiveAsteroidField: MassiveAsteroidField): void {

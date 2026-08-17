@@ -33,8 +33,9 @@ export class MassiveAsteroidField {
     this.prepareAround(center, 1500);
   }
 
-  prepareAround(center: Vec2, spawnExclusionRadius: number): void {
+  prepareAround(center: Vec2, spawnExclusionRadius: number, spawnEnabled = true): void {
     if (this.fixedAsteroids) return;
+    if (!spawnEnabled) return;
     const centerColumn = Math.floor(center.x / MassiveAsteroidField.regionSize);
     const centerRow = Math.floor(center.y / MassiveAsteroidField.regionSize);
     const regionRadius = Math.max(1, Math.ceil(

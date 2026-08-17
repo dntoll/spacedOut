@@ -9,6 +9,7 @@ import { Hud } from './Hud';
 import { LaserField } from './LaserField';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Minimap } from './Minimap';
+import { MissionOverlay } from './MissionOverlay';
 import { MusicSystem } from './MusicSystem';
 import { ParticleField } from './ParticleField';
 import { PlayerInput } from './PlayerInput';
@@ -36,6 +37,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly particleField = new ParticleField();
   private readonly explorationMap = new ExplorationMap();
   private readonly minimap = new Minimap();
+  private readonly missionOverlay = new MissionOverlay();
   private readonly music = MusicSystem.create();
   private readonly sounds = SoundSystem.create();
   private readonly soundGate = new SoundGate(this.camera, this.sounds, () => this.drawing.size);
@@ -102,6 +104,8 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     return false;
   }
 
+  consumeMissionContinueClick(): boolean { return this.missionOverlay.consumeClick(); }
+
   reset(): void {
     this.explorationMap.reset();
     this.particleField.reset();
@@ -146,8 +150,13 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.minimap.draw(this.drawing, this.explorationMap, model, this.camera);
     this.hud.updateSpeed(model.speed);
     this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);
-    if (model.isGameOver) this.gameOverNode?.classList.remove('hidden');
-    else this.gameOverNode?.classList.add('hidden');
+    if (model.isGameOver) {
+      this.gameOverNode?.classList.remove('hidden');
+      this.missionOverlay.hide();
+    } else {
+      this.gameOverNode?.classList.add('hidden');
+      this.missionOverlay.show(model.mission.phase);
+    }
   }
 
   private resize(): void {

@@ -19,6 +19,10 @@ export class Game {
     this.lastTime = time;
     if (this.model.isGameOver) {
       if (this.view.consumeRestartRequest()) this.restart();
+    } else if (this.model.mission.requestsRestart) {
+      this.restart();
+    } else if (this.model.mission.isPaused) {
+      if (this.view.consumeMissionContinueClick()) this.model.advanceMission();
     } else {
       this.model.setThrustTarget(this.view.getThrustTarget());
       this.model.setDirectionalThrust(this.view.getDirectionalThrust());

@@ -177,4 +177,16 @@ describe('Ship controls', () => {
     for (let i = 0; i < 10; i++) ship.applyControls(0.1);
     expect(ship.velocity.y).toBeLessThan(0);
   });
+
+  it('REQ-52 starts at custom initial resource levels while the default stays full', () => {
+    const ship = new Ship({ fuel: 50, hp: 50, ammo: 50 });
+    expect(ship.fuel).toBe(50);
+    expect(ship.hp).toBe(50);
+    expect(ship.ammo).toBe(50);
+
+    const fresh = new Ship();
+    expect(fresh.fuel).toBe(100);
+    expect(fresh.hp).toBe(100);
+    expect(fresh.ammo).toBe(100);
+  });
 });

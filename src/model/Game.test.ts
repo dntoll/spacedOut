@@ -37,6 +37,7 @@ describe('Game', () => {
 
   it('REQ-45 forwards collectable-pickup observers to the supply field', () => {
     const game = new Game();
+    game.advanceMission();
     const events: CollectablePickup[] = [];
     game.addCollectablePickupObserver({ onCollectablePickup(event) { events.push(event); } });
     const fuel = new FuelContainer({ ...game.ship.position }, 10);
@@ -45,6 +46,18 @@ describe('Game', () => {
     game.update(0);
 
     expect(events).toHaveLength(1);
+  });
+
+  it('REQ-52 starts mission 1 paused with the ship at 50% resources', () => {
+    const game = new Game();
+    expect(game.ship.fuel).toBe(50);
+    expect(game.ship.hp).toBe(50);
+    expect(game.ship.ammo).toBe(50);
+    expect(game.mission.isPaused).toBe(true);
+
+    game.advanceMission();
+
+    expect(game.mission.isPaused).toBe(false);
   });
 
   it('REQ-51 drops the lowest-meter resource from destroyed asteroids', () => {

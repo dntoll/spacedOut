@@ -32,8 +32,15 @@ export class SupplyField {
     this.activateAround(center, 1500);
   }
 
-  update(dt: number, ship: Ship, asteroidBelt: AsteroidBelt, spawnExclusionRadius = 1500, visibleRadius = spawnExclusionRadius): void {
-    this.activateAround(ship.position, spawnExclusionRadius, ship, visibleRadius);
+  update(
+    dt: number,
+    ship: Ship,
+    asteroidBelt: AsteroidBelt,
+    spawnExclusionRadius = 1500,
+    visibleRadius = spawnExclusionRadius,
+    spawnEnabled = true,
+  ): void {
+    if (spawnEnabled) this.activateAround(ship.position, spawnExclusionRadius, ship, visibleRadius);
     for (const region of this.activeRegions) region.update(dt, ship, asteroidBelt);
     this.updateDrops(dt, ship, asteroidBelt);
   }

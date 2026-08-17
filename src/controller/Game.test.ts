@@ -6,6 +6,8 @@ import { Game } from './Game';
 const stubModel = (isGameOver: boolean): Model.Game =>
   ({
     isGameOver,
+    mission: { isPaused: false, requestsRestart: false },
+    advanceMission: vi.fn(),
     setThrustTarget: vi.fn(),
     setDirectionalThrust: vi.fn(),
     setControlTuning: vi.fn(),
@@ -33,6 +35,7 @@ const stubView = (restart: boolean, firing = false): View.Game =>
     getControlTuning: vi.fn(() => ({ dampening: 1, thrustAccel: 1, maxSpeed: 1 })),
     getSpawnExclusionRadius: vi.fn(() => 1000),
     consumeRestartRequest: vi.fn(() => restart),
+    consumeMissionContinueClick: vi.fn(() => false),
     render: vi.fn(),
     reset: vi.fn(),
     onCollision: vi.fn(),
@@ -96,6 +99,25 @@ describe('Controller Game', () => {
     rafCbs[0](1016);
 
     expect(model.fireLaser).toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('REQ-52 advances the mission on a continue click while paused', () => {
+    vi.stubGlobal('performance', { now: () => 1000 });
+    const rafCbs: ((t: number) => void)[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: (t: number) => void) => { rafCbs.push(cb); return rafCbs.length; });
+
+    const model = stubModel(false);
+    (model.mission as { isPaused: boolean }).isPaused = true;
+    const view = stubView(false);
+    (view.consumeMissionContinueClick as ReturnType<typeof vi.fn>).mockReturnValueOnce(true);
+    const controller = new Game(model, view);
+
+    controller.start();
+    rafCbs[0](1016);
+
+    expect(model.advanceMission).toHaveBeenCalledOnce();
+    expect(model.setThrustTarget).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 });

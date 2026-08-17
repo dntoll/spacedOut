@@ -34,12 +34,12 @@ export class AsteroidBelt {
     }
   }
 
-  update(dt: number, center: Vec2, spawnExclusionRadius = 1450): void {
+  update(dt: number, center: Vec2, spawnExclusionRadius = 1450, spawnEnabled = true): void {
     for (const asteroid of this.asteroids) {
       asteroid.integrate(dt);
     }
     this.resolveInternalCollisions();
-    this.recycleDistantAsteroids(center, spawnExclusionRadius);
+    if (spawnEnabled) this.recycleDistantAsteroids(center, spawnExclusionRadius);
   }
 
   forEach(visitor: (asteroid: Asteroid) => void): void {

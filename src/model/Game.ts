@@ -15,23 +15,27 @@ import type { LaserImpactObserver } from './LaserImpactObserver';
 import { LaserField } from './LaserField';
 import type { LaserShotObserver } from './LaserShotObserver';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
+import { Mission } from './Mission';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
 import { SupplyChooser, SupplyType } from './SupplyChooser';
 import { SupplyContainer } from './SupplyContainer';
 import { SupplyField } from './SupplyField';
 import type { PolygonObstacle } from './SweptCircleCollision';
+import { VisitedMap } from './VisitedMap';
 
 const DROP_PROBABILITY = 0.35;
 const DROP_AMOUNT = 24;
 
 export class Game implements AsteroidDestroyedObserver {
-  readonly ship = new Ship();
+  readonly ship = new Ship({ fuel: 50, hp: 50, ammo: 50 });
   readonly asteroidBelt = new AsteroidBelt(this.ship.position);
   readonly supplyField = new SupplyField(this.ship.position);
   readonly massiveAsteroidField = new MassiveAsteroidField(this.ship.position, this.ship.radius);
   readonly laserField = new LaserField();
   readonly droneField = new DroneField();
+  readonly mission = new Mission();
+  readonly visitedMap = new VisitedMap();
   private readonly shipCollisions = new ShipCollisionSystem();
   private spawnExclusionRadius = 1500;
   elapsed = 0;
@@ -57,6 +61,8 @@ export class Game implements AsteroidDestroyedObserver {
     this.droneField.awakenNearby(this.ship, this.spawnExclusionRadius);
   }
   setSpawnExclusionRadius(radius: number): void { this.spawnExclusionRadius = Math.max(0, radius); }
+
+  advanceMission(): void { this.mission.advance(this.visitedMap); }
   addCollisionObserver(observer: CollisionObserver): void {
     this.asteroidBelt.addCollisionObserver(observer);
     this.massiveAsteroidField.addCollisionObserver(observer);
@@ -121,22 +127,27 @@ export class Game implements AsteroidDestroyedObserver {
     dt = Math.min(dt, 0.033);
     this.elapsed += dt;
     if (!this.ship.isAlive) return;
+    if (this.mission.isPaused) return;
     this.ship.updateInvulnerability(dt);
     this.ship.updateEmergencyReload(dt);
     this.ship.applyControls(dt);
 
     this.ship.integrate(dt);
+    this.visitedMap.visit(this.ship.position);
     const spawnBoundary = this.spawnExclusionRadius + this.ship.speed * 1.2;
-    this.asteroidBelt.update(dt, this.ship.position, spawnBoundary);
-    this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary, this.spawnExclusionRadius);
-    this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary);
+    const spawnEnabled = !this.mission.suppressSpawning;
+    this.asteroidBelt.update(dt, this.ship.position, spawnBoundary, spawnEnabled);
+    this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary, this.spawnExclusionRadius, spawnEnabled);
+    this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary, spawnEnabled);
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
-    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary);
+    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, spawnEnabled);
     this.laserField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, this.spawnExclusionRadius, this.droneField);
 
     const obstacles: PolygonObstacle[] = [];
     this.asteroidBelt.forEach((asteroid) => obstacles.push(asteroid));
     this.massiveAsteroidField.forEachActive((asteroid) => obstacles.push(asteroid));
     this.shipCollisions.resolve(this.ship, obstacles, dt);
+
+    this.mission.update(dt, this.ship, this.droneField, this.visitedMap);
   }
 }

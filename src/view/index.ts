@@ -7,6 +7,7 @@ export { Game } from './Game';
 export { Hud } from './Hud';
 export { MassiveAsteroidField } from './MassiveAsteroidField';
 export { Minimap } from './Minimap';
+export { MissionOverlay } from './MissionOverlay';
 export { MusicSystem, type AudioTrack, type MusicCategory } from './MusicSystem';
 export { Particle } from './Particle';
 export { ParticleField } from './ParticleField';

@@ -9,12 +9,18 @@ const MAX_AMMO = 100;
 const EMERGENCY_RELOAD_INTERVAL = 2;
 const EMERGENCY_RELOAD_AMOUNT = 1;
 
+export interface ShipInitialLevels {
+  fuel?: number;
+  hp?: number;
+  ammo?: number;
+}
+
 export class Ship extends PhysicsBody {
   private aimTarget: Vec2 = { x: 0, y: -100 };
   private throttle = 0;
-  private fuelLevel = 100;
-  private hpLevel = 100;
-  private ammoLevel = 100;
+  private fuelLevel: number;
+  private hpLevel: number;
+  private ammoLevel: number;
   private ammoReloadTimer = 0;
   private fuelReloadTimer = 0;
   private invulnerableTime = 0;
@@ -26,7 +32,7 @@ export class Ship extends PhysicsBody {
   private directionalVec: Vec2 | null = null;
   private directionalLevel = 0;
 
-  constructor() {
+  constructor(initial?: ShipInitialLevels) {
     const radius = 18;
     super(
       { x: 0, y: 0 },
@@ -36,6 +42,9 @@ export class Ship extends PhysicsBody {
       -Math.PI / 2,
       0,
     );
+    this.fuelLevel = initial?.fuel ?? 100;
+    this.hpLevel = initial?.hp ?? 100;
+    this.ammoLevel = initial?.ammo ?? 100;
   }
 
   get speed(): number { return length(this.velocity); }
