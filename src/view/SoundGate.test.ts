@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Collision } from '../model/Collision';
+import { CollectablePickup } from '../model/CollectablePickup';
 import { Damage } from '../model/Damage';
 import { LaserShot } from '../model/LaserShot';
 import { Camera } from './Camera';
@@ -11,10 +12,12 @@ class FakeSounds {
   laserImpact = 0;
   asteroidCollision = 0;
   shipCollision = 0;
+  collectable = 0;
   onLaserShot(): void { this.laserShot++; }
   onLaserImpact(): void { this.laserImpact++; }
   onAsteroidCollision(): void { this.asteroidCollision++; }
   onShipCollision(): void { this.shipCollision++; }
+  onCollectable(): void { this.collectable++; }
 }
 
 function buildGate(): { gate: SoundGate; sounds: FakeSounds } {
@@ -91,5 +94,21 @@ describe('SoundGate', () => {
     gate.onShipCollision(new Damage(OFFSCREEN, 100, true));
 
     expect(sounds.shipCollision).toBe(0);
+  });
+
+  it('REQ-45 plays the collectable-pickup sound for on-screen pickups', () => {
+    const { gate, sounds } = buildGate();
+
+    gate.onCollectable(new CollectablePickup(ONSCREEN));
+
+    expect(sounds.collectable).toBe(1);
+  });
+
+  it('REQ-45 stays silent for collectable pickups off-screen', () => {
+    const { gate, sounds } = buildGate();
+
+    gate.onCollectable(new CollectablePickup(OFFSCREEN));
+
+    expect(sounds.collectable).toBe(0);
   });
 });

@@ -3,6 +3,7 @@ import { AirContainer } from './AirContainer';
 import { AmmoContainer } from './AmmoContainer';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
+import { CollectablePickup } from './CollectablePickup';
 import { FuelContainer } from './FuelContainer';
 import { HpContainer } from './HpContainer';
 import { Ship } from './Ship';
@@ -137,5 +138,68 @@ describe('SupplyField', () => {
     const active: SupplyContainer[] = [];
     field.forEachActive((container) => active.push(container));
     expect(active).not.toContain(drop);
+  });
+
+  it('REQ-47 attracts a nearby container toward the ship', () => {
+    const ship = new Ship();
+    ship.position = { x: 0, y: 0 };
+    const container = new AirContainer({ x: 60, y: 0 }, 10);
+    const field = new SupplyField(ship.position, [container]);
+
+    field.update(0, ship, new AsteroidBelt(ship.position, []));
+
+    expect(container.velocity.x).toBeLessThan(0);
+    expect(container.velocity.y).toBeCloseTo(0, 5);
+  });
+
+  it('REQ-47 leaves containers beyond three ship lengths stationary', () => {
+    const ship = new Ship();
+    ship.position = { x: 0, y: 0 };
+    const container = new AirContainer({ x: 200, y: 0 }, 10);
+    const field = new SupplyField(ship.position, [container]);
+
+    field.update(0, ship, new AsteroidBelt(ship.position, []));
+
+    expect(container.velocity.x).toBe(0);
+    expect(container.velocity.y).toBe(0);
+  });
+
+  it('REQ-47 pulls a nearby container in until it is collected', () => {
+    const ship = new Ship();
+    ship.position = { x: 0, y: 0 };
+    const container = new AirContainer({ x: 80, y: 0 }, 10);
+    const field = new SupplyField(ship.position, [container]);
+    const belt = new AsteroidBelt(ship.position, []);
+
+    for (let step = 0; step < 30; step++) field.update(0.05, ship, belt);
+
+    const active: SupplyContainer[] = [];
+    field.forEachActive((current) => active.push(current));
+    expect(active).not.toContain(container);
+  });
+
+  it('REQ-45 notifies observers when a region container is collected', () => {
+    const ship = new Ship();
+    const container = new AirContainer({ ...ship.position }, 10);
+    const field = new SupplyField(ship.position, [container]);
+    const events: CollectablePickup[] = [];
+    field.addCollectablePickupObserver({ onCollectablePickup(event) { events.push(event); } });
+
+    field.update(0, ship, new AsteroidBelt(ship.position, []));
+
+    expect(events).toHaveLength(1);
+  });
+
+  it('REQ-45 notifies observers when a dropped container is collected', () => {
+    const ship = new Ship();
+    const field = new SupplyField(ship.position, []);
+    const drop = new AirContainer({ ...ship.position }, 10);
+    field.drop(drop);
+    const events: CollectablePickup[] = [];
+    field.addCollectablePickupObserver({ onCollectablePickup(event) { events.push(event); } });
+
+    field.update(0, ship, new AsteroidBelt(ship.position, []));
+
+    expect(events).toHaveLength(1);
   });
 });

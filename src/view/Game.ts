@@ -20,7 +20,7 @@ import { SpaceBackground } from './SpaceBackground';
 import { StorageAdapter } from './StorageAdapter';
 import { SupplyField } from './SupplyField';
 
-export class Game implements Model.CollisionObserver, Model.DamageObserver, Model.AsteroidDestroyedObserver, Model.LaserShotObserver, Model.LaserImpactObserver, Model.AsteroidCollisionObserver {
+export class Game implements Model.CollisionObserver, Model.DamageObserver, Model.AsteroidDestroyedObserver, Model.LaserShotObserver, Model.LaserImpactObserver, Model.AsteroidCollisionObserver, Model.CollectablePickupObserver {
   private readonly drawing: Drawing;
   private readonly camera = new Camera();
   private readonly hud = new Hud();
@@ -86,6 +86,10 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
 
   onAsteroidCollision(collision: Model.Collision): void {
     this.soundGate.onAsteroidCollision(collision);
+  }
+
+  onCollectablePickup(event: Model.CollectablePickup): void {
+    this.soundGate.onCollectable(event);
   }
 
   consumeRestartRequest(): boolean {

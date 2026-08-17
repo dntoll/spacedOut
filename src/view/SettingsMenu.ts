@@ -33,6 +33,7 @@ const SFX_SLIDERS: readonly SfxSliderConfig[] = [
   { channel: SfxChannel.LaserHit, field: 'laserHit', sliderId: 'sfx-laser-hit-slider', valueId: 'sfx-laser-hit-value' },
   { channel: SfxChannel.AsteroidCollision, field: 'asteroidCollision', sliderId: 'sfx-asteroid-slider', valueId: 'sfx-asteroid-value' },
   { channel: SfxChannel.ShipCollision, field: 'shipCollision', sliderId: 'sfx-ship-slider', valueId: 'sfx-ship-value' },
+  { channel: SfxChannel.Collectable, field: 'collectable', sliderId: 'sfx-collectable-slider', valueId: 'sfx-collectable-value' },
 ];
 
 export class SettingsMenu {
@@ -150,6 +151,7 @@ export class SettingsMenu {
       laserHit: this.sfxFraction(SfxChannel.LaserHit),
       asteroidCollision: this.sfxFraction(SfxChannel.AsteroidCollision),
       shipCollision: this.sfxFraction(SfxChannel.ShipCollision),
+      collectable: this.sfxFraction(SfxChannel.Collectable),
     };
   }
 

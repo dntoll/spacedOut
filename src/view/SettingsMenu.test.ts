@@ -60,6 +60,8 @@ function buildDocument(): Map<string, MockElement> {
     ['#sfx-asteroid-value', makeElement()],
     ['#sfx-ship-slider', makeElement('100')],
     ['#sfx-ship-value', makeElement()],
+    ['#sfx-collectable-slider', makeElement('100')],
+    ['#sfx-collectable-value', makeElement()],
   ]);
 }
 
@@ -344,6 +346,7 @@ describe('SettingsMenu', () => {
     expect(sfx.laserHit).toBeCloseTo(1, 5);
     expect(sfx.asteroidCollision).toBeCloseTo(1, 5);
     expect(sfx.shipCollision).toBeCloseTo(1, 5);
+    expect(sfx.collectable).toBeCloseTo(1, 5);
   });
 
   it('REQ-45 reflects SFX slider changes in the settings', () => {
@@ -353,16 +356,18 @@ describe('SettingsMenu', () => {
 
     elements.get('#sfx-master-slider')!.value = '40';
     elements.get('#sfx-laser-slider')!.value = '25';
+    elements.get('#sfx-collectable-slider')!.value = '70';
 
     const sfx = menu.getSfxSettings();
     expect(sfx.master).toBeCloseTo(0.4, 5);
     expect(sfx.laserShot).toBeCloseTo(0.25, 5);
+    expect(sfx.collectable).toBeCloseTo(0.7, 5);
   });
 
   it('REQ-45 loads persisted SFX settings into the sliders on startup', () => {
     const store = new FakeStore();
     store.setItem('sfx-settings', JSON.stringify({
-      master: 40, thrust: 60, laserShot: 25, laserHit: 0, asteroidCollision: 80, shipCollision: 10,
+      master: 40, thrust: 60, laserShot: 25, laserHit: 0, asteroidCollision: 80, shipCollision: 10, collectable: 55,
     }));
     const elements = buildDocument();
     stubDocument(elements);
@@ -371,8 +376,11 @@ describe('SettingsMenu', () => {
     expect(elements.get('#sfx-master-slider')!.value).toBe('40');
     expect(elements.get('#sfx-master-value')!.textContent).toBe('40');
     expect(elements.get('#sfx-laser-hit-slider')!.value).toBe('0');
+    expect(elements.get('#sfx-collectable-slider')!.value).toBe('55');
+    expect(elements.get('#sfx-collectable-value')!.textContent).toBe('55');
     expect(menu.getSfxSettings().master).toBeCloseTo(0.4, 5);
     expect(menu.getSfxSettings().laserHit).toBeCloseTo(0, 5);
+    expect(menu.getSfxSettings().collectable).toBeCloseTo(0.55, 5);
   });
 
   it('REQ-45 saves the SFX settings when a slider changes', () => {

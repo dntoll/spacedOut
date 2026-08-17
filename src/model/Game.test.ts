@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { AirContainer } from './AirContainer';
+import { CollectablePickup } from './CollectablePickup';
 import { Game } from './Game';
 import { LaserShot } from './LaserShot';
 
@@ -28,5 +30,17 @@ describe('Game', () => {
     game.fireLaser();
 
     expect(shots).toHaveLength(1);
+  });
+
+  it('REQ-45 forwards collectable-pickup observers to the supply field', () => {
+    const game = new Game();
+    const events: CollectablePickup[] = [];
+    game.addCollectablePickupObserver({ onCollectablePickup(event) { events.push(event); } });
+    const air = new AirContainer({ ...game.ship.position }, 10);
+    game.supplyField.drop(air);
+
+    game.update(0);
+
+    expect(events).toHaveLength(1);
   });
 });

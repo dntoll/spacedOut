@@ -14,6 +14,7 @@ export enum SfxChannel {
   LaserHit = 'laser-hit',
   AsteroidCollision = 'asteroid-collision',
   ShipCollision = 'ship-collision',
+  Collectable = 'collectable',
 }
 
 export interface SfxSettings {
@@ -23,6 +24,7 @@ export interface SfxSettings {
   laserHit: number;
   asteroidCollision: number;
   shipCollision: number;
+  collectable: number;
 }
 
 export const DEFAULT_SFX_SETTINGS: SfxSettings = {
@@ -32,6 +34,7 @@ export const DEFAULT_SFX_SETTINGS: SfxSettings = {
   laserHit: 1,
   asteroidCollision: 1,
   shipCollision: 1,
+  collectable: 1,
 };
 
 const ONE_SHOT_CHANNELS: readonly SfxChannel[] = [
@@ -39,6 +42,7 @@ const ONE_SHOT_CHANNELS: readonly SfxChannel[] = [
   SfxChannel.LaserHit,
   SfxChannel.AsteroidCollision,
   SfxChannel.ShipCollision,
+  SfxChannel.Collectable,
 ];
 
 export interface SoundSystemOptions {
@@ -122,6 +126,7 @@ export class SoundSystem {
   onLaserImpact(): void { this.playOneshot(SfxChannel.LaserHit); }
   onAsteroidCollision(): void { this.playOneshot(SfxChannel.AsteroidCollision); }
   onShipCollision(): void { this.playOneshot(SfxChannel.ShipCollision); }
+  onCollectable(): void { this.playOneshot(SfxChannel.Collectable); }
 
   private playOneshot(channel: SfxChannel): void {
     if (!this.unlocked) return;
@@ -138,6 +143,7 @@ export class SoundSystem {
       case SfxChannel.LaserHit: return this.volumes.laserHit;
       case SfxChannel.AsteroidCollision: return this.volumes.asteroidCollision;
       case SfxChannel.ShipCollision: return this.volumes.shipCollision;
+      case SfxChannel.Collectable: return this.volumes.collectable;
       case SfxChannel.Thrust: return this.volumes.thrust;
       default: return 1;
     }
@@ -166,6 +172,7 @@ function emptyClips(): Record<SfxChannel, SoundClip[]> {
     [SfxChannel.LaserHit]: [],
     [SfxChannel.AsteroidCollision]: [],
     [SfxChannel.ShipCollision]: [],
+    [SfxChannel.Collectable]: [],
   };
 }
 
@@ -177,6 +184,7 @@ function clampSettings(settings: SfxSettings): SfxSettings {
     laserHit: clamp(settings.laserHit, 0, 1),
     asteroidCollision: clamp(settings.asteroidCollision, 0, 1),
     shipCollision: clamp(settings.shipCollision, 0, 1),
+    collectable: clamp(settings.collectable, 0, 1),
   };
 }
 
@@ -186,6 +194,7 @@ function folderToChannel(folder: string): SfxChannel | null {
     case 'laser_hit_asteroid': return SfxChannel.LaserHit;
     case 'asteroid_asteroid_collision': return SfxChannel.AsteroidCollision;
     case 'asteroid_ship_collision': return SfxChannel.ShipCollision;
+    case 'collectable': return SfxChannel.Collectable;
     default: return null;
   }
 }

@@ -91,11 +91,13 @@ describe('SoundSystem', () => {
     const hit = new FakeSoundClip();
     const rock = new FakeSoundClip();
     const ship = new FakeSoundClip();
+    const pickup = new FakeSoundClip();
     const { system } = harness({
       [SfxChannel.LaserShot]: [laser],
       [SfxChannel.LaserHit]: [hit],
       [SfxChannel.AsteroidCollision]: [rock],
       [SfxChannel.ShipCollision]: [ship],
+      [SfxChannel.Collectable]: [pickup],
     });
     system.unlock();
 
@@ -103,11 +105,34 @@ describe('SoundSystem', () => {
     system.onLaserImpact();
     system.onAsteroidCollision();
     system.onShipCollision();
+    system.onCollectable();
 
     expect(laser.plays).toBe(1);
     expect(hit.plays).toBe(1);
     expect(rock.plays).toBe(1);
     expect(ship.plays).toBe(1);
+    expect(pickup.plays).toBe(1);
+  });
+
+  it('REQ-45 plays a collectable-pickup variation on collection after unlock', () => {
+    const clip = new FakeSoundClip();
+    const { system } = harness({ [SfxChannel.Collectable]: [clip] });
+    system.unlock();
+
+    system.onCollectable();
+
+    expect(clip.plays).toBe(1);
+  });
+
+  it('REQ-45 scales the collectable-pickup volume by the master and per-type sliders', () => {
+    const clip = new FakeSoundClip();
+    const { system } = harness({ [SfxChannel.Collectable]: [clip] });
+    system.unlock();
+    system.setSettings(fullSettings({ master: 0.5, collectable: 0.8 }));
+
+    system.onCollectable();
+
+    expect(clip.volume).toBeCloseTo(0.4, 5);
   });
 
   it('REQ-45 starts the thrust start segment when thrust begins', () => {

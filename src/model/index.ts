@@ -11,6 +11,8 @@ export { BodyMass } from './BodyMass';
 export { Collision } from './Collision';
 export type { CollisionObserver } from './CollisionObserver';
 export { CollisionResolver } from './CollisionResolver';
+export { CollectablePickup } from './CollectablePickup';
+export type { CollectablePickupObserver } from './CollectablePickupObserver';
 export { Damage } from './Damage';
 export type { DamageObserver } from './DamageObserver';
 export { DamageCalculator } from './DamageCalculator';

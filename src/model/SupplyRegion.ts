@@ -17,6 +17,7 @@ export class SupplyRegion {
     regionSize: number,
     worldSeed: number,
     initialContainers?: SupplyContainer[],
+    private readonly onPickup: (position: Vec2) => void = () => {},
   ) {
     if (initialContainers) {
       this.containers.push(...initialContainers);
@@ -41,6 +42,7 @@ export class SupplyRegion {
   update(dt: number, ship: Ship, asteroidBelt: AsteroidBelt): void {
     for (let index = this.containers.length - 1; index >= 0; index--) {
       const container = this.containers[index];
+      container.attractToward(ship);
       container.integrate(dt);
       asteroidBelt.collideWith(container);
 
@@ -49,6 +51,7 @@ export class SupplyRegion {
       const collectionRadius = container.radius + ship.radius;
       if (dx * dx + dy * dy <= collectionRadius * collectionRadius) {
         container.collect(ship);
+        this.onPickup(container.position);
         this.containers.splice(index, 1);
       }
     }

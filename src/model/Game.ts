@@ -5,6 +5,7 @@ import { AsteroidBelt } from './AsteroidBelt';
 import { AsteroidDestroyed } from './AsteroidDestroyed';
 import type { AsteroidDestroyedObserver } from './AsteroidDestroyedObserver';
 import type { AsteroidCollisionObserver } from './AsteroidCollisionObserver';
+import type { CollectablePickupObserver } from './CollectablePickupObserver';
 import type { CollisionObserver } from './CollisionObserver';
 import type { DamageObserver } from './DamageObserver';
 import { FuelContainer } from './FuelContainer';
@@ -82,6 +83,8 @@ export class Game implements AsteroidDestroyedObserver {
     this.asteroidBelt.removeAsteroidCollisionObserver(observer);
     this.massiveAsteroidField.removeAsteroidCollisionObserver(observer);
   }
+  addCollectablePickupObserver(observer: CollectablePickupObserver): void { this.supplyField.addCollectablePickupObserver(observer); }
+  removeCollectablePickupObserver(observer: CollectablePickupObserver): void { this.supplyField.removeCollectablePickupObserver(observer); }
 
   onDestroyed(event: AsteroidDestroyed): void {
     if (Math.random() >= DROP_PROBABILITY) return;

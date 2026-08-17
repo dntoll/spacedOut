@@ -1,4 +1,5 @@
 import type { Collision } from '../model/Collision';
+import type { CollectablePickup } from '../model/CollectablePickup';
 import type { Damage } from '../model/Damage';
 import type { LaserShot } from '../model/LaserShot';
 import type { Vec2 } from '../types';
@@ -27,6 +28,10 @@ export class SoundGate {
 
   onShipCollision(damage: Damage): void {
     if (this.onScreen(damage.position)) this.sounds.onShipCollision();
+  }
+
+  onCollectable(event: CollectablePickup): void {
+    if (this.onScreen(event.position)) this.sounds.onCollectable();
   }
 
   private onScreen(position: Vec2): boolean {
