@@ -14,7 +14,6 @@ import type { Ship } from './Ship';
 const TARGET_POPULATION = 24;
 const DETACH_RANGE_RADII = 12;
 const DRONE_IMPACT_DAMAGE = 20;
-const MENACE_RANGE = 700;
 const MASSIVE_CAPACITY_MAX = 6;
 
 export class DroneField {
@@ -31,17 +30,9 @@ export class DroneField {
   get count(): number { return this.drones.length; }
   has(drone: Drone): boolean { return this.drones.includes(drone); }
 
-  menace(center: Vec2): number {
-    let sum = 0;
-    const range = MENACE_RANGE;
-    for (const drone of this.drones) {
-      const dx = drone.position.x - center.x;
-      const dy = drone.position.y - center.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist >= range) continue;
-      sum += 1 - dist / range;
-    }
-    return Math.min(1, sum);
+  anyHunting(): boolean {
+    for (const drone of this.drones) { if (!drone.host) return true; }
+    return false;
   }
 
   addDamageObserver(observer: DamageObserver): void { this.damageObservers.add(observer); }

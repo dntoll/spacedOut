@@ -6,7 +6,6 @@ import { Drawing } from './Drawing';
 import { DroneField } from './DroneField';
 import { ExplorationMap } from './ExplorationMap';
 import { Hud } from './Hud';
-import { IntensityMeter } from './IntensityMeter';
 import { LaserField } from './LaserField';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Minimap } from './Minimap';
@@ -37,7 +36,6 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly particleField = new ParticleField();
   private readonly explorationMap = new ExplorationMap();
   private readonly minimap = new Minimap();
-  private readonly intensityMeter = new IntensityMeter();
   private readonly music = MusicSystem.create();
   private readonly sounds = SoundSystem.create();
   private readonly soundGate = new SoundGate(this.camera, this.sounds, () => this.drawing.size);
@@ -69,21 +67,19 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.particleField.emitDamageBurst(damage.position);
     if (damage.lethal) this.particleField.emitExplosion(damage.position);
     this.soundGate.onShipCollision(damage);
-    this.music.recordShipDamage();
   }
 
   onDestroyed(event: Model.AsteroidDestroyed): void {
     this.particleField.emitExplosion(event.position);
-    this.music.recordExplosion();
   }
 
   onLaserShot(event: Model.LaserShot): void {
     this.soundGate.onLaserShot(event);
+    this.music.recordLaserShot();
   }
 
   onLaserImpact(collision: Model.Collision): void {
     this.soundGate.onLaserImpact(collision);
-    this.music.recordLaserImpact();
   }
 
   onAsteroidCollision(collision: Model.Collision): void {
@@ -96,7 +92,6 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
 
   onDroneDestroyed(event: Model.DroneDestroyed): void {
     this.particleField.emitExplosion(event.position);
-    this.music.recordExplosion();
   }
 
   consumeRestartRequest(): boolean {
@@ -129,9 +124,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.camera.update(model.ship.position, model.speed, dt);
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
     this.particleField.update(dt, model, this.camera, this.drawing.size);
-    this.music.setThresholds(this.settings.getMusicThresholds());
-    this.music.setDecay(this.settings.getMusicDecay());
-    this.music.update({ thrust: model.thrustAmount, turn: model.turnRate, firing: model.laserField.count, menace: model.droneField.menace(model.ship.position) }, this.getMusicLevel(), dt);
+    this.music.update(this.getMusicLevel(), dt, model.droneField.anyHunting());
     const particleVisibility = this.settings.getParticleVisibility();
     this.particleField.setVisibility(particleVisibility);
     this.sounds.setSettings(this.settings.getSfxSettings());
@@ -151,7 +144,6 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     });
     this.background.drawVignette(this.drawing);
     this.minimap.draw(this.drawing, this.explorationMap, model, this.camera);
-    this.intensityMeter.draw(this.drawing, this.music.intensity, this.settings.getMusicThresholds(), this.music.activeCategory, this.drawing.size);
     this.hud.updateSpeed(model.speed);
     this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);
     if (model.isGameOver) this.gameOverNode?.classList.remove('hidden');

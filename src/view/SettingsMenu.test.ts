@@ -40,12 +40,6 @@ function buildDocument(): Map<string, MockElement> {
     ['#maxspeed-value', makeElement()],
     ['#music-slider', makeElement('50')],
     ['#music-value', makeElement()],
-    ['#medium-slider', makeElement('25')],
-    ['#medium-value', makeElement()],
-    ['#action-slider', makeElement('60')],
-    ['#action-value', makeElement()],
-    ['#decay-slider', makeElement('30')],
-    ['#decay-value', makeElement()],
     ['#particle-slider', makeElement('100')],
     ['#particle-value', makeElement()],
     ['#zoom-slider', makeElement('1.15')],
@@ -268,115 +262,6 @@ describe('SettingsMenu', () => {
 
     const saved = new StorageAdapter(store).read<number>('default-zoom');
     expect(saved).toBeCloseTo(0.8, 5);
-  });
-
-  it('REQ-29 exposes the default music thresholds from the sliders', () => {
-    const elements = buildDocument();
-    stubDocument(elements);
-    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
-
-    const thresholds = menu.getMusicThresholds();
-    expect(thresholds.medium).toBeCloseTo(0.25, 5);
-    expect(thresholds.action).toBeCloseTo(0.6, 5);
-  });
-
-  it('REQ-29 reflects threshold slider changes', () => {
-    const elements = buildDocument();
-    stubDocument(elements);
-    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
-
-    elements.get('#medium-slider')!.value = '15';
-    elements.get('#action-slider')!.value = '45';
-
-    const thresholds = menu.getMusicThresholds();
-    expect(thresholds.medium).toBeCloseTo(0.15, 5);
-    expect(thresholds.action).toBeCloseTo(0.45, 5);
-  });
-
-  it('REQ-29 keeps the action threshold at least a floor above medium', () => {
-    const elements = buildDocument();
-    stubDocument(elements);
-    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
-
-    elements.get('#medium-slider')!.value = '60';
-    elements.get('#action-slider')!.value = '10';
-
-    const thresholds = menu.getMusicThresholds();
-    expect(thresholds.medium).toBeCloseTo(0.6, 5);
-    expect(thresholds.action).toBeCloseTo(0.61, 5);
-  });
-
-  it('REQ-30 loads persisted thresholds into the sliders on startup', () => {
-    const store = new FakeStore();
-    store.setItem('music-thresholds', JSON.stringify({ medium: 15, action: 45 }));
-    const elements = buildDocument();
-    stubDocument(elements);
-    const menu = new SettingsMenu(new StorageAdapter(store));
-
-    expect(elements.get('#medium-slider')!.value).toBe('15');
-    expect(elements.get('#medium-value')!.textContent).toBe('15');
-    expect(elements.get('#action-slider')!.value).toBe('45');
-    expect(elements.get('#action-value')!.textContent).toBe('45');
-    expect(menu.getMusicThresholds().medium).toBeCloseTo(0.15, 5);
-  });
-
-  it('REQ-30 saves the thresholds when a slider changes', () => {
-    const store = new FakeStore();
-    const elements = buildDocument();
-    stubDocument(elements);
-    new SettingsMenu(new StorageAdapter(store));
-
-    elements.get('#action-slider')!.value = '40';
-    elements.get('#action-slider')!.handlers.get('input')!();
-
-    const saved = new StorageAdapter(store).read<{ medium: number; action: number }>('music-thresholds');
-    expect(saved?.medium).toBe(25);
-    expect(saved?.action).toBe(40);
-  });
-
-  it('REQ-30 exposes the default music decay from the slider', () => {
-    const elements = buildDocument();
-    stubDocument(elements);
-    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
-
-    expect(menu.getMusicDecay()).toBeCloseTo(3, 5);
-  });
-
-  it('REQ-30 reflects the decay slider position in seconds', () => {
-    const elements = buildDocument();
-    stubDocument(elements);
-    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
-
-    elements.get('#decay-slider')!.value = '0';
-    expect(menu.getMusicDecay()).toBeCloseTo(0, 5);
-
-    elements.get('#decay-slider')!.value = '100';
-    expect(menu.getMusicDecay()).toBeCloseTo(10, 5);
-  });
-
-  it('REQ-30 loads persisted decay into the slider on startup', () => {
-    const store = new FakeStore();
-    store.setItem('music-decay', JSON.stringify(70));
-    const elements = buildDocument();
-    stubDocument(elements);
-    const menu = new SettingsMenu(new StorageAdapter(store));
-
-    expect(elements.get('#decay-slider')!.value).toBe('70');
-    expect(elements.get('#decay-value')!.textContent).toBe('70');
-    expect(menu.getMusicDecay()).toBeCloseTo(7, 5);
-  });
-
-  it('REQ-30 saves the decay when the slider changes', () => {
-    const store = new FakeStore();
-    const elements = buildDocument();
-    stubDocument(elements);
-    new SettingsMenu(new StorageAdapter(store));
-
-    elements.get('#decay-slider')!.value = '55';
-    elements.get('#decay-slider')!.handlers.get('input')!();
-
-    const saved = new StorageAdapter(store).read<number>('music-decay');
-    expect(saved).toBe(55);
   });
 
   it('REQ-45 exposes the default SFX settings from the sliders', () => {

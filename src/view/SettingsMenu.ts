@@ -1,21 +1,13 @@
 import type { ControlTuning } from '../types';
-import { THRESHOLD_FLOOR, type MusicThresholds } from './MusicSystem';
 import { SfxChannel, type SfxSettings } from './SoundSystem';
 import { StorageAdapter } from './StorageAdapter';
 
 const STORAGE_KEY = 'control-tuning';
 const MUSIC_STORAGE_KEY = 'music-level';
-const MUSIC_THRESHOLD_STORAGE_KEY = 'music-thresholds';
-const MUSIC_DECAY_STORAGE_KEY = 'music-decay';
 const PARTICLE_STORAGE_KEY = 'particle-visibility';
 const SFX_STORAGE_KEY = 'sfx-settings';
 const ZOOM_STORAGE_KEY = 'default-zoom';
 const DEFAULT_MUSIC_PERCENT = 50;
-const DEFAULT_MEDIUM_PERCENT = 25;
-const DEFAULT_ACTION_PERCENT = 60;
-const DEFAULT_DECAY_PERCENT = 30;
-const DECAY_MIN_SECONDS = 0;
-const DECAY_MAX_SECONDS = 10;
 const DEFAULT_PARTICLE_PERCENT = 100;
 const DEFAULT_SFX_PERCENT = 100;
 const DEFAULT_ZOOM = 1.15;
@@ -51,12 +43,6 @@ export class SettingsMenu {
   private readonly maxSpeedValue: HTMLElement | null;
   private readonly musicSlider: HTMLInputElement | null;
   private readonly musicValue: HTMLElement | null;
-  private readonly mediumSlider: HTMLInputElement | null;
-  private readonly mediumValue: HTMLElement | null;
-  private readonly actionSlider: HTMLInputElement | null;
-  private readonly actionValue: HTMLElement | null;
-  private readonly decaySlider: HTMLInputElement | null;
-  private readonly decayValue: HTMLElement | null;
   private readonly particleSlider: HTMLInputElement | null;
   private readonly particleValue: HTMLElement | null;
   private readonly zoomSlider: HTMLInputElement | null;
@@ -75,12 +61,6 @@ export class SettingsMenu {
     this.maxSpeedValue = document.querySelector<HTMLElement>('#maxspeed-value');
     this.musicSlider = document.querySelector<HTMLInputElement>('#music-slider');
     this.musicValue = document.querySelector<HTMLElement>('#music-value');
-    this.mediumSlider = document.querySelector<HTMLInputElement>('#medium-slider');
-    this.mediumValue = document.querySelector<HTMLElement>('#medium-value');
-    this.actionSlider = document.querySelector<HTMLInputElement>('#action-slider');
-    this.actionValue = document.querySelector<HTMLElement>('#action-value');
-    this.decaySlider = document.querySelector<HTMLInputElement>('#decay-slider');
-    this.decayValue = document.querySelector<HTMLElement>('#decay-value');
     this.particleSlider = document.querySelector<HTMLInputElement>('#particle-slider');
     this.particleValue = document.querySelector<HTMLElement>('#particle-value');
     this.zoomSlider = document.querySelector<HTMLInputElement>('#zoom-slider');
@@ -94,10 +74,6 @@ export class SettingsMenu {
     this.applyTuning({ ...DEFAULT_TUNING, ...persisted });
     const persistedMusic = this.storage.read<number>(MUSIC_STORAGE_KEY);
     if (persistedMusic != null) this.applyMusic(persistedMusic);
-    const persistedThresholds = this.storage.read<{ medium?: number; action?: number }>(MUSIC_THRESHOLD_STORAGE_KEY);
-    this.applyThresholds(persistedThresholds?.medium ?? DEFAULT_MEDIUM_PERCENT, persistedThresholds?.action ?? DEFAULT_ACTION_PERCENT);
-    const persistedDecay = this.storage.read<number>(MUSIC_DECAY_STORAGE_KEY);
-    if (persistedDecay != null) this.applyDecay(persistedDecay);
     const persistedParticle = this.storage.read<number>(PARTICLE_STORAGE_KEY);
     if (persistedParticle != null) this.applyParticle(persistedParticle);
     const persistedZoom = this.storage.read<number>(ZOOM_STORAGE_KEY);
@@ -110,9 +86,6 @@ export class SettingsMenu {
     this.thrustSlider?.addEventListener('input', () => this.onChange(this.thrustValue, this.thrustSlider, 0));
     this.maxSpeedSlider?.addEventListener('input', () => this.onChange(this.maxSpeedValue, this.maxSpeedSlider, 0));
     this.musicSlider?.addEventListener('input', () => this.onMusicChange());
-    this.mediumSlider?.addEventListener('input', () => this.onThresholdChange());
-    this.actionSlider?.addEventListener('input', () => this.onThresholdChange());
-    this.decaySlider?.addEventListener('input', () => this.onDecayChange());
     this.particleSlider?.addEventListener('input', () => this.onParticleChange());
     this.zoomSlider?.addEventListener('input', () => this.onZoomChange());
     for (const cfg of SFX_SLIDERS) {
@@ -132,20 +105,6 @@ export class SettingsMenu {
     const raw = Number(this.musicSlider?.value);
     const percent = Number.isFinite(raw) ? raw : DEFAULT_MUSIC_PERCENT;
     return Math.max(0, Math.min(1, percent / 100));
-  }
-
-  getMusicThresholds(): MusicThresholds {
-    const medium = this.percent(this.mediumSlider, DEFAULT_MEDIUM_PERCENT);
-    let action = this.percent(this.actionSlider, DEFAULT_ACTION_PERCENT);
-    action = Math.max(action, Math.min(1, medium + THRESHOLD_FLOOR));
-    return { medium, action };
-  }
-
-  getMusicDecay(): number {
-    const raw = Number(this.decaySlider?.value);
-    const percent = Number.isFinite(raw) ? raw : DEFAULT_DECAY_PERCENT;
-    const normalized = Math.max(0, Math.min(1, percent / 100));
-    return DECAY_MIN_SECONDS + normalized * (DECAY_MAX_SECONDS - DECAY_MIN_SECONDS);
   }
 
   getParticleVisibility(): number {
@@ -185,21 +144,6 @@ export class SettingsMenu {
     const clamped = String(Math.max(0, Math.min(100, Math.round(percent))));
     if (this.musicSlider) this.musicSlider.value = clamped;
     if (this.musicValue) this.musicValue.textContent = clamped;
-  }
-
-  private applyThresholds(mediumPercent: number, actionPercent: number): void {
-    const medium = String(Math.max(0, Math.min(100, Math.round(mediumPercent))));
-    const action = String(Math.max(0, Math.min(100, Math.round(actionPercent))));
-    if (this.mediumSlider) this.mediumSlider.value = medium;
-    if (this.mediumValue) this.mediumValue.textContent = medium;
-    if (this.actionSlider) this.actionSlider.value = action;
-    if (this.actionValue) this.actionValue.textContent = action;
-  }
-
-  private applyDecay(percent: number): void {
-    const clamped = String(Math.max(0, Math.min(100, Math.round(percent))));
-    if (this.decaySlider) this.decaySlider.value = clamped;
-    if (this.decayValue) this.decayValue.textContent = clamped;
   }
 
   private applyParticle(percent: number): void {
@@ -242,20 +186,6 @@ export class SettingsMenu {
     this.storage.write(MUSIC_STORAGE_KEY, Number(this.musicSlider?.value));
   }
 
-  private onThresholdChange(): void {
-    if (this.mediumValue && this.mediumSlider) this.mediumValue.textContent = this.mediumSlider.value;
-    if (this.actionValue && this.actionSlider) this.actionValue.textContent = this.actionSlider.value;
-    this.storage.write(MUSIC_THRESHOLD_STORAGE_KEY, {
-      medium: Number(this.mediumSlider?.value),
-      action: Number(this.actionSlider?.value),
-    });
-  }
-
-  private onDecayChange(): void {
-    if (this.decayValue && this.decaySlider) this.decayValue.textContent = this.decaySlider.value;
-    this.storage.write(MUSIC_DECAY_STORAGE_KEY, Number(this.decaySlider?.value));
-  }
-
   private onParticleChange(): void {
     if (this.particleValue && this.particleSlider) this.particleValue.textContent = this.particleSlider.value;
     this.storage.write(PARTICLE_STORAGE_KEY, Number(this.particleSlider?.value));
@@ -280,12 +210,6 @@ export class SettingsMenu {
   private read(slider: HTMLInputElement | null, fallback: number): number {
     const value = Number(slider?.value);
     return Number.isFinite(value) ? value : fallback;
-  }
-
-  private percent(slider: HTMLInputElement | null, fallbackPercent: number): number {
-    const raw = Number(slider?.value);
-    const value = Number.isFinite(raw) ? raw : fallbackPercent;
-    return Math.max(0, Math.min(1, value / 100));
   }
 
   private sfxFraction(channel: SfxChannel): number {

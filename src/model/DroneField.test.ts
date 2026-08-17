@@ -233,35 +233,21 @@ describe('DroneField', () => {
     spy.mockRestore();
   });
 
-  it('REQ-29 menace rises as drones get closer to the ship', () => {
-    const ship = new Ship();
-    const far = new Drone(null, 0, [1, 1, 1], 2);
-    far.position = { x: 600, y: 0 };
-    const near = new Drone(null, 0, [1, 1, 1], 2);
-    near.position = { x: 100, y: 0 };
-    const field = new DroneField([far]);
+  it('REQ-29 anyHunting is false when every drone is still attached to a host', () => {
+    const host = new Asteroid(1, { x: 2000, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const attached = new Drone(host, 0, [1, 1, 1], 2);
+    const field = new DroneField([attached]);
 
-    const farMenace = field.menace(ship.position);
-    field.forEach(() => {});
-    const field2 = new DroneField([near]);
-    const nearMenace = field2.menace(ship.position);
-
-    expect(nearMenace).toBeGreaterThan(farMenace);
-    expect(nearMenace).toBeGreaterThan(0);
-    expect(nearMenace).toBeLessThanOrEqual(1);
+    expect(field.anyHunting()).toBe(false);
   });
 
-  it('REQ-29 menace saturates at one when many drones crowd the ship', () => {
+  it('REQ-29 anyHunting is true once a drone has detached and is pursuing the ship', () => {
     const ship = new Ship();
-    const drones: Drone[] = [];
-    for (let i = 0; i < 10; i++) {
-      const drone = new Drone(null, 0, [1, 1, 1], 2);
-      drone.position = { x: ship.position.x + i, y: ship.position.y };
-      drones.push(drone);
-    }
-    const field = new DroneField(drones);
+    const hunter = new Drone(null, 0, [1, 1, 1], 2);
+    hunter.position = { x: 2000, y: 0 };
+    const field = new DroneField([hunter]);
 
-    expect(field.menace(ship.position)).toBe(1);
+    expect(field.anyHunting()).toBe(true);
   });
 });
 
