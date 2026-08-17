@@ -62,6 +62,8 @@ export class MassiveAsteroidField {
   }
 
   forEachActive(visitor: (asteroid: MassiveAsteroid) => void): void { this.activeAsteroids.forEach(visitor); }
+
+  has(asteroid: MassiveAsteroid): boolean { return this.activeAsteroids.includes(asteroid); }
   forEachKnown(visitor: (asteroid: MassiveAsteroid) => void): void {
     if (this.fixedAsteroids) {
       this.fixedAsteroids.forEach(visitor);

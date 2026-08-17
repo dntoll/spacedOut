@@ -21,6 +21,7 @@ const stubModel = (isGameOver: boolean): Model.Game =>
     addLaserImpactObserver: vi.fn(),
     addAsteroidCollisionObserver: vi.fn(),
     addCollectablePickupObserver: vi.fn(),
+    addDroneDestroyedObserver: vi.fn(),
   }) as unknown as Model.Game;
 
 const stubView = (restart: boolean, firing = false): View.Game =>
@@ -63,6 +64,7 @@ describe('Controller Game', () => {
     expect(freshModel.addLaserImpactObserver).toHaveBeenCalledWith(view);
     expect(freshModel.addAsteroidCollisionObserver).toHaveBeenCalledWith(view);
     expect(freshModel.addCollectablePickupObserver).toHaveBeenCalledWith(view);
+    expect(freshModel.addDroneDestroyedObserver).toHaveBeenCalledWith(view);
     expect(freshModel.update).toHaveBeenCalled();
     expect(view.render).toHaveBeenCalledWith(freshModel, expect.any(Number));
     expect(deadModel.update).not.toHaveBeenCalled();

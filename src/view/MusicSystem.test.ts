@@ -123,6 +123,26 @@ describe('MusicSystem', () => {
     expect(firing).toBeGreaterThan(cruising);
   });
 
+  it('REQ-29 charges intensity from nearby mining drones, scaling with proximity', () => {
+    const calm = tracks('calm');
+    const medium = tracks('medium');
+    const action = tracks('action');
+    const base = new MusicSystem([...calm, ...medium, ...action], { fadeSeconds: 1, decaySeconds: 3 });
+    const mild = new MusicSystem([...calm, ...medium, ...action], { fadeSeconds: 1, decaySeconds: 3 });
+    const heavy = new MusicSystem([...calm, ...medium, ...action], { fadeSeconds: 1, decaySeconds: 3 });
+    base.unlock(); mild.unlock(); heavy.unlock();
+    hold(base, IDLE, 1, 1);
+    hold(mild, IDLE, 1, 1);
+    hold(heavy, IDLE, 1, 1);
+
+    hold(base, { thrust: 0, turn: 0, firing: 0 }, 1, 10);
+    hold(mild, { thrust: 0, turn: 0, firing: 0, menace: 0.3 }, 1, 10);
+    hold(heavy, { thrust: 0, turn: 0, firing: 0, menace: 1 }, 1, 10);
+
+    expect(mild.intensity).toBeGreaterThan(base.intensity);
+    expect(heavy.intensity).toBeGreaterThan(mild.intensity);
+  });
+
   it('REQ-29 decays the intensity sum toward zero when actions stop', () => {
     const calm = tracks('calm');
     const medium = tracks('medium');

@@ -32,6 +32,7 @@ export class Minimap {
       this.drawMassiveAsteroids(drawing, exploration, model.massiveAsteroidField, center, position, size);
       this.drawAsteroids(drawing, exploration, model.asteroidBelt, center, position, size);
       this.drawSupplies(drawing, exploration, model.supplyField, center, position, size);
+      this.drawDrones(drawing, exploration, model.droneField, center, position, size);
       this.drawShip(drawing, model.ship.angle, position, size);
     });
   }
@@ -116,6 +117,24 @@ export class Minimap {
             : container instanceof Model.AmmoContainer
               ? '#c98bff'
               : '#ffc35c',
+      );
+    });
+  }
+
+  private drawDrones(
+    drawing: Drawing,
+    exploration: ExplorationMap,
+    field: Model.DroneField,
+    center: Vec2,
+    position: Vec2,
+    size: Size,
+  ): void {
+    field.forEach((drone) => {
+      if (!exploration.isExplored(drone.position) || !this.intersectsMap(drone.position, 0, center)) return;
+      drawing.circle(
+        this.toMap(drone.position, center, position, size),
+        2.0,
+        '#7dff5e',
       );
     });
   }

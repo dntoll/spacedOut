@@ -1,6 +1,7 @@
 export { AsteroidBelt } from './AsteroidBelt';
 export { Camera, type WorldBounds } from './Camera';
 export { Drawing } from './Drawing';
+export { DroneField } from './DroneField';
 export { ExplorationMap } from './ExplorationMap';
 export { Game } from './Game';
 export { Hud } from './Hud';

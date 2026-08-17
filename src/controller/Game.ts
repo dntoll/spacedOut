@@ -47,5 +47,6 @@ export class Game {
     model.addLaserImpactObserver(this.view);
     model.addAsteroidCollisionObserver(this.view);
     model.addCollectablePickupObserver(this.view);
+    model.addDroneDestroyedObserver(this.view);
   }
 }

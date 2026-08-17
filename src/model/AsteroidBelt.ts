@@ -46,6 +46,8 @@ export class AsteroidBelt {
     this.asteroids.forEach(visitor);
   }
 
+  has(asteroid: Asteroid): boolean { return this.asteroids.includes(asteroid); }
+
   collideWith(body: PhysicsBody): void {
     for (const asteroid of this.asteroids) this.collide(body, asteroid);
   }

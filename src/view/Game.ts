@@ -3,6 +3,7 @@ import type { ControlTuning, Vec2 } from '../types';
 import { AsteroidBelt } from './AsteroidBelt';
 import { Camera } from './Camera';
 import { Drawing } from './Drawing';
+import { DroneField } from './DroneField';
 import { ExplorationMap } from './ExplorationMap';
 import { Hud } from './Hud';
 import { IntensityMeter } from './IntensityMeter';
@@ -20,7 +21,7 @@ import { SpaceBackground } from './SpaceBackground';
 import { StorageAdapter } from './StorageAdapter';
 import { SupplyField } from './SupplyField';
 
-export class Game implements Model.CollisionObserver, Model.DamageObserver, Model.AsteroidDestroyedObserver, Model.LaserShotObserver, Model.LaserImpactObserver, Model.AsteroidCollisionObserver, Model.CollectablePickupObserver {
+export class Game implements Model.CollisionObserver, Model.DamageObserver, Model.AsteroidDestroyedObserver, Model.LaserShotObserver, Model.LaserImpactObserver, Model.AsteroidCollisionObserver, Model.CollectablePickupObserver, Model.DroneDestroyedObserver {
   private readonly drawing: Drawing;
   private readonly camera = new Camera();
   private readonly hud = new Hud();
@@ -32,6 +33,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly massiveAsteroidField = new MassiveAsteroidField();
   private readonly supplyField = new SupplyField();
   private readonly laserField = new LaserField();
+  private readonly droneField = new DroneField();
   private readonly particleField = new ParticleField();
   private readonly explorationMap = new ExplorationMap();
   private readonly minimap = new Minimap();
@@ -92,6 +94,11 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.soundGate.onCollectable(event);
   }
 
+  onDroneDestroyed(event: Model.DroneDestroyed): void {
+    this.particleField.emitExplosion(event.position);
+    this.music.recordExplosion();
+  }
+
   consumeRestartRequest(): boolean {
     if (this.restartRequested) {
       this.restartRequested = false;
@@ -112,7 +119,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.particleField.update(dt, model, this.camera, this.drawing.size);
     this.music.setThresholds(this.settings.getMusicThresholds());
     this.music.setDecay(this.settings.getMusicDecay());
-    this.music.update({ thrust: model.thrustAmount, turn: model.turnRate, firing: model.laserField.count }, this.getMusicLevel(), dt);
+    this.music.update({ thrust: model.thrustAmount, turn: model.turnRate, firing: model.laserField.count, menace: model.droneField.menace(model.ship.position) }, this.getMusicLevel(), dt);
     const particleVisibility = this.settings.getParticleVisibility();
     this.particleField.setVisibility(particleVisibility);
     this.sounds.setSettings(this.settings.getSfxSettings());
@@ -125,6 +132,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
       this.particleField.draw(this.drawing);
       this.supplyField.draw(this.drawing, model.supplyField);
       this.asteroidBelt.draw(this.drawing, model.asteroidBelt, model.ship.position, this.camera);
+      this.droneField.draw(this.drawing, model.droneField, model.ship.position, this.camera);
       this.laserField.draw(this.drawing, model.laserField);
       if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship);
     });

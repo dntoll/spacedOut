@@ -17,11 +17,13 @@ describe('Minimap', () => {
       1, { x: -100, y: 0 }, 50, 0, [1, 1, 1, 1], [], 0.5,
     );
     const asteroid = new Model.Asteroid(1, { x: 200, y: 0 }, { x: 0, y: 0 }, 24, 0, 0, [1, 1, 1], 0.5);
+    const drone = new Model.Drone(null, 0, [1, 1, 1], 2);
     const model = {
       ship,
       supplyField,
       massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, [massive]),
       asteroidBelt: { forEach: (fn: (a: Model.Asteroid) => void) => fn(asteroid) },
+      droneField: { forEach: (fn: (d: Model.Drone) => void) => fn(drone) },
     } as Model.Game;
     const exploration = new ExplorationMap();
     exploration.observe({ left: -250, top: -250, right: 250, bottom: 250 });
@@ -50,6 +52,7 @@ describe('Minimap', () => {
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#62e6ff');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#5dff9a');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.0, '#7dff5e');
     expect(circle).not.toHaveBeenCalledWith(expect.any(Object), 2.2, '#ffc35c');
     expect(circle).not.toHaveBeenCalledWith(expect.any(Object), 2.2, '#c98bff');
     expect(withTransform).toHaveBeenCalledWith({ x: 870, y: 162 }, ship.angle, expect.any(Function));

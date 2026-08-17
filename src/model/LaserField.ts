@@ -4,6 +4,8 @@ import type { Asteroid } from './Asteroid';
 import type { AsteroidBelt } from './AsteroidBelt';
 import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
+import type { Drone } from './Drone';
+import type { DroneField } from './DroneField';
 import type { LaserImpactObserver } from './LaserImpactObserver';
 import { Laser } from './Laser';
 import { LaserShot } from './LaserShot';
@@ -13,8 +15,7 @@ import type { MassiveAsteroidField } from './MassiveAsteroidField';
 import type { Ship } from './Ship';
 
 const NOSE_OFFSET = 22;
-const LASER_SPEED = 900;
-const LASER_LIFE = 0.9;
+const LASER_SPEED = 1800;
 const LASER_RADIUS = 2.5;
 const FIRE_COOLDOWN = 0.18;
 const SHOT_COST = 1;
@@ -44,7 +45,7 @@ export class LaserField {
     const forward = { x: Math.cos(ship.angle), y: Math.sin(ship.angle) };
     const muzzle = add(ship.position, scale(forward, NOSE_OFFSET));
     const velocity = add(scale(forward, LASER_SPEED), ship.velocity);
-    this.lasers.push(new Laser(muzzle, velocity, ship.angle, LASER_RADIUS, LASER_LIFE));
+    this.lasers.push(new Laser(muzzle, velocity, ship.angle, LASER_RADIUS));
     const event = new LaserShot({ ...muzzle });
     for (const observer of this.laserShotObservers) observer.onLaserShot(event);
   }
@@ -55,13 +56,13 @@ export class LaserField {
     asteroidBelt: AsteroidBelt,
     massiveAsteroidField: MassiveAsteroidField,
     cullRadius = Number.POSITIVE_INFINITY,
+    droneField?: DroneField,
   ): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
     const maxRange = cullRadius + CULL_MARGIN;
     for (let i = this.lasers.length - 1; i >= 0; i--) {
       const laser = this.lasers[i];
       laser.update(dt);
-      if (!laser.isAlive) { this.lasers.splice(i, 1); continue; }
       if (length(sub(laser.position, ship.position)) > maxRange) { this.lasers.splice(i, 1); continue; }
 
       const regularHit = this.nearestRegularHit(laser, asteroidBelt);
@@ -78,7 +79,30 @@ export class LaserField {
         this.lasers.splice(i, 1);
         continue;
       }
+
+      if (droneField) {
+        const drone = this.droneHit(laser, droneField);
+        if (drone) {
+          this.emitSpark(laser.position, normalize(sub(laser.position, drone.position)));
+          droneField.applyLaserHit(drone, laser.position);
+          this.lasers.splice(i, 1);
+          continue;
+        }
+      }
     }
+  }
+
+  private droneHit(laser: Laser, droneField: DroneField): Drone | null {
+    let hit: Drone | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    droneField.forEach((drone) => {
+      const distance = length(sub(drone.position, laser.position));
+      if (distance <= drone.radius + laser.radius && distance < bestDistance) {
+        bestDistance = distance;
+        hit = drone;
+      }
+    });
+    return hit;
   }
 
   private nearestRegularHit(laser: Laser, asteroidBelt: AsteroidBelt): { asteroid: Asteroid } | null {

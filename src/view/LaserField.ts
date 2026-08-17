@@ -2,7 +2,7 @@ import { scale } from '../math';
 import type * as Model from '../model';
 import type { Drawing } from './Drawing';
 
-const LASER_LENGTH = 22;
+const LASER_LENGTH = 34;
 const LASER_COLOR = '#ff3b4d';
 const LASER_GLOW = '#ff2a3a';
 

@@ -100,6 +100,22 @@ describe('LaserField', () => {
     expect(count).toBe(0);
   });
 
+  it('REQ-44 keeps laser shots alive while still on screen, even at high speed and long flight time', () => {
+    const ship = new Ship();
+    ship.aimAt({ x: 100, y: 0 });
+    ship.applyControls(0);
+    const field = new LaserField();
+
+    field.fire(ship);
+    // Large cull radius simulates a zoomed-out high-speed view; the laser must
+    // survive far past any fixed lifetime because it has not left the screen.
+    field.update(1.0, ship, emptyBelt(), emptyMassiveField(), 5000);
+
+    let count = 0;
+    field.forEach(() => count++);
+    expect(count).toBe(1);
+  });
+
   it('REQ-41 destroys a regular asteroid on hit and emits a spark', () => {
     const ship = new Ship();
     ship.aimAt({ x: 100, y: 0 });

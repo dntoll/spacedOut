@@ -8,6 +8,8 @@ import type { AsteroidCollisionObserver } from './AsteroidCollisionObserver';
 import type { CollectablePickupObserver } from './CollectablePickupObserver';
 import type { CollisionObserver } from './CollisionObserver';
 import type { DamageObserver } from './DamageObserver';
+import { DroneField } from './DroneField';
+import type { DroneDestroyedObserver } from './DroneDestroyedObserver';
 import { FuelContainer } from './FuelContainer';
 import { HpContainer } from './HpContainer';
 import type { LaserImpactObserver } from './LaserImpactObserver';
@@ -29,6 +31,7 @@ export class Game implements AsteroidDestroyedObserver {
   readonly supplyField = new SupplyField(this.ship.position);
   readonly massiveAsteroidField = new MassiveAsteroidField(this.ship.position, this.ship.radius);
   readonly laserField = new LaserField();
+  readonly droneField = new DroneField();
   private readonly shipCollisions = new ShipCollisionSystem();
   private spawnExclusionRadius = 1500;
   elapsed = 0;
@@ -63,8 +66,16 @@ export class Game implements AsteroidDestroyedObserver {
     this.shipCollisions.removeCollisionObserver(observer);
     this.laserField.removeCollisionObserver(observer);
   }
-  addDamageObserver(observer: DamageObserver): void { this.shipCollisions.addDamageObserver(observer); }
-  removeDamageObserver(observer: DamageObserver): void { this.shipCollisions.removeDamageObserver(observer); }
+  addDamageObserver(observer: DamageObserver): void {
+    this.shipCollisions.addDamageObserver(observer);
+    this.droneField.addDamageObserver(observer);
+  }
+  removeDamageObserver(observer: DamageObserver): void {
+    this.shipCollisions.removeDamageObserver(observer);
+    this.droneField.removeDamageObserver(observer);
+  }
+  addDroneDestroyedObserver(observer: DroneDestroyedObserver): void { this.droneField.addDroneDestroyedObserver(observer); }
+  removeDroneDestroyedObserver(observer: DroneDestroyedObserver): void { this.droneField.removeDroneDestroyedObserver(observer); }
   addAsteroidDestroyedObserver(observer: AsteroidDestroyedObserver): void {
     this.asteroidBelt.addAsteroidDestroyedObserver(observer);
   }
@@ -113,7 +124,8 @@ export class Game implements AsteroidDestroyedObserver {
     this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary);
     this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary);
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
-    this.laserField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, this.spawnExclusionRadius);
+    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary);
+    this.laserField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, this.spawnExclusionRadius, this.droneField);
 
     const obstacles: PolygonObstacle[] = [];
     this.asteroidBelt.forEach((asteroid) => obstacles.push(asteroid));

@@ -6,6 +6,7 @@ export interface FlightSignals {
   thrust: number;
   turn: number;
   firing: number;
+  menace?: number;
 }
 
 export interface AudioTrack {
@@ -40,6 +41,7 @@ const THRUST_RATE = 0.1;
 const TURN_RATE = 0.1;
 const FIRING_RATE = 0.05;
 const FIRING_REF = 5;
+const MENACE_RATE = 0.12;
 const SPIKE_EXPLOSION = 0.1;
 const SPIKE_SHIP_DAMAGE = 0.3;
 const SPIKE_LASER_IMPACT = 0.08;
@@ -88,7 +90,8 @@ export class MusicSystem {
     const thrust = clamp01(signals.thrust);
     const turnBoost = clamp01(Math.abs(signals.turn) / TURN_REF) * thrust;
     const firing = clamp01(signals.firing / FIRING_REF);
-    const charge = (THRUST_RATE * thrust) + (TURN_RATE * turnBoost) + (FIRING_RATE * firing);
+    const menace = clamp01(signals.menace ?? 0);
+    const charge = (THRUST_RATE * thrust) + (TURN_RATE * turnBoost) + (FIRING_RATE * firing) + (MENACE_RATE * menace);
     this.intensityValue = clamp01(this.intensityValue + charge * dt);
 
     if (!this.unlocked) { this.pauseAll(); return; }
