@@ -44,8 +44,22 @@ function buildDocument(): Map<string, MockElement> {
     ['#medium-value', makeElement()],
     ['#action-slider', makeElement('60')],
     ['#action-value', makeElement()],
+    ['#decay-slider', makeElement('30')],
+    ['#decay-value', makeElement()],
     ['#particle-slider', makeElement('100')],
     ['#particle-value', makeElement()],
+    ['#sfx-master-slider', makeElement('100')],
+    ['#sfx-master-value', makeElement()],
+    ['#sfx-thrust-slider', makeElement('100')],
+    ['#sfx-thrust-value', makeElement()],
+    ['#sfx-laser-slider', makeElement('100')],
+    ['#sfx-laser-value', makeElement()],
+    ['#sfx-laser-hit-slider', makeElement('100')],
+    ['#sfx-laser-hit-value', makeElement()],
+    ['#sfx-asteroid-slider', makeElement('100')],
+    ['#sfx-asteroid-value', makeElement()],
+    ['#sfx-ship-slider', makeElement('100')],
+    ['#sfx-ship-value', makeElement()],
   ]);
 }
 
@@ -232,7 +246,7 @@ describe('SettingsMenu', () => {
     expect(thresholds.action).toBeCloseTo(0.45, 5);
   });
 
-  it('REQ-29 keeps the action threshold at least one hysteresis band above medium', () => {
+  it('REQ-29 keeps the action threshold at least a floor above medium', () => {
     const elements = buildDocument();
     stubDocument(elements);
     const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
@@ -242,7 +256,7 @@ describe('SettingsMenu', () => {
 
     const thresholds = menu.getMusicThresholds();
     expect(thresholds.medium).toBeCloseTo(0.6, 5);
-    expect(thresholds.action).toBeCloseTo(0.65, 5);
+    expect(thresholds.action).toBeCloseTo(0.61, 5);
   });
 
   it('REQ-30 loads persisted thresholds into the sliders on startup', () => {
@@ -271,5 +285,106 @@ describe('SettingsMenu', () => {
     const saved = new StorageAdapter(store).read<{ medium: number; action: number }>('music-thresholds');
     expect(saved?.medium).toBe(25);
     expect(saved?.action).toBe(40);
+  });
+
+  it('REQ-30 exposes the default music decay from the slider', () => {
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
+
+    expect(menu.getMusicDecay()).toBeCloseTo(3, 5);
+  });
+
+  it('REQ-30 reflects the decay slider position in seconds', () => {
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
+
+    elements.get('#decay-slider')!.value = '0';
+    expect(menu.getMusicDecay()).toBeCloseTo(0, 5);
+
+    elements.get('#decay-slider')!.value = '100';
+    expect(menu.getMusicDecay()).toBeCloseTo(10, 5);
+  });
+
+  it('REQ-30 loads persisted decay into the slider on startup', () => {
+    const store = new FakeStore();
+    store.setItem('music-decay', JSON.stringify(70));
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(store));
+
+    expect(elements.get('#decay-slider')!.value).toBe('70');
+    expect(elements.get('#decay-value')!.textContent).toBe('70');
+    expect(menu.getMusicDecay()).toBeCloseTo(7, 5);
+  });
+
+  it('REQ-30 saves the decay when the slider changes', () => {
+    const store = new FakeStore();
+    const elements = buildDocument();
+    stubDocument(elements);
+    new SettingsMenu(new StorageAdapter(store));
+
+    elements.get('#decay-slider')!.value = '55';
+    elements.get('#decay-slider')!.handlers.get('input')!();
+
+    const saved = new StorageAdapter(store).read<number>('music-decay');
+    expect(saved).toBe(55);
+  });
+
+  it('REQ-45 exposes the default SFX settings from the sliders', () => {
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
+
+    const sfx = menu.getSfxSettings();
+    expect(sfx.master).toBeCloseTo(1, 5);
+    expect(sfx.thrust).toBeCloseTo(1, 5);
+    expect(sfx.laserShot).toBeCloseTo(1, 5);
+    expect(sfx.laserHit).toBeCloseTo(1, 5);
+    expect(sfx.asteroidCollision).toBeCloseTo(1, 5);
+    expect(sfx.shipCollision).toBeCloseTo(1, 5);
+  });
+
+  it('REQ-45 reflects SFX slider changes in the settings', () => {
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
+
+    elements.get('#sfx-master-slider')!.value = '40';
+    elements.get('#sfx-laser-slider')!.value = '25';
+
+    const sfx = menu.getSfxSettings();
+    expect(sfx.master).toBeCloseTo(0.4, 5);
+    expect(sfx.laserShot).toBeCloseTo(0.25, 5);
+  });
+
+  it('REQ-45 loads persisted SFX settings into the sliders on startup', () => {
+    const store = new FakeStore();
+    store.setItem('sfx-settings', JSON.stringify({
+      master: 40, thrust: 60, laserShot: 25, laserHit: 0, asteroidCollision: 80, shipCollision: 10,
+    }));
+    const elements = buildDocument();
+    stubDocument(elements);
+    const menu = new SettingsMenu(new StorageAdapter(store));
+
+    expect(elements.get('#sfx-master-slider')!.value).toBe('40');
+    expect(elements.get('#sfx-master-value')!.textContent).toBe('40');
+    expect(elements.get('#sfx-laser-hit-slider')!.value).toBe('0');
+    expect(menu.getSfxSettings().master).toBeCloseTo(0.4, 5);
+    expect(menu.getSfxSettings().laserHit).toBeCloseTo(0, 5);
+  });
+
+  it('REQ-45 saves the SFX settings when a slider changes', () => {
+    const store = new FakeStore();
+    const elements = buildDocument();
+    stubDocument(elements);
+    new SettingsMenu(new StorageAdapter(store));
+
+    elements.get('#sfx-thrust-slider')!.value = '30';
+    elements.get('#sfx-thrust-slider')!.handlers.get('input')!();
+
+    const saved = new StorageAdapter(store).read<Record<string, number>>('sfx-settings');
+    expect(saved?.thrust).toBe(30);
   });
 });

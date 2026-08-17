@@ -1,5 +1,7 @@
 import type { Vec2 } from '../types';
 import type { AsteroidBelt } from './AsteroidBelt';
+import type { AsteroidCollisionObserver } from './AsteroidCollisionObserver';
+import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
 import { CollisionResolver } from './CollisionResolver';
 import type { MassiveAsteroid } from './MassiveAsteroid';
@@ -14,6 +16,7 @@ export class MassiveAsteroidField {
   private activeAsteroids: MassiveAsteroid[] = [];
   private readonly fixedAsteroids?: MassiveAsteroid[];
   private readonly collisionObservers = new Set<CollisionObserver>();
+  private readonly asteroidCollisionObservers = new Set<AsteroidCollisionObserver>();
 
   constructor(
     center: Vec2,
@@ -48,7 +51,12 @@ export class MassiveAsteroidField {
 
   resolveBodyCollisions(asteroidBelt: AsteroidBelt, supplyField: SupplyField): void {
     for (const massive of this.activeAsteroids) {
-      asteroidBelt.forEach((asteroid) => this.collide(asteroid, massive));
+      asteroidBelt.forEach((asteroid) => {
+        const collision = this.collide(asteroid, massive);
+        if (collision) {
+          for (const observer of this.asteroidCollisionObservers) observer.onAsteroidCollision(collision);
+        }
+      });
       supplyField.forEachActive((container) => this.collide(container, massive));
     }
   }
@@ -65,15 +73,18 @@ export class MassiveAsteroidField {
   }
   addCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.add(observer); }
   removeCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.delete(observer); }
+  addAsteroidCollisionObserver(observer: AsteroidCollisionObserver): void { this.asteroidCollisionObservers.add(observer); }
+  removeAsteroidCollisionObserver(observer: AsteroidCollisionObserver): void { this.asteroidCollisionObservers.delete(observer); }
 
-  private collide(body: PhysicsBody, massive: MassiveAsteroid): void {
+  private collide(body: PhysicsBody, massive: MassiveAsteroid): Collision | undefined {
     const boundaryRadius = this.boundaryRadiusAt(massive, body.position);
     const collision = CollisionResolver.resolveAgainstStaticBoundary(body, massive.position, boundaryRadius);
-    if (!collision) return;
+    if (!collision) return undefined;
     for (const observer of this.collisionObservers) observer.onCollision(collision);
+    return collision;
   }
 
-  private boundaryRadiusAt(asteroid: MassiveAsteroid, worldPosition: Vec2): number {
+  boundaryRadiusAt(asteroid: MassiveAsteroid, worldPosition: Vec2): number {
     const worldAngle = Math.atan2(
       worldPosition.y - asteroid.position.y,
       worldPosition.x - asteroid.position.x,

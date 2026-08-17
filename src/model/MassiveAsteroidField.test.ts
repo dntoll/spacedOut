@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
+import { Collision } from './Collision';
 import { FuelContainer } from './FuelContainer';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
@@ -134,5 +135,34 @@ describe('MassiveAsteroidField', () => {
     ship.previousPosition = { x: Math.cos(concaveAngle) * 70, y: Math.sin(concaveAngle) * 70 };
     new ShipCollisionSystem().resolve(ship, [massive], 1);
     expect(ship.velocity.x).not.toBeCloseTo(velocityOutsideRock.x);
+  });
+
+  it('REQ-45 emits an AsteroidCollision when a regular asteroid hits a massive one', () => {
+    const massive = new MassiveAsteroid(1, { x: 0, y: 0 }, 100, 0, [1, 1, 1, 1, 1, 1], [], 0.5);
+    const field = new MassiveAsteroidField({ x: 0, y: 0 }, 18, [massive]);
+    const asteroid = new Asteroid(2, { x: 95, y: 0 }, { x: -25, y: 0 }, 20, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const supplies = new SupplyField({ x: 0, y: 0 }, []);
+    const events: Collision[] = [];
+    field.addAsteroidCollisionObserver({ onAsteroidCollision: (collision) => events.push(collision) });
+
+    field.resolveBodyCollisions(belt, supplies);
+
+    expect(events.length).toBeGreaterThan(0);
+  });
+
+  it('REQ-45 does not emit an AsteroidCollision when a supply container hits a massive asteroid', () => {
+    const massive = new MassiveAsteroid(1, { x: 0, y: 0 }, 100, 0, [1, 1, 1, 1, 1, 1], [], 0.5);
+    const field = new MassiveAsteroidField({ x: 0, y: 0 }, 18, [massive]);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+    const container = new FuelContainer({ x: 80, y: 0 });
+    container.velocity = { x: -20, y: 0 };
+    const supplies = new SupplyField({ x: 0, y: 0 }, [container]);
+    const events: Collision[] = [];
+    field.addAsteroidCollisionObserver({ onAsteroidCollision: (collision) => events.push(collision) });
+
+    field.resolveBodyCollisions(belt, supplies);
+
+    expect(events).toHaveLength(0);
   });
 });

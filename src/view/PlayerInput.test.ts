@@ -20,11 +20,11 @@ describe('PlayerInput', () => {
     } as unknown as Drawing;
     const input = new PlayerInput(drawing, vi.fn());
 
-    down?.({ x: 100, y: 100, pointerId: 1, pointerType: 'mouse' });
+    down?.({ x: 100, y: 100, pointerId: 1, pointerType: 'mouse', button: 0 });
     expect(input.isThrusting).toBe(false);
-    down?.({ x: 200, y: 200, pointerId: 42, pointerType: 'touch' });
+    down?.({ x: 200, y: 200, pointerId: 42, pointerType: 'touch', button: 0 });
     expect(input.isThrusting).toBe(true);
-    up?.({ x: 200, y: 200, pointerId: 42, pointerType: 'touch' });
+    up?.({ x: 200, y: 200, pointerId: 42, pointerType: 'touch', button: 0 });
     expect(input.isThrusting).toBe(false);
   });
 
@@ -76,7 +76,40 @@ describe('PlayerInput', () => {
     } as unknown as Drawing;
     const input = new PlayerInput(drawing, vi.fn());
 
-    down?.({ x: 100, y: 100, pointerId: 1, pointerType: 'mouse' });
+    down?.({ x: 100, y: 100, pointerId: 1, pointerType: 'mouse', button: 0 });
     expect(input.isThrusting).toBe(false);
+  });
+
+  it('REQ-39 fires while the left mouse button or space key is held', () => {
+    let down: ((pointer: PointerPosition) => void) | undefined;
+    let up: ((pointer: PointerPosition) => void) | undefined;
+    let keyDown: ((key: string) => void) | undefined;
+    let keyUp: ((key: string) => void) | undefined;
+    const drawing = {
+      size: { width: 800, height: 600 },
+      onPointerMove: vi.fn(),
+      onPointerDown: (listener: typeof down) => { down = listener; },
+      onPointerUp: (listener: typeof up) => { up = listener; },
+      onPointerCancel: vi.fn(),
+      onBlur: vi.fn(),
+      capturePointer: vi.fn(),
+      releasePointer: vi.fn(),
+      onKeyDown: (listener: typeof keyDown) => { keyDown = listener; },
+      onKeyUp: (listener: typeof keyUp) => { keyUp = listener; },
+    } as unknown as Drawing;
+    const input = new PlayerInput(drawing, vi.fn());
+
+    expect(input.isFiring).toBe(false);
+    down?.({ x: 100, y: 100, pointerId: 1, pointerType: 'mouse', button: 2 });
+    expect(input.isFiring).toBe(false);
+    down?.({ x: 100, y: 100, pointerId: 1, pointerType: 'mouse', button: 0 });
+    expect(input.isFiring).toBe(true);
+    up?.({ x: 100, y: 100, pointerId: 1, pointerType: 'mouse', button: 0 });
+    expect(input.isFiring).toBe(false);
+
+    keyDown?.(' ');
+    expect(input.isFiring).toBe(true);
+    keyUp?.(' ');
+    expect(input.isFiring).toBe(false);
   });
 });

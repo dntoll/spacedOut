@@ -5,6 +5,9 @@ import { PhysicsBody } from './PhysicsBody';
 
 const RAMP_UP = 3;
 const RAMP_DOWN = 6;
+const MAX_AMMO = 100;
+const EMERGENCY_RELOAD_INTERVAL = 2;
+const EMERGENCY_RELOAD_AMOUNT = 1;
 
 export class Ship extends PhysicsBody {
   private aimTarget: Vec2 = { x: 0, y: -100 };
@@ -12,6 +15,9 @@ export class Ship extends PhysicsBody {
   private airLevel = 100;
   private fuelLevel = 100;
   private hpLevel = 100;
+  private ammoLevel = 100;
+  private ammoReloadTimer = 0;
+  private fuelReloadTimer = 0;
   private invulnerableTime = 0;
   private alive = true;
   private dampening = 1.5;
@@ -40,6 +46,7 @@ export class Ship extends PhysicsBody {
   get air(): number { return this.airLevel; }
   get fuel(): number { return this.fuelLevel; }
   get hp(): number { return this.hpLevel; }
+  get ammo(): number { return this.ammoLevel; }
   get isInvulnerable(): boolean { return this.invulnerableTime > 0; }
   get isAlive(): boolean { return this.alive; }
   get turnRate(): number { return this.turningRate; }
@@ -71,6 +78,12 @@ export class Ship extends PhysicsBody {
   stopThrust(): void { this.throttle = 0; }
   collectAir(amount: number): void { this.airLevel = clamp(this.airLevel + amount, 0, 100); }
   collectFuel(amount: number): void { this.fuelLevel = clamp(this.fuelLevel + amount, 0, 100); }
+  collectAmmo(amount: number): void { this.ammoLevel = clamp(this.ammoLevel + amount, 0, MAX_AMMO); }
+  consumeAmmo(amount: number): boolean {
+    if (this.ammoLevel < amount) return false;
+    this.ammoLevel -= amount;
+    return true;
+  }
   takeDamage(amount: number): void {
     this.hpLevel = Math.max(0, this.hpLevel - amount);
     if (this.hpLevel === 0) this.alive = false;
@@ -84,6 +97,24 @@ export class Ship extends PhysicsBody {
   updateLifeSupport(dt: number): void {
     this.airLevel = Math.max(0, this.airLevel - dt * 0.7);
     this.invulnerableTime = Math.max(0, this.invulnerableTime - dt);
+  }
+
+  updateEmergencyReload(dt: number): void {
+    if (this.ammoLevel === 0) {
+      this.ammoReloadTimer += dt;
+      if (this.ammoReloadTimer >= EMERGENCY_RELOAD_INTERVAL) {
+        this.ammoReloadTimer -= EMERGENCY_RELOAD_INTERVAL;
+        this.ammoLevel = Math.min(MAX_AMMO, this.ammoLevel + EMERGENCY_RELOAD_AMOUNT);
+      }
+    } else this.ammoReloadTimer = 0;
+
+    if (this.fuelLevel === 0) {
+      this.fuelReloadTimer += dt;
+      if (this.fuelReloadTimer >= EMERGENCY_RELOAD_INTERVAL) {
+        this.fuelReloadTimer -= EMERGENCY_RELOAD_INTERVAL;
+        this.fuelLevel = Math.min(100, this.fuelLevel + EMERGENCY_RELOAD_AMOUNT);
+      }
+    } else this.fuelReloadTimer = 0;
   }
 
   applyControls(dt: number): void {

@@ -18,4 +18,25 @@ describe('Drawing', () => {
     expect(canvas.height).toBe(1200);
     expect(context.fillRect).toHaveBeenCalledWith(0, 0, 800, 600);
   });
+
+  it('REQ-39 strokes a line between two points for laser beams', () => {
+    const context = {
+      setTransform: vi.fn(), fillRect: vi.fn(), fillStyle: '',
+      beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), stroke: vi.fn(),
+      strokeStyle: '', lineWidth: 0, lineCap: '',
+    };
+    const canvas = { getContext: vi.fn(() => context), style: {}, width: 0, height: 0 };
+    vi.stubGlobal('window', { innerWidth: 800, innerHeight: 600, devicePixelRatio: 1 });
+    vi.stubGlobal('document', { querySelector: vi.fn(() => canvas) });
+
+    const drawing = new Drawing('#game');
+    drawing.line({ x: 10, y: 10 }, { x: 40, y: 10 }, '#ff3b4d', 3);
+
+    expect(context.beginPath).toHaveBeenCalled();
+    expect(context.moveTo).toHaveBeenCalledWith(10, 10);
+    expect(context.lineTo).toHaveBeenCalledWith(40, 10);
+    expect(context.strokeStyle).toBe('#ff3b4d');
+    expect(context.lineWidth).toBe(3);
+    expect(context.stroke).toHaveBeenCalled();
+  });
 });

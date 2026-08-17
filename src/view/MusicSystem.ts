@@ -5,7 +5,7 @@ const CATEGORIES: readonly MusicCategory[] = ['calm', 'medium', 'action'];
 export interface FlightSignals {
   thrust: number;
   turn: number;
-  speed: number;
+  firing: number;
 }
 
 export interface AudioTrack {
@@ -21,7 +21,7 @@ export interface AudioTrack {
 
 export interface MusicSystemOptions {
   fadeSeconds?: number;
-  dwellSeconds?: number;
+  decaySeconds?: number;
   window?: Window;
 }
 
@@ -30,41 +30,33 @@ export interface MusicThresholds {
   action: number;
 }
 
-export const MUSIC_HYSTERESIS = 0.05;
 export const DEFAULT_MUSIC_THRESHOLDS: MusicThresholds = { medium: 0.25, action: 0.6 };
-export const DEFAULT_MUSIC_DWELL_SECONDS = 5;
 export const DEFAULT_MUSIC_FADE_SECONDS = 2.5;
+export const DEFAULT_MUSIC_DECAY_SECONDS = 3;
+const THRESHOLD_FLOOR = 0.01;
 
 const TURN_REF = 6;
-const PULSE_TAU = 1.5;
-const PULSE_CEIL = 3;
-const EDGE_THRESHOLD = 0.05;
-const SPEED_CALM_GATE = 0.0001;
-const ACCEL_REF = 0.5;
-const W_THRUST = 0.2;
-const W_SPEED = 0.2;
-const W_ACCEL = 0.2;
-const W_TURN = 0.3;
-const W_PULSE = 0.1;
+const THRUST_RATE = 0.1;
+const TURN_RATE = 0.1;
+const FIRING_RATE = 0.05;
+const FIRING_REF = 5;
+const SPIKE_EXPLOSION = 0.1;
+const SPIKE_SHIP_DAMAGE = 0.3;
+const SPIKE_LASER_IMPACT = 0.08;
 
 export class MusicSystem {
   private readonly byCategory: Record<MusicCategory, AudioTrack[]> = { calm: [], medium: [], action: [] };
   private readonly index: Record<MusicCategory, number> = { calm: 0, medium: 0, action: 0 };
   private readonly fadeSeconds: number;
-  private readonly dwellSeconds: number;
+  private decaySeconds: number;
   private active: MusicCategory | null = null;
   private unlocked = false;
-  private pulse = 0;
-  private prevThrust = 0;
-  private prevSpeed = -1;
   private intensityValue = 0;
   private thresholds: MusicThresholds = { ...DEFAULT_MUSIC_THRESHOLDS };
-  private elapsed = 0;
-  private lastSwitchAt = 0;
 
   constructor(tracks: AudioTrack[], options?: MusicSystemOptions) {
     this.fadeSeconds = options?.fadeSeconds ?? DEFAULT_MUSIC_FADE_SECONDS;
-    this.dwellSeconds = options?.dwellSeconds ?? DEFAULT_MUSIC_DWELL_SECONDS;
+    this.decaySeconds = options?.decaySeconds ?? DEFAULT_MUSIC_DECAY_SECONDS;
     for (const track of tracks) this.byCategory[track.category].push(track);
     if (options?.window) this.attachUnlock(options.window);
   }
@@ -85,21 +77,27 @@ export class MusicSystem {
     };
   }
 
+  setDecay(seconds: number): void { this.decaySeconds = Math.max(0.1, seconds); }
+
+  recordExplosion(): void { this.intensityValue = clamp01(this.intensityValue + SPIKE_EXPLOSION); }
+  recordShipDamage(): void { this.intensityValue = clamp01(this.intensityValue + SPIKE_SHIP_DAMAGE); }
+  recordLaserImpact(): void { this.intensityValue = clamp01(this.intensityValue + SPIKE_LASER_IMPACT); }
+
   update(signals: FlightSignals, level: number, dt: number): void {
-    this.intensityValue = this.computeIntensity(signals, dt);
+    this.intensityValue = clamp01(this.intensityValue * Math.exp(-dt / this.decaySeconds));
+    const thrust = clamp01(signals.thrust);
+    const turnBoost = clamp01(Math.abs(signals.turn) / TURN_REF) * thrust;
+    const firing = clamp01(signals.firing / FIRING_REF);
+    const charge = (THRUST_RATE * thrust) + (TURN_RATE * turnBoost) + (FIRING_RATE * firing);
+    this.intensityValue = clamp01(this.intensityValue + charge * dt);
+
     if (!this.unlocked) { this.pauseAll(); return; }
-    this.elapsed += dt;
-    const target = signals.speed <= SPEED_CALM_GATE ? 'calm' : this.targetCategory(this.intensityValue);
+    const target = this.targetCategory(this.intensityValue);
     if (this.active === null) {
-      if (level > 0 && this.byCategory[target].length > 0) {
-        this.active = target;
-        this.lastSwitchAt = this.elapsed;
-      } else { this.pauseAll(); return; }
+      if (level > 0 && this.byCategory[target].length > 0) this.active = target;
+      else { this.pauseAll(); return; }
     } else if (target !== this.active && this.byCategory[target].length > 0) {
-      if (this.elapsed - this.lastSwitchAt >= this.dwellSeconds) {
-        this.active = target;
-        this.lastSwitchAt = this.elapsed;
-      }
+      this.active = target;
     }
 
     const cat = this.active;
@@ -129,23 +127,6 @@ export class MusicSystem {
     }
   }
 
-  private computeIntensity(signals: FlightSignals, dt: number): number {
-    this.pulse *= Math.exp(-dt / PULSE_TAU);
-    if (this.prevThrust <= EDGE_THRESHOLD && signals.thrust > EDGE_THRESHOLD) this.pulse += 1;
-    this.prevThrust = signals.thrust;
-
-    const t = clamp01(signals.thrust);
-    const s = clamp01(signals.speed);
-    const r = clamp01(Math.abs(signals.turn) / TURN_REF);
-    const f = clamp01(this.pulse / PULSE_CEIL);
-
-    let a = 0;
-    if (this.prevSpeed >= 0 && dt > 0) a = clamp01(Math.abs(s - this.prevSpeed) / (dt * ACCEL_REF));
-    this.prevSpeed = s;
-
-    return W_THRUST * t + W_SPEED * s + W_ACCEL * a + W_TURN * (r * t) + W_PULSE * f;
-  }
-
   private activeTrack(): AudioTrack | null {
     if (this.active === null) return null;
     const list = this.byCategory[this.active];
@@ -153,16 +134,9 @@ export class MusicSystem {
   }
 
   private targetCategory(intensity: number): MusicCategory {
-    const medUp = this.thresholds.medium;
-    const medDown = medUp - MUSIC_HYSTERESIS;
-    const actUp = this.thresholds.action;
-    const actDown = actUp - MUSIC_HYSTERESIS;
-    switch (this.active) {
-      case 'calm':   return intensity >= actUp ? 'action' : intensity >= medUp ? 'medium' : 'calm';
-      case 'medium': return intensity >= actUp ? 'action' : intensity < medDown ? 'calm' : 'medium';
-      case 'action': return intensity < medDown ? 'calm' : intensity < actDown ? 'medium' : 'action';
-      default:       return intensity >= actUp ? 'action' : intensity >= medUp ? 'medium' : 'calm';
-    }
+    if (intensity >= this.thresholds.action) return 'action';
+    if (intensity >= this.thresholds.medium) return 'medium';
+    return 'calm';
   }
 
   private pauseAll(): void {
@@ -216,3 +190,5 @@ function buildTracks(): AudioTrack[] {
   }
   return tracks;
 }
+
+export { THRESHOLD_FLOOR };

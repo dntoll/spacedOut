@@ -1,7 +1,7 @@
 import type { Vec2 } from '../types';
 
 export interface Size { width: number; height: number }
-export interface PointerPosition extends Vec2 { pointerId: number; pointerType: string }
+export interface PointerPosition extends Vec2 { pointerId: number; pointerType: string; button: number }
 export interface GradientStop { offset: number; color: string }
 export interface RadialPaint {
   from: Vec2;
@@ -118,6 +118,16 @@ export class Drawing {
     }
   }
 
+  line(from: Vec2, to: Vec2, color: string, width: number): void {
+    this.context.beginPath();
+    this.context.moveTo(from.x, from.y);
+    this.context.lineTo(to.x, to.y);
+    this.context.strokeStyle = color;
+    this.context.lineWidth = width;
+    this.context.lineCap = 'round';
+    this.context.stroke();
+  }
+
   onResize(listener: () => void): void { window.addEventListener('resize', listener); }
   onBlur(listener: () => void): void { window.addEventListener('blur', listener); }
   onKeyDown(listener: (key: string) => void): void {
@@ -157,7 +167,7 @@ export class Drawing {
   private onPointer(type: 'pointermove' | 'pointerdown' | 'pointerup', listener: (pointer: PointerPosition) => void): void {
     this.canvas.addEventListener(type, (event) => {
       event.preventDefault();
-      listener({ x: event.clientX, y: event.clientY, pointerId: event.pointerId, pointerType: event.pointerType });
+      listener({ x: event.clientX, y: event.clientY, pointerId: event.pointerId, pointerType: event.pointerType, button: event.button });
     });
   }
 }

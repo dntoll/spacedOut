@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
+import { AsteroidDestroyed } from './AsteroidDestroyed';
+import { AsteroidTier } from './AsteroidTier';
+import { Collision } from './Collision';
 import { CollisionResolver } from './CollisionResolver';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
@@ -12,6 +15,21 @@ describe('AsteroidBelt', () => {
     expect(asteroids).toHaveLength(34);
     expect(new Set(asteroids.map((asteroid) => asteroid.radius)).size).toBeGreaterThan(1);
     expect(new Set(asteroids.map((asteroid) => `${asteroid.position.x},${asteroid.position.y}`)).size).toBeGreaterThan(1);
+  });
+
+  it('REQ-11 weights asteroid spawning toward the small tier', () => {
+    const spy = vi.spyOn(Math, 'random');
+    spy.mockReturnValue(0);
+    expect(AsteroidBelt.tierOf(AsteroidBelt.pickRadius())).toBe(AsteroidTier.Small);
+    spy.mockReturnValue(0.49);
+    expect(AsteroidBelt.tierOf(AsteroidBelt.pickRadius())).toBe(AsteroidTier.Small);
+    spy.mockReturnValue(0.5);
+    expect(AsteroidBelt.tierOf(AsteroidBelt.pickRadius())).toBe(AsteroidTier.Medium);
+    spy.mockReturnValue(0.79);
+    expect(AsteroidBelt.tierOf(AsteroidBelt.pickRadius())).toBe(AsteroidTier.Medium);
+    spy.mockReturnValue(0.8);
+    expect(AsteroidBelt.tierOf(AsteroidBelt.pickRadius())).toBe(AsteroidTier.Large);
+    spy.mockRestore();
   });
 
   it('REQ-25 recycles asteroids beyond the visible boundary used at high speed', () => {
@@ -64,5 +82,72 @@ describe('AsteroidBelt', () => {
     expect(small.asteroid.velocity.x).toBeGreaterThan(small.ship.velocity.x);
     expect(large.asteroid.mass).toBeGreaterThan(large.ship.mass);
     expect(large.ship.velocity.x).toBeLessThan(0);
+  });
+
+  it('REQ-41 classifies regular asteroids into small, medium, and large tiers by radius', () => {
+    expect(AsteroidBelt.tierOf(20)).toBe(AsteroidTier.Small);
+    expect(AsteroidBelt.tierOf(38)).toBe(AsteroidTier.Medium);
+    expect(AsteroidBelt.tierOf(50)).toBe(AsteroidTier.Large);
+  });
+
+  it('REQ-41 splits a large asteroid into two medium asteroids on a laser hit', () => {
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const asteroid = new Asteroid(1, { x: 0, y: 0 }, { x: 0, y: 0 }, 50, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const events: AsteroidDestroyed[] = [];
+    belt.addAsteroidDestroyedObserver({ onDestroyed: (event) => events.push(event) });
+
+    belt.applyLaserHit(asteroid, { x: 0, y: 0 });
+
+    const remaining: Asteroid[] = [];
+    belt.forEach((body) => remaining.push(body));
+    expect(remaining).toHaveLength(2);
+    expect(remaining.every((body) => AsteroidBelt.tierOf(body.radius) === AsteroidTier.Medium)).toBe(true);
+    expect(events).toHaveLength(1);
+    expect(events[0].tier).toBe(AsteroidTier.Large);
+    spy.mockRestore();
+  });
+
+  it('REQ-41 splits a medium asteroid into two small asteroids on a laser hit', () => {
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const asteroid = new Asteroid(1, { x: 0, y: 0 }, { x: 0, y: 0 }, 38, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+
+    belt.applyLaserHit(asteroid, { x: 0, y: 0 });
+
+    const remaining: Asteroid[] = [];
+    belt.forEach((body) => remaining.push(body));
+    expect(remaining).toHaveLength(2);
+    expect(remaining.every((body) => AsteroidBelt.tierOf(body.radius) === AsteroidTier.Small)).toBe(true);
+    spy.mockRestore();
+  });
+
+  it('REQ-41 explodes the smallest asteroid without splitting on a laser hit', () => {
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const asteroid = new Asteroid(1, { x: 0, y: 0 }, { x: 0, y: 0 }, 20, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const events: AsteroidDestroyed[] = [];
+    belt.addAsteroidDestroyedObserver({ onDestroyed: (event) => events.push(event) });
+
+    belt.applyLaserHit(asteroid, { x: 0, y: 0 });
+
+    const remaining: Asteroid[] = [];
+    belt.forEach((body) => remaining.push(body));
+    expect(remaining).toHaveLength(0);
+    expect(events).toHaveLength(1);
+    expect(events[0].tier).toBe(AsteroidTier.Small);
+    spy.mockRestore();
+  });
+
+  it('REQ-45 emits an AsteroidCollision when two asteroids collide', () => {
+    const a = new Asteroid(1, { x: 0, y: 0 }, { x: 10, y: 0 }, 20, 0, 0, [1, 1, 1], 0.5);
+    const b = new Asteroid(2, { x: 5, y: 0 }, { x: -10, y: 0 }, 20, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [a, b]);
+    const events: Collision[] = [];
+    belt.addAsteroidCollisionObserver({ onAsteroidCollision: (collision) => events.push(collision) });
+
+    belt.update(0, { x: 0, y: 0 }, 100000);
+
+    expect(events.length).toBeGreaterThan(0);
   });
 });

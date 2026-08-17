@@ -1,5 +1,6 @@
 import type { Vec2 } from '../types';
 import { AirContainer } from './AirContainer';
+import { AmmoContainer } from './AmmoContainer';
 import type { AsteroidBelt } from './AsteroidBelt';
 import { FuelContainer } from './FuelContainer';
 import { HpContainer } from './HpContainer';
@@ -27,11 +28,14 @@ export class SupplyRegion {
       ^ Math.imul(this.column, 0x9e3779b1)
       ^ Math.imul(this.row, 0x85ebca6b),
     );
-    this.containers.push(
-      new AirContainer(this.createPosition(regionSize, random)),
-      new FuelContainer(this.createPosition(regionSize, random)),
-      new HpContainer(this.createPosition(regionSize, random)),
-    );
+    this.containers.push(this.createContainer(random.integer(0, 4), this.createPosition(regionSize, random)));
+  }
+
+  private createContainer(typeIndex: number, position: Vec2): SupplyContainer {
+    if (typeIndex === 0) return new AirContainer(position);
+    if (typeIndex === 1) return new FuelContainer(position);
+    if (typeIndex === 2) return new HpContainer(position);
+    return new AmmoContainer(position);
   }
 
   update(dt: number, ship: Ship, asteroidBelt: AsteroidBelt): void {

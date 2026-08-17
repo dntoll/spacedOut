@@ -1,15 +1,17 @@
 import { add, scale } from '../math';
 import type { Vec2 } from '../types';
 
-export class CollisionParticle {
+export class Laser {
+  public life: number;
   constructor(
     public position: Vec2,
-    private readonly velocity: Vec2,
-    public life: number,
-    public readonly maxLife: number,
-    public readonly size: number,
-    public readonly heat: number,
-  ) {}
+    public velocity: Vec2,
+    public angle: number,
+    public readonly radius: number,
+    life: number,
+  ) {
+    this.life = life;
+  }
 
   get isAlive(): boolean { return this.life > 0; }
 

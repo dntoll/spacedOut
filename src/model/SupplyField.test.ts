@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { AirContainer } from './AirContainer';
+import { AmmoContainer } from './AmmoContainer';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
 import { FuelContainer } from './FuelContainer';
@@ -13,10 +14,11 @@ describe('SupplyField', () => {
     const containers: SupplyContainer[] = [];
     new SupplyField({ x: 0, y: 0 }, undefined, 1234).forEachActive((container) => containers.push(container));
 
-    expect(containers).toHaveLength(147);
+    expect(containers).toHaveLength(49);
     expect(containers.some((container) => container instanceof AirContainer)).toBe(true);
     expect(containers.some((container) => container instanceof FuelContainer)).toBe(true);
     expect(containers.some((container) => container instanceof HpContainer)).toBe(true);
+    expect(containers.some((container) => container instanceof AmmoContainer)).toBe(true);
     expect(new Set(containers.map((container) => `${container.position.x},${container.position.y}`)).size).toBeGreaterThan(1);
   });
 
@@ -38,7 +40,7 @@ describe('SupplyField', () => {
     };
 
     expect(positions(first)).toEqual(positions(second));
-    expect(positions(first)).toHaveLength(147);
+    expect(positions(first)).toHaveLength(49);
     const distant: SupplyContainer[] = [];
     first.forEachActive((container) => distant.push(container));
     expect(distant.every((container) => Math.hypot(container.position.x, container.position.y) > 3500)).toBe(true);
@@ -99,5 +101,41 @@ describe('SupplyField', () => {
     const known: SupplyContainer[] = [];
     repairField.forEachKnown((container) => known.push(container));
     expect(known).not.toContain(hp);
+  });
+
+  it('REQ-40 stably spreads ammo containers that replenish ammo when collected', () => {
+    const field = new SupplyField({ x: 0, y: 0 }, undefined, 7777);
+    const spread: SupplyContainer[] = [];
+    field.forEachActive((container) => spread.push(container));
+    expect(spread.some((container) => container instanceof AmmoContainer)).toBe(true);
+
+    const ship = new Ship();
+    ship.consumeAmmo(40);
+    expect(ship.ammo).toBe(60);
+    const ammo = new AmmoContainer({ ...ship.position }, 30);
+    const ammoField = new SupplyField(ship.position, [ammo]);
+
+    ammoField.update(0, ship, new AsteroidBelt(ship.position, []));
+
+    expect(ship.ammo).toBe(90);
+    const known: SupplyContainer[] = [];
+    ammoField.forEachKnown((container) => known.push(container));
+    expect(known).not.toContain(ammo);
+  });
+
+  it('REQ-40 collects ammo containers dropped from destroyed asteroids', () => {
+    const ship = new Ship();
+    ship.consumeAmmo(40);
+    expect(ship.ammo).toBe(60);
+    const field = new SupplyField(ship.position, []);
+    const drop = new AmmoContainer({ ...ship.position }, 30);
+    field.drop(drop);
+
+    field.update(0, ship, new AsteroidBelt(ship.position, []));
+
+    expect(ship.ammo).toBe(90);
+    const active: SupplyContainer[] = [];
+    field.forEachActive((container) => active.push(container));
+    expect(active).not.toContain(drop);
   });
 });

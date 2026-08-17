@@ -18,7 +18,7 @@
 
 - Camera and input belong to the view.
 - Abstract device and screen details from the controller. The view exposes model-space input through APIs such as `isPlayerThrusting` and `getThrustTarget()`.
-- The view may maintain its own visual models and collections for stars, exhaust, collision particles, and other effects.
+- The view may maintain its own visual models and collections for stars, atmospheric particles, and other effects.
 - Split rendering responsibilities into focused view classes instead of growing `View.Game`.
 - Hide native Canvas and event-listener details behind a drawing/input API. View components should use drawing primitives rather than `CanvasRenderingContext2D` directly.
 - The view may observe typed model events, such as collisions, to produce visual effects.

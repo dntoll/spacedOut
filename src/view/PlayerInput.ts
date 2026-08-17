@@ -5,6 +5,8 @@ import type { Drawing } from './Drawing';
 export class PlayerInput {
   private pointerPosition: Vec2;
   private thrusting = false;
+  private mouseFiring = false;
+  private keyFiring = false;
   private readonly keys = new Set<string>();
 
   constructor(private drawing: Drawing, onFirstThrust: () => void) {
@@ -17,22 +19,33 @@ export class PlayerInput {
       if (pointer.pointerType === 'touch') {
         this.thrusting = true;
         onFirstThrust();
+      } else if (pointer.pointerType === 'mouse' && pointer.button === 0) {
+        this.mouseFiring = true;
       }
       drawing.capturePointer(pointer.pointerId);
     });
     drawing.onPointerUp((pointer) => {
       this.thrusting = false;
+      if (pointer.pointerType === 'mouse') this.mouseFiring = false;
       drawing.releasePointer(pointer.pointerId);
     });
-    drawing.onPointerCancel(() => { this.thrusting = false; });
-    drawing.onBlur(() => { this.thrusting = false; this.keys.clear(); });
+    drawing.onPointerCancel(() => { this.thrusting = false; this.mouseFiring = false; });
+    drawing.onBlur(() => { this.thrusting = false; this.mouseFiring = false; this.keyFiring = false; this.keys.clear(); });
 
-    drawing.onKeyDown((key) => { this.keys.add(key.toLowerCase()); if (this.isDirectionalThrusting) onFirstThrust(); });
-    drawing.onKeyUp((key) => { this.keys.delete(key.toLowerCase()); });
+    drawing.onKeyDown((key) => {
+      this.keys.add(key.toLowerCase());
+      if (key === ' ') this.keyFiring = true;
+      if (this.isDirectionalThrusting) onFirstThrust();
+    });
+    drawing.onKeyUp((key) => {
+      this.keys.delete(key.toLowerCase());
+      if (key === ' ') this.keyFiring = false;
+    });
   }
 
   get isThrusting(): boolean { return this.thrusting; }
   get isDirectionalThrusting(): boolean { return this.getDirectionalVector() !== null; }
+  get isFiring(): boolean { return this.mouseFiring || this.keyFiring; }
 
   getDirectionalThrust(): Vec2 | null { return this.getDirectionalVector(); }
   getTarget(camera: Camera): Vec2 { return camera.screenToWorld(this.pointerPosition, this.drawing.size); }

@@ -8,6 +8,7 @@ export class SupplyField {
   static readonly regionSize = 1200;
   private readonly regions = new Map<number, Map<number, SupplyRegion>>();
   private activeRegions: SupplyRegion[] = [];
+  private readonly drops: SupplyContainer[] = [];
 
   constructor(
     center: Vec2,
@@ -25,15 +26,36 @@ export class SupplyField {
   update(dt: number, ship: Ship, asteroidBelt: AsteroidBelt, spawnExclusionRadius = 1500): void {
     this.activateAround(ship.position, spawnExclusionRadius);
     for (const region of this.activeRegions) region.update(dt, ship, asteroidBelt);
+    this.updateDrops(dt, ship, asteroidBelt);
   }
+
+  drop(container: SupplyContainer): void { this.drops.push(container); }
 
   forEachActive(visitor: (container: SupplyContainer) => void): void {
     for (const region of this.activeRegions) region.forEach(visitor);
+    for (const drop of this.drops) visitor(drop);
   }
 
   forEachKnown(visitor: (container: SupplyContainer) => void): void {
     for (const rows of this.regions.values()) {
       for (const region of rows.values()) region.forEach(visitor);
+    }
+    for (const drop of this.drops) visitor(drop);
+  }
+
+  private updateDrops(dt: number, ship: Ship, asteroidBelt: AsteroidBelt): void {
+    for (let index = this.drops.length - 1; index >= 0; index--) {
+      const container = this.drops[index];
+      container.integrate(dt);
+      asteroidBelt.collideWith(container);
+
+      const dx = container.position.x - ship.position.x;
+      const dy = container.position.y - ship.position.y;
+      const collectionRadius = container.radius + ship.radius;
+      if (dx * dx + dy * dy <= collectionRadius * collectionRadius) {
+        container.collect(ship);
+        this.drops.splice(index, 1);
+      }
     }
   }
 

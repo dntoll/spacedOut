@@ -9,15 +9,19 @@ describe('Minimap', () => {
   it('REQ-23 shows explored space and discovered massive asteroids and collectables', () => {
     const ship = new Model.Ship();
     const air = new Model.AirContainer({ x: 100, y: 0 });
+    const hp = new Model.HpContainer({ x: -100, y: 100 });
     const fuel = new Model.FuelContainer({ x: 1000, y: 0 });
-    const supplyField = new Model.SupplyField(ship.position, [air, fuel], 1);
+    const ammo = new Model.AmmoContainer({ x: 1000, y: 100 });
+    const supplyField = new Model.SupplyField(ship.position, [air, hp, fuel, ammo], 1);
     const massive = new Model.MassiveAsteroid(
       1, { x: -100, y: 0 }, 50, 0, [1, 1, 1, 1], [], 0.5,
     );
+    const asteroid = new Model.Asteroid(1, { x: 200, y: 0 }, { x: 0, y: 0 }, 24, 0, 0, [1, 1, 1], 0.5);
     const model = {
       ship,
       supplyField,
       massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, [massive]),
+      asteroidBelt: { forEach: (fn: (a: Model.Asteroid) => void) => fn(asteroid) },
     } as Model.Game;
     const exploration = new ExplorationMap();
     exploration.observe({ left: -250, top: -250, right: 250, bottom: 250 });
@@ -44,7 +48,10 @@ describe('Minimap', () => {
       1,
     );
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#62e6ff');
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#5dff9a');
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
     expect(circle).not.toHaveBeenCalledWith(expect.any(Object), 2.2, '#ffc35c');
+    expect(circle).not.toHaveBeenCalledWith(expect.any(Object), 2.2, '#c98bff');
     expect(withTransform).toHaveBeenCalledWith({ x: 870, y: 162 }, ship.angle, expect.any(Function));
 
     ship.position = { x: 1000, y: 0 };
@@ -55,6 +62,7 @@ describe('Minimap', () => {
     new Minimap().draw(drawing, exploration, model, camera);
 
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#ffc35c');
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#c98bff');
     expect(withTransform).toHaveBeenCalledWith({ x: 870, y: 162 }, ship.angle, expect.any(Function));
   });
 });

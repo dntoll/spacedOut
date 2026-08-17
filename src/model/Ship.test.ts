@@ -59,6 +59,38 @@ describe('Ship controls', () => {
     expect(ship.hp).toBe(100);
   });
 
+  it('REQ-40 tracks ammo, collection, and consumption', () => {
+    const ship = new Ship();
+    expect(ship.ammo).toBe(100);
+    ship.consumeAmmo(30);
+    expect(ship.ammo).toBe(70);
+    expect(ship.consumeAmmo(80)).toBe(false);
+    expect(ship.ammo).toBe(70);
+    ship.collectAmmo(50);
+    expect(ship.ammo).toBe(100);
+  });
+
+  it('REQ-42 regenerates one unit of ammo and fuel every two seconds when at zero', () => {
+    const ship = new Ship();
+    ship.consumeAmmo(100);
+    expect(ship.ammo).toBe(0);
+    ship.updateEmergencyReload(1.9);
+    expect(ship.ammo).toBe(0);
+    ship.updateEmergencyReload(0.2);
+    expect(ship.ammo).toBe(1);
+    ship.updateEmergencyReload(2);
+    expect(ship.ammo).toBe(1);
+
+    ship.aimAt({ x: 100000, y: 0 });
+    ship.startThrust();
+    for (let i = 0; i < 300 && ship.fuel > 0; i++) ship.applyControls(0.1);
+    expect(ship.fuel).toBe(0);
+    ship.updateEmergencyReload(1.9);
+    expect(ship.fuel).toBe(0);
+    ship.updateEmergencyReload(0.2);
+    expect(ship.fuel).toBe(1);
+  });
+
   it('REQ-35 becomes invulnerable for 0.5s after taking damage', () => {
     const ship = new Ship();
     expect(ship.isInvulnerable).toBe(false);

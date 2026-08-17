@@ -9,8 +9,7 @@ export class Game {
     private view: View.Game,
     private readonly createModel: () => Model.Game = () => new Model.Game(),
   ) {
-    model.addCollisionObserver(view);
-    model.addDamageObserver(view);
+    this.attachObservers(this.model);
   }
 
   start(): void { requestAnimationFrame((time) => this.frame(time)); }
@@ -27,6 +26,7 @@ export class Game {
       this.model.setSpawnExclusionRadius(this.view.getSpawnExclusionRadius());
       if (this.view.isPlayerThrusting) this.model.startThrust();
       else this.model.stopThrust();
+      if (this.view.isPlayerFiring) this.model.fireLaser();
     }
     this.model.update(dt);
     this.view.render(this.model, dt);
@@ -35,8 +35,16 @@ export class Game {
 
   private restart(): void {
     this.model = this.createModel();
-    this.model.addCollisionObserver(this.view);
-    this.model.addDamageObserver(this.view);
+    this.attachObservers(this.model);
     this.view.reset();
+  }
+
+  private attachObservers(model: Model.Game): void {
+    model.addCollisionObserver(this.view);
+    model.addDamageObserver(this.view);
+    model.addAsteroidDestroyedObserver(this.view);
+    model.addLaserShotObserver(this.view);
+    model.addLaserImpactObserver(this.view);
+    model.addAsteroidCollisionObserver(this.view);
   }
 }

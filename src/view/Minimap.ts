@@ -30,6 +30,7 @@ export class Minimap {
     drawing.withClipRectangle(position, size, () => {
       this.drawExplored(drawing, exploration, center, position, size);
       this.drawMassiveAsteroids(drawing, exploration, model.massiveAsteroidField, center, position, size);
+      this.drawAsteroids(drawing, exploration, model.asteroidBelt, center, position, size);
       this.drawSupplies(drawing, exploration, model.supplyField, center, position, size);
       this.drawShip(drawing, model.ship.angle, position, size);
     });
@@ -76,6 +77,25 @@ export class Minimap {
     });
   }
 
+  private drawAsteroids(
+    drawing: Drawing,
+    exploration: ExplorationMap,
+    belt: Model.AsteroidBelt,
+    center: Vec2,
+    position: Vec2,
+    size: Size,
+  ): void {
+    belt.forEach((asteroid) => {
+      if (!exploration.isExplored(asteroid.position, asteroid.radius)) return;
+      if (!this.intersectsMap(asteroid.position, asteroid.radius, center)) return;
+      drawing.circle(
+        this.toMap(asteroid.position, center, position, size),
+        1.6,
+        'rgba(146,164,186,.72)',
+      );
+    });
+  }
+
   private drawSupplies(
     drawing: Drawing,
     exploration: ExplorationMap,
@@ -93,7 +113,9 @@ export class Minimap {
           ? '#62e6ff'
           : container instanceof Model.HpContainer
             ? '#5dff9a'
-            : '#ffc35c',
+            : container instanceof Model.AmmoContainer
+              ? '#c98bff'
+              : '#ffc35c',
       );
     });
   }
