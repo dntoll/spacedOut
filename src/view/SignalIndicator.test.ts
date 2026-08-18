@@ -2,6 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { Drone } from '../model/Drone';
 import { DroneField } from '../model/DroneField';
 import { Mission, MissionPhase } from '../model';
+import { Pirate } from '../model/Pirate';
+import { PirateField } from '../model/PirateField';
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import { Camera } from './Camera';
@@ -19,6 +21,7 @@ const stubModel = (overrides: Partial<Model.Game> = {}): Model.Game =>
   ({
     mission: new Mission(),
     droneField: new DroneField(),
+    pirateField: new PirateField(),
     elapsed: 0.5,
     ...overrides,
   }) as unknown as Model.Game;
@@ -132,5 +135,32 @@ describe('SignalIndicator', () => {
 
     const greenCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(93,184,255,'));
     expect(greenCalls).toHaveLength(0);
+  });
+
+  it('REQ-63 draws an orange wave toward an off-screen hunting pirate', () => {
+    const { drawing, arc } = stubDrawing({ width: 800, height: 600 });
+    const pirate = new Pirate({ x: 100000, y: 0 }, [1, 1, 1], 3);
+    pirate.awaken();
+    const model = stubModel({ pirateField: new PirateField([pirate]) });
+    const camera = new Camera();
+
+    new SignalIndicator().draw(drawing, model, camera);
+
+    const pirateCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(255,106,74,'));
+    expect(pirateCalls.length).toBeGreaterThan(0);
+  });
+
+  it('REQ-63 does not draw a pirate wave for an on-screen pirate', () => {
+    const { drawing, arc } = stubDrawing({ width: 800, height: 600 });
+    const pirate = new Pirate({ x: 0, y: 0 }, [1, 1, 1], 3);
+    pirate.awaken();
+    const model = stubModel({ pirateField: new PirateField([pirate]) });
+    const camera = new Camera();
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
+
+    new SignalIndicator().draw(drawing, model, camera);
+
+    const pirateCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(255,106,74,'));
+    expect(pirateCalls).toHaveLength(0);
   });
 });

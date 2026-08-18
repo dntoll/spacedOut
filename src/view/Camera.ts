@@ -11,8 +11,8 @@ export interface WorldBounds {
 
 const DRONE_THREAT_ZOOM_OUT = 0.25;
 const DRONE_THREAT_FLOOR = 0.30;
-const DESOLATE_ZOOM_OUT = 0.35;
-const DESOLATE_FLOOR = 0.25;
+const DESOLATE_ZOOM_OUT = 0.15;
+const DESOLATE_FLOOR = 0.35;
 const LOOKAHEAD_GAIN = 0.3;
 const LOOKAHEAD_EASE = 2.5;
 

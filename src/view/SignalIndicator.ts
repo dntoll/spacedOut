@@ -7,6 +7,7 @@ import type { Drawing } from './Drawing';
 const SEGMENT_LENGTH = 140;
 const SIGNAL_COLOR = '#ff3b3b';
 const DRONE_COLOR = '#5db8ff';
+const PIRATE_COLOR = '#ff6a4a';
 const WAVE_PERIOD = 1.4;
 const WAVE_ARC_COUNT = 3;
 const WAVE_MAX_RADIUS = 220;
@@ -25,14 +26,31 @@ export class SignalIndicator {
     }
 
     const bounds = camera.getVisibleWorldBounds(size);
-    model.droneField.forEach((drone) => {
-      if (!drone.isHunting) return;
-      if (drone.position.x >= bounds.left && drone.position.x <= bounds.right
-        && drone.position.y >= bounds.top && drone.position.y <= bounds.bottom) return;
-      const droneDir = normalize(sub(drone.position, camera.focusPosition));
-      if (droneDir.x === 0 && droneDir.y === 0) return;
-      const edge = this.edgePoint(center, droneDir, size);
-      this.drawWave(drawing, edge, droneDir, DRONE_COLOR, model.elapsed, WAVE_MAX_RADIUS);
+    this.drawThreatWaves(drawing, center, size, bounds, camera.focusPosition, model.elapsed,
+      model.droneField.forEach.bind(model.droneField), DRONE_COLOR, (threat) => threat.isHunting);
+    this.drawThreatWaves(drawing, center, size, bounds, camera.focusPosition, model.elapsed,
+      model.pirateField.forEachPirate.bind(model.pirateField), PIRATE_COLOR, (threat) => threat.isHunting);
+  }
+
+  private drawThreatWaves<T extends { position: Vec2 }>(
+    drawing: Drawing,
+    center: Vec2,
+    size: { width: number; height: number },
+    bounds: { left: number; top: number; right: number; bottom: number },
+    focus: Vec2,
+    elapsed: number,
+    forEachThreat: (visitor: (threat: T) => void) => void,
+    color: string,
+    isHunting: (threat: T) => boolean,
+  ): void {
+    forEachThreat((threat) => {
+      if (!isHunting(threat)) return;
+      if (threat.position.x >= bounds.left && threat.position.x <= bounds.right
+        && threat.position.y >= bounds.top && threat.position.y <= bounds.bottom) return;
+      const direction = normalize(sub(threat.position, focus));
+      if (direction.x === 0 && direction.y === 0) return;
+      const edge = this.edgePoint(center, direction, size);
+      this.drawWave(drawing, edge, direction, color, elapsed, WAVE_MAX_RADIUS);
     });
   }
 

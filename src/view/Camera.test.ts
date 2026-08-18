@@ -100,6 +100,17 @@ describe('Camera', () => {
     expect(fastDesolate.zoom).toBeLessThan(fastCalm.zoom);
   });
 
+  it('REQ-60 keeps the mission 2 traversal pullback within a playable range', () => {
+    const resting = new Camera();
+    resting.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1, false, true);
+
+    const fast = new Camera();
+    fast.update({ x: 0, y: 0 }, { x: 2000, y: 0 }, 1, false, true);
+
+    expect(resting.zoom).toBeCloseTo(1);
+    expect(fast.zoom).toBeCloseTo(0.35);
+  });
+
   it('REQ-60 composes the desolation zoom with the hunting-drone pullback', () => {
     const camera = new Camera();
     camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1, false, false);
