@@ -24,6 +24,7 @@ import { ShipCollisionSystem } from './ShipCollisionSystem';
 import { SupplyChooser, SupplyType } from './SupplyChooser';
 import { SupplyContainer } from './SupplyContainer';
 import { SupplyField } from './SupplyField';
+import type { PhysicsBody } from './PhysicsBody';
 import type { PolygonObstacle } from './SweptCircleCollision';
 import { VisitedMap } from './VisitedMap';
 import { WeaponPod } from './WeaponPod';
@@ -190,6 +191,12 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver 
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
     this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, dronesEnabled);
     this.pirateField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, piratesEnabled, this.mission.isTraversal ? this.mission.signalDirection : null);
+    const droneBodies: PhysicsBody[] = [];
+    this.droneField.forEach((drone) => droneBodies.push(drone));
+    const pirateBodies: PhysicsBody[] = [];
+    this.pirateField.forEachPirate((pirate) => pirateBodies.push(pirate));
+    this.droneField.applySeparation(pirateBodies, dt);
+    this.pirateField.applySeparation(droneBodies, dt);
     this.laserField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, this.spawnExclusionRadius, this.droneField, this.pirateField);
 
     const obstacles: PolygonObstacle[] = [];

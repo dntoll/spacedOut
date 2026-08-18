@@ -69,8 +69,8 @@ export class ParticleField {
     this.burst(position, 40, 40, 220, 0.25, 0.7, 1.5, 3.8);
   }
 
-  emitExplosion(position: Vec2): void {
-    this.burst(position, 150, 30, 380, 0.4, 1.2, 2, 5.5);
+  emitExplosion(position: Vec2, hotColor: { r: number; g: number; b: number } = IMPACT_HOT_COLOR): void {
+    this.burst(position, 150, 30, 380, 0.4, 1.2, 2, 5.5, hotColor);
   }
 
   private burst(
@@ -82,6 +82,7 @@ export class ParticleField {
     lifeMax: number,
     sizeMin: number,
     sizeMax: number,
+    hotColor: { r: number; g: number; b: number } = IMPACT_HOT_COLOR,
   ): void {
     for (let i = 0; i < count; i++) {
       const angle = random(0, Math.PI * 2);
@@ -94,7 +95,7 @@ export class ParticleField {
         random(sizeMin, sizeMax),
         life,
         life,
-        heat > 0.78 ? IMPACT_HOT_COLOR : IMPACT_COOL_COLOR,
+        heat > 0.78 ? hotColor : IMPACT_COOL_COLOR,
         heat > 0.78 ? IMPACT_HOT_ALPHA : IMPACT_COOL_ALPHA,
       ));
     }

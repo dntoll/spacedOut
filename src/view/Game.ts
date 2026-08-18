@@ -103,11 +103,11 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   }
 
   onDroneDestroyed(event: Model.DroneDestroyed): void {
-    this.particleField.emitExplosion(event.position);
+    this.particleField.emitExplosion(event.position, { r: 93, g: 184, b: 255 });
   }
 
   onPirateDestroyed(event: Model.PirateDestroyed): void {
-    this.particleField.emitExplosion(event.position);
+    this.particleField.emitExplosion(event.position, { r: 255, g: 106, b: 74 });
   }
 
   consumeRestartRequest(): boolean {

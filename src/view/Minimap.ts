@@ -143,7 +143,7 @@ export class Minimap {
       drawing.circle(
         this.toMap(drone.position, center, position, size, span),
         2.0,
-        '#7dff5e',
+        '#5db8ff',
       );
     });
   }

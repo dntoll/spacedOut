@@ -114,7 +114,7 @@ describe('NebulaField', () => {
     field.update(0.016, traversalModel(), camera, { width: 800, height: 600 });
     field.draw(drawing);
 
-    expect(circles.mock.calls.length).toBeGreaterThanOrEqual(200);
+    expect(circles.mock.calls.length).toBeGreaterThanOrEqual(350);
   });
 
   it('REQ-67 defers to asteroid islands so nebulas and belts rarely co-occur', () => {

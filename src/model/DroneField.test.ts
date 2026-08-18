@@ -8,8 +8,10 @@ import { DroneDestroyed } from './DroneDestroyed';
 import { DroneField } from './DroneField';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
+import { Pirate } from './Pirate';
 import type { PhysicsBody } from './PhysicsBody';
 import { Ship } from './Ship';
+import { length, sub } from '../math';
 
 const emptyBelt = () => new AsteroidBelt({ x: 0, y: 0 }, []);
 const emptyMassive = () => new MassiveAsteroidField({ x: 0, y: 0 }, 18, []);
@@ -409,6 +411,19 @@ describe('DroneField', () => {
 
     expect(collisions.length).toBe(0);
     expect(field.has(drone)).toBe(true);
+  });
+
+  it('REQ-12 repulses hunting drones from pirates and other drones so they do not overlap', () => {
+    const droneA = new Drone(null, 0, [1, 1, 1], 2);
+    droneA.position = { x: 0, y: 0 };
+    const droneB = new Drone(null, 0, [1, 1, 1], 2);
+    droneB.position = { x: 20, y: 0 };
+    const pirate = new Pirate({ x: 10, y: 0 }, [1, 1, 1], 3);
+    const field = new DroneField([droneA, droneB]);
+
+    field.applySeparation([pirate], 0.016);
+
+    expect(length(sub(droneA.position, droneB.position))).toBeGreaterThan(20);
   });
 });
 

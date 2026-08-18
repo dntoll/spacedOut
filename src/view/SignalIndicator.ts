@@ -6,7 +6,7 @@ import type { Drawing } from './Drawing';
 
 const SEGMENT_LENGTH = 140;
 const SIGNAL_COLOR = '#ff3b3b';
-const DRONE_COLOR = '#7dff5e';
+const DRONE_COLOR = '#5db8ff';
 const WAVE_PERIOD = 1.4;
 const WAVE_ARC_COUNT = 3;
 const WAVE_MAX_RADIUS = 220;

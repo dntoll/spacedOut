@@ -93,7 +93,7 @@ describe('SignalIndicator', () => {
     expect(edge.y).toBe(300);
   });
 
-  it('REQ-57 draws a green wave toward an off-screen hunting drone', () => {
+  it('REQ-57 draws a blue wave toward an off-screen hunting drone', () => {
     const { drawing, arc } = stubDrawing({ width: 800, height: 600 });
     const drone = new Drone(null, 0, [1, 1, 1], 2);
     drone.position = { x: 100000, y: 0 };
@@ -103,11 +103,11 @@ describe('SignalIndicator', () => {
     new SignalIndicator().draw(drawing, model, camera);
 
     expect(arc).toHaveBeenCalled();
-    const greenCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(125,255,94,'));
+    const greenCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(93,184,255,'));
     expect(greenCalls.length).toBeGreaterThan(0);
   });
 
-  it('REQ-57 does not draw a green wave for an on-screen hunting drone', () => {
+  it('REQ-57 does not draw a blue wave for an on-screen hunting drone', () => {
     const { drawing, arc } = stubDrawing({ width: 800, height: 600 });
     const drone = new Drone(null, 0, [1, 1, 1], 2);
     drone.position = { x: 0, y: 0 };
@@ -117,11 +117,11 @@ describe('SignalIndicator', () => {
 
     new SignalIndicator().draw(drawing, model, camera);
 
-    const greenCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(125,255,94,'));
+    const greenCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(93,184,255,'));
     expect(greenCalls).toHaveLength(0);
   });
 
-  it('REQ-57 draws no green waves when no drones are hunting', () => {
+  it('REQ-57 draws no blue waves when no drones are hunting', () => {
     const { drawing, arc } = stubDrawing({ width: 800, height: 600 });
     const attached = new Drone({ position: { x: 0, y: 0 }, radius: 30 } as never, 0, [1, 1, 1], 2);
     attached.position = { x: 100000, y: 0 };
@@ -130,7 +130,7 @@ describe('SignalIndicator', () => {
 
     new SignalIndicator().draw(drawing, model, camera);
 
-    const greenCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(125,255,94,'));
+    const greenCalls = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(93,184,255,'));
     expect(greenCalls).toHaveLength(0);
   });
 });

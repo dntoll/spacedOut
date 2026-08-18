@@ -1,4 +1,4 @@
-import { add, length, normalize, random, scale, sub } from '../math';
+import { add, clamp, dot, length, normalize, random, scale, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { Asteroid } from './Asteroid';
 import type { AsteroidBelt } from './AsteroidBelt';
@@ -15,6 +15,7 @@ import { PirateDestroyed } from './PirateDestroyed';
 import type { PirateDestroyedObserver } from './PirateDestroyedObserver';
 import type { MassiveAsteroid } from './MassiveAsteroid';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
+import type { PhysicsBody } from './PhysicsBody';
 import type { Ship } from './Ship';
 
 const TARGET_COMBAT_SQUADS = 1;
@@ -107,6 +108,22 @@ export class PirateField {
     }
   }
 
+  applySeparation(others: PhysicsBody[], dt: number): void {
+    const bodies: PhysicsBody[] = [...this.pirates, ...others];
+    for (const pirate of this.pirates) {
+      for (const body of bodies) {
+        if (body === pirate) continue;
+        const offset = sub(pirate.position, body.position);
+        const dist = length(offset);
+        const minDist = pirate.radius + body.radius + 20;
+        if (dist < minDist && dist > 0.0001) {
+          const push = scale(normalize(offset), (minDist - dist) * 0.5);
+          pirate.position = add(pirate.position, push);
+        }
+      }
+    }
+  }
+
   private awakenInRange(ship: Ship): void {
     const range = this.detectionRange(ship);
     const rangeSq = range * range;
@@ -140,15 +157,14 @@ export class PirateField {
     const cullRadius = spawnExclusionRadius + LASER_CULL_MARGIN;
     for (let i = this.lasers.length - 1; i >= 0; i--) {
       const laser = this.lasers[i];
+      const previous = { x: laser.position.x, y: laser.position.y };
       laser.update(dt);
       if (length(sub(laser.position, ship.position)) > cullRadius) {
         this.lasers.splice(i, 1);
         continue;
       }
-      const dx = laser.position.x - ship.position.x;
-      const dy = laser.position.y - ship.position.y;
       const reach = laser.radius + ship.radius;
-      if (dx * dx + dy * dy <= reach * reach) {
+      if (this.segmentHitsCircle(previous, laser.position, ship.position, reach)) {
         if (!ship.isInvulnerable) {
           ship.takeDamage(PIRATE_LASER_DAMAGE);
           const lethal = !ship.isAlive;
@@ -195,6 +211,19 @@ export class PirateField {
       }
     }
     return hit;
+  }
+
+  private segmentHitsCircle(a: Vec2, b: Vec2, center: Vec2, radius: number): boolean {
+    const ab = sub(b, a);
+    const abLenSq = dot(ab, ab);
+    if (abLenSq < 1e-9) {
+      const d = sub(center, a);
+      return dot(d, d) <= radius * radius;
+    }
+    const t = clamp(dot(sub(center, a), ab) / abLenSq, 0, 1);
+    const closest = add(a, scale(ab, t));
+    const d = sub(center, closest);
+    return dot(d, d) <= radius * radius;
   }
 
   private nearestRegularHit(laser: Laser, asteroidBelt: AsteroidBelt): { asteroid: Asteroid } | null {

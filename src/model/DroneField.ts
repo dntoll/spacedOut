@@ -1,4 +1,4 @@
-import { length, random, sub } from '../math';
+import { add, length, normalize, random, scale, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { AsteroidBelt } from './AsteroidBelt';
 import { Collision } from './Collision';
@@ -79,6 +79,23 @@ export class DroneField {
     this.resolveShipImpacts(ship);
     this.recycleDistant(ship, asteroidBelt, massiveAsteroidField);
     if (spawnEnabled) this.spawnToTarget(ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
+  }
+
+  applySeparation(others: PhysicsBody[], dt: number): void {
+    const bodies: PhysicsBody[] = [...this.drones, ...others];
+    for (const drone of this.drones) {
+      if (drone.host || drone.reHomeTarget) continue;
+      for (const body of bodies) {
+        if (body === drone) continue;
+        const offset = sub(drone.position, body.position);
+        const dist = length(offset);
+        const minDist = drone.radius + body.radius + 20;
+        if (dist < minDist && dist > 0.0001) {
+          const push = scale(normalize(offset), (minDist - dist) * 0.5);
+          drone.position = add(drone.position, push);
+        }
+      }
+    }
   }
 
   private resolveAsteroidCollisions(asteroidBelt: AsteroidBelt): void {

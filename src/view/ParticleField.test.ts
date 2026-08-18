@@ -331,4 +331,16 @@ describe('ParticleField', () => {
     expect(cooled!.color).toMatch(/120,200,235/);
     vi.restoreAllMocks();
   });
+
+  it('REQ-35 explosion particles take the tint of the destroyed drone or pirate', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const { drawing, circles } = countingDrawing();
+    const field = new ParticleField();
+
+    field.emitExplosion({ x: 0, y: 0 }, { r: 93, g: 184, b: 255 });
+    field.draw(drawing);
+
+    expect(circles.some((c) => c.color.startsWith('rgba(93,184,255,'))).toBe(true);
+    vi.restoreAllMocks();
+  });
 });

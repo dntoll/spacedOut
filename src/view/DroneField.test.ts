@@ -24,7 +24,7 @@ const stubField = (drones: Drone[], hunting: boolean, detach: number, giveUp: nu
 }) as never;
 
 describe('DroneField view', () => {
-  it('REQ-49 draws a green irregular body with gripping arms on one side', () => {
+  it('REQ-49 draws a blue irregular body with gripping arms on one side', () => {
     const polygons: Array<{ points: Array<{ x: number; y: number }>; fill: RadialPaint }> = [];
     const lines: Array<{ from: { x: number; y: number }; to: { x: number; y: number } }> = [];
     const drawing = {
@@ -46,8 +46,8 @@ describe('DroneField view', () => {
 
     expect(polygons).toHaveLength(1);
     expect(polygons[0].points.length).toBe(drone.vertices.length);
-    const green = polygons[0].fill.stops.some((stop) => stop.color === '#3fae3a' || stop.color === '#b6ff8a');
-    expect(green).toBe(true);
+    const blue = polygons[0].fill.stops.some((stop) => stop.color === '#3a8fd6' || stop.color === '#8accff');
+    expect(blue).toBe(true);
     expect(lines.length).toBeGreaterThanOrEqual(2);
     const radius = drone.radius;
     expect(lines.every((line) => line.to.x > radius * 0.8)).toBe(true);

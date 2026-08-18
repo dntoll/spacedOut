@@ -59,7 +59,7 @@ describe('Minimap', () => {
     );
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#5dff9a');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
-    expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.0, '#7dff5e');
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.0, '#5db8ff');
     expect(circle).not.toHaveBeenCalledWith(expect.any(Object), 2.2, '#ffc35c');
     expect(circle).not.toHaveBeenCalledWith(expect.any(Object), 2.2, '#c98bff');
     expect(withTransform).toHaveBeenCalledWith({ x: 870, y: 162 }, ship.angle, expect.any(Function));
