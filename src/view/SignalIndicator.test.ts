@@ -84,7 +84,7 @@ describe('SignalIndicator', () => {
     } as unknown as Model.Mission;
     const model = stubModel({ mission });
     const camera = new Camera();
-    camera.update({ x: 0, y: 0 }, 0, 1);
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
 
     new SignalIndicator().draw(drawing, model, camera);
 
@@ -113,7 +113,7 @@ describe('SignalIndicator', () => {
     drone.position = { x: 0, y: 0 };
     const model = stubModel({ droneField: new DroneField([drone]) });
     const camera = new Camera();
-    camera.update({ x: 0, y: 0 }, 0, 1);
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
 
     new SignalIndicator().draw(drawing, model, camera);
 

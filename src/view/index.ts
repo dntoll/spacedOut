@@ -1,5 +1,6 @@
 export { AsteroidBelt } from './AsteroidBelt';
 export { Camera, type WorldBounds } from './Camera';
+export { CompositeShadowCasters } from './CompositeShadowCasters';
 export { Drawing } from './Drawing';
 export { DroneField } from './DroneField';
 export { ExplorationMap } from './ExplorationMap';
@@ -14,9 +15,11 @@ export { Particle } from './Particle';
 export { ParticleField } from './ParticleField';
 export { PlayerInput } from './PlayerInput';
 export { SettingsMenu } from './SettingsMenu';
+export { ShadowVolume } from './ShadowVolume';
 export { Ship } from './Ship';
 export { SoundSystem, type SfxSettings, SfxChannel } from './SoundSystem';
 export { SpaceBackground } from './SpaceBackground';
+export { StarLight, type ShadowCasters } from './StarLight';
 export { StorageAdapter, type KeyValueStore } from './StorageAdapter';
 export { SupplyField } from './SupplyField';
 export { ThrustSound, type ThrustAudio, type ThrustPhase } from './ThrustSound';

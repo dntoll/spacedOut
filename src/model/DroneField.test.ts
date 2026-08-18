@@ -425,5 +425,65 @@ describe('DroneField', () => {
 
     expect(length(sub(droneA.position, droneB.position))).toBeGreaterThan(20);
   });
+
+  it('REQ-73 spawns drones on asteroid islands during the second mission traversal', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+    belt.update(0, { x: 0, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+    const ship = new Ship();
+    const field = new DroneField();
+
+    field.update(0, ship, belt, emptyMassive(), 0, false, true);
+
+    let islandDroneCount = 0;
+    let islandCenter: { x: number; y: number } | null = null;
+    let islandRadius = 0;
+    belt.forEachIsland((island) => {
+      if (island.droneCount > 0) { islandCenter = island.center; islandRadius = island.radius; }
+    });
+    field.forEach((drone) => {
+      if (drone.host && islandCenter && length(sub(drone.host.position, islandCenter)) <= islandRadius) {
+        islandDroneCount++;
+      }
+    });
+    expect(islandDroneCount).toBeGreaterThan(0);
+    vi.restoreAllMocks();
+  });
+
+  it('REQ-73 does not double-spawn island drones across repeated updates', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+    belt.update(0, { x: 0, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+    const ship = new Ship();
+    const field = new DroneField();
+
+    field.update(0, ship, belt, emptyMassive(), 0, false, true);
+    const afterFirst = field.count;
+
+    field.update(0, ship, belt, emptyMassive(), 0, false, true);
+
+    expect(field.count).toBe(afterFirst);
+    vi.restoreAllMocks();
+  });
+
+  it('REQ-73 island drones detach and hunt when the ship comes within range', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.1);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+    belt.update(0, { x: 0, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+    const ship = new Ship();
+    const field = new DroneField();
+
+    field.update(0, ship, belt, emptyMassive(), 0, false, true);
+    const attached: Drone[] = [];
+    field.forEach((drone) => { if (drone.host) attached.push(drone); });
+    expect(attached.length).toBeGreaterThan(0);
+    const hunter = attached[0];
+
+    ship.position = { ...hunter.position };
+    field.update(0.02, ship, belt, emptyMassive(), 0, false, true);
+
+    expect(hunter.isHunting).toBe(true);
+    vi.restoreAllMocks();
+  });
 });
 

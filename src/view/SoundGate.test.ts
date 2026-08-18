@@ -22,7 +22,7 @@ class FakeSounds {
 
 function buildGate(): { gate: SoundGate; sounds: FakeSounds } {
   const camera = new Camera();
-  camera.update({ x: 0, y: 0 }, 0, 1); // zoom 1 -> bounds [-100,100] each axis for a 200x200 viewport
+  camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1); // default baseZoom -> bounds inside +/- 100 each axis for a 200x200 viewport
   const sounds = new FakeSounds();
   const gate = new SoundGate(camera, sounds as unknown as SoundSystem, () => ({ width: 200, height: 200 }));
   return { gate, sounds };

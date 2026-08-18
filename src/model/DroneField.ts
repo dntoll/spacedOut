@@ -1,6 +1,7 @@
 import { add, length, normalize, random, scale, sub } from '../math';
 import type { Vec2 } from '../types';
-import type { AsteroidBelt } from './AsteroidBelt';
+import { Asteroid } from './Asteroid';
+import type { AsteroidBelt, AsteroidIsland } from './AsteroidBelt';
 import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
 import { CollisionResolver } from './CollisionResolver';
@@ -27,6 +28,7 @@ export class DroneField {
   private readonly destroyedObservers = new Set<DroneDestroyedObserver>();
   private readonly collisionObservers = new Set<CollisionObserver>();
   private readonly massiveCapacity = new Map<MassiveAsteroid, number>();
+  private readonly populatedIslands = new Set<AsteroidIsland>();
 
   constructor(initialDrones?: Drone[]) {
     if (initialDrones) this.drones.push(...initialDrones);
@@ -71,6 +73,7 @@ export class DroneField {
     massiveAsteroidField: MassiveAsteroidField,
     spawnExclusionRadius: number,
     spawnEnabled = true,
+    islandDrones = false,
   ): void {
     this.releaseLostHosts(asteroidBelt, massiveAsteroidField);
     this.detachInRange(ship);
@@ -79,6 +82,7 @@ export class DroneField {
     this.resolveShipImpacts(ship);
     this.recycleDistant(ship, asteroidBelt, massiveAsteroidField);
     if (spawnEnabled) this.spawnToTarget(ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
+    if (islandDrones) this.spawnIslandDrones(asteroidBelt);
   }
 
   applySeparation(others: PhysicsBody[], dt: number): void {
@@ -249,6 +253,35 @@ export class DroneField {
       hostCounts.set(host, (hostCounts.get(host) ?? 0) + 1);
       activeCount++;
     }
+  }
+
+  private spawnIslandDrones(asteroidBelt: AsteroidBelt): void {
+    const liveIslands = new Set<AsteroidIsland>();
+    asteroidBelt.forEachIsland((island) => liveIslands.add(island));
+    for (const island of [...this.populatedIslands]) {
+      if (!liveIslands.has(island)) this.populatedIslands.delete(island);
+    }
+    asteroidBelt.forEachIsland((island) => {
+      if (island.droneCount <= 0) return;
+      if (this.populatedIslands.has(island)) return;
+      const candidates: Asteroid[] = [];
+      asteroidBelt.forEach((asteroid) => {
+        if (length(sub(asteroid.position, island.center)) <= island.radius) candidates.push(asteroid);
+      });
+      const assigned = new Set<Asteroid>();
+      for (const drone of this.drones) {
+        if (drone.host instanceof Asteroid && candidates.includes(drone.host)) assigned.add(drone.host);
+      }
+      const available = candidates.filter((asteroid) => !assigned.has(asteroid));
+      const count = Math.min(island.droneCount, available.length);
+      for (let i = 0; i < count; i++) {
+        const host = available[i];
+        const drone = new Drone(host, random(0, Math.PI * 2), Drone.createBodyVertices(), Math.floor(random(1, 4)));
+        drone.rideHost(null);
+        this.drones.push(drone);
+      }
+      this.populatedIslands.add(island);
+    });
   }
 
   private capacityFor(host: PhysicsBody, massiveAsteroidField: MassiveAsteroidField): number {

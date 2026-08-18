@@ -6,9 +6,11 @@ import type { AsteroidDestroyedObserver } from './AsteroidDestroyedObserver';
 import type { AsteroidCollisionObserver } from './AsteroidCollisionObserver';
 import type { CollectablePickupObserver } from './CollectablePickupObserver';
 import type { CollisionObserver } from './CollisionObserver';
+import { DamageCalculator } from './DamageCalculator';
 import type { DamageObserver } from './DamageObserver';
 import { DroneField } from './DroneField';
 import type { DroneDestroyedObserver } from './DroneDestroyedObserver';
+import { DroneDestroyed } from './DroneDestroyed';
 import { FuelContainer } from './FuelContainer';
 import { HpContainer } from './HpContainer';
 import type { LaserImpactObserver } from './LaserImpactObserver';
@@ -37,7 +39,7 @@ export interface GameOptions {
   startingMission?: 1 | 2;
 }
 
-export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver {
+export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver, DroneDestroyedObserver {
   readonly ship = new Ship({ fuel: 50, hp: 50, ammo: 50 });
   readonly asteroidBelt = new AsteroidBelt(this.ship.position);
   readonly supplyField = new SupplyField(this.ship.position);
@@ -54,6 +56,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver 
   constructor(options?: GameOptions) {
     this.asteroidBelt.addAsteroidDestroyedObserver(this);
     this.pirateField.addPirateDestroyedObserver(this);
+    this.droneField.addDroneDestroyedObserver(this);
     if (options?.startingMission === 2) {
       this.ship.collectFuel(100);
       this.ship.repair(100);
@@ -69,6 +72,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver 
   get turnRate(): number { return this.ship.turnRate; }
   get speedFraction(): number { return this.ship.speedFraction; }
   get isGameOver(): boolean { return !this.ship.isAlive; }
+  get damageSpeedThreshold(): number { return DamageCalculator.violentThreshold; }
 
   setThrustTarget(target: Vec2): void { this.ship.aimAt(target); }
   setControlTuning(tuning: ControlTuning): void { this.ship.setControlTuning(tuning); }
@@ -153,6 +157,11 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver 
     }
   }
 
+  onDroneDestroyed(event: DroneDestroyed): void {
+    if (Math.random() >= DROP_PROBABILITY) return;
+    this.supplyField.drop(this.createDrop(event.position));
+  }
+
   private createDrop(position: Vec2): SupplyContainer {
     const visible = this.supplyField.visibleTypes(this.ship, this.spawnExclusionRadius);
     const type = SupplyChooser.choose({ fuel: this.ship.fuel, hp: this.ship.hp, ammo: this.ship.ammo }, visible, Math.random);
@@ -189,7 +198,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver 
     this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary, this.spawnExclusionRadius, suppliesEnabled);
     this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary, massiveEnabled);
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
-    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, dronesEnabled);
+    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, dronesEnabled, islands);
     this.pirateField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, piratesEnabled, this.mission.isTraversal ? this.mission.signalDirection : null);
     const droneBodies: PhysicsBody[] = [];
     this.droneField.forEach((drone) => droneBodies.push(drone));

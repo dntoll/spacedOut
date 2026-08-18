@@ -83,4 +83,59 @@ describe('Drawing', () => {
     expect(context.lineWidth).toBe(2);
     expect(context.stroke).toHaveBeenCalled();
   });
+
+  it('REQ-70 resolves a linear gradient paint for directional lit/dark body fills', () => {
+    const gradient = { addColorStop: vi.fn() };
+    const context = {
+      setTransform: vi.fn(), fillRect: vi.fn(), fillStyle: '',
+      beginPath: vi.fn(), moveTo: vi.fn(), lineTo: vi.fn(), closePath: vi.fn(),
+      fill: vi.fn(), stroke: vi.fn(),
+      createLinearGradient: vi.fn(() => gradient),
+      createRadialGradient: vi.fn(),
+      strokeStyle: '', lineWidth: 0,
+    };
+    const canvas = { getContext: vi.fn(() => context), style: {}, width: 0, height: 0 };
+    vi.stubGlobal('window', { innerWidth: 800, innerHeight: 600, devicePixelRatio: 1 });
+    vi.stubGlobal('document', { querySelector: vi.fn(() => canvas) });
+
+    const drawing = new Drawing('#game');
+    drawing.polygon(
+      [{ x: -10, y: -10 }, { x: 10, y: -10 }, { x: 10, y: 10 }, { x: -10, y: 10 }],
+      { from: { x: -10, y: 0 }, to: { x: 10, y: 0 }, stops: [{ offset: 0, color: '#fff' }, { offset: 1, color: '#000' }] },
+    );
+
+    expect(context.createLinearGradient).toHaveBeenCalledWith(-10, 0, 10, 0);
+    expect(gradient.addColorStop).toHaveBeenCalledWith(0, '#fff');
+    expect(gradient.addColorStop).toHaveBeenCalledWith(1, '#000');
+    expect(context.fill).toHaveBeenCalled();
+  });
+
+  it('REQ-71 composites the offscreen shadow layer onto the main canvas with a multiply blend', () => {
+    const mainContext = {
+      setTransform: vi.fn(), fillRect: vi.fn(), fillStyle: '',
+      save: vi.fn(), restore: vi.fn(),
+      globalCompositeOperation: '',
+      drawImage: vi.fn(),
+    };
+    const offscreenContext = {
+      setTransform: vi.fn(), clearRect: vi.fn(),
+    };
+    const mainCanvas = { getContext: vi.fn(() => mainContext), style: {}, width: 0, height: 0 };
+    const offscreenCanvas = { getContext: vi.fn(() => offscreenContext), width: 0, height: 0 };
+    vi.stubGlobal('window', { innerWidth: 800, innerHeight: 600, devicePixelRatio: 1 });
+    vi.stubGlobal('document', {
+      querySelector: vi.fn(() => mainCanvas),
+      createElement: vi.fn(() => offscreenCanvas),
+    });
+
+    const drawing = new Drawing('#game');
+    drawing.beginShadowLayer();
+    drawing.endShadowLayer();
+    drawing.compositeShadowLayer('multiply');
+
+    expect(mainContext.globalCompositeOperation).toBe('multiply');
+    expect(mainContext.drawImage).toHaveBeenCalledWith(offscreenCanvas, 0, 0);
+    expect(mainContext.save).toHaveBeenCalled();
+    expect(mainContext.restore).toHaveBeenCalled();
+  });
 });

@@ -1,5 +1,6 @@
 import type * as Model from '../model';
 import type { Drawing, RadialPaint } from './Drawing';
+import type { StarLight, ShadowCasters } from './StarLight';
 
 interface Nozzle { offset: { x: number; y: number }; radius: number }
 
@@ -7,15 +8,19 @@ const TAIL: Nozzle = { offset: { x: -15, y: 0 }, radius: 35 };
 const NOSE: Nozzle = { offset: { x: 20, y: 0 }, radius: 22 };
 const STARBOARD: Nozzle = { offset: { x: -4, y: 13 }, radius: 18 };
 const PORT: Nozzle = { offset: { x: -4, y: -13 }, radius: 18 };
+const SHIP_SHADOW_RADIUS = 20;
 
 export class Ship {
-  draw(drawing: Drawing, ship: Model.Ship): void {
+  draw(drawing: Drawing, ship: Model.Ship, starLight: StarLight, casters: ShadowCasters | null): void {
     drawing.withTransform(ship.position, ship.angle, () => {
       this.drawNozzles(drawing, ship);
+      const localLight = starLight.localDirection(ship.angle);
+      const shadow = starLight.shadowFactor(ship.position, SHIP_SHADOW_RADIUS, casters);
+      const hull = starLight.bodyPaint(localLight, 22, '#d9f7ff', '#16263b', shadow);
       drawing.withShadow('#7ee9ff', 15, () => {
         drawing.polygon(
           [{ x: 22, y: 0 }, { x: -14, y: 13 }, { x: -14, y: -13 }],
-          '#d9f7ff',
+          hull,
           '#72dff5',
           1.4,
         );

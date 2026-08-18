@@ -8,6 +8,7 @@ import type { Vec2 } from '../types';
 import { Camera } from './Camera';
 import type { Drawing } from './Drawing';
 import { ParticleField } from './ParticleField';
+import { StarLight, type ShadowCasters } from './StarLight';
 
 interface DrawnCircle { x: number; y: number; size: number; color: string }
 
@@ -96,7 +97,7 @@ describe('ParticleField', () => {
     const { drawing, circles } = countingDrawing();
 
     field.update(5, stubModel(ship), camera, VIEWPORT);
-    camera.update({ x: 100000, y: 0 }, 0, 0);
+    camera.update({ x: 100000, y: 0 }, { x: 0, y: 0 }, 0);
     field.update(0, stubModel(ship), camera, VIEWPORT);
     field.draw(drawing);
 
@@ -252,7 +253,7 @@ describe('ParticleField', () => {
     field.draw(drawing);
     expect(circles.length).toBeGreaterThan(0);
 
-    camera.update({ x: 100000, y: 0 }, 0, 0);
+    camera.update({ x: 100000, y: 0 }, { x: 0, y: 0 }, 0);
     circles.length = 0;
     field.update(0, stubModel(ship), camera, VIEWPORT);
     field.draw(drawing);
@@ -280,13 +281,12 @@ describe('ParticleField', () => {
     const { drawing, circles } = countingDrawing();
 
     field.emitCollision(new Collision({ x: 100, y: 0 }, { x: 1, y: 0 }, 100));
-    field.update(1, stubModel(ship), camera, VIEWPORT);
+    field.update(1.5, stubModel(ship), camera, VIEWPORT);
     field.draw(drawing);
 
     expect(circles.length).toBeGreaterThanOrEqual(12);
-    const cooled = circles.find((c) => Math.abs(c.x - 181) < 2 && Math.abs(c.y) < 2);
+    const cooled = circles.find((c) => c.color.match(/120,200,235/));
     expect(cooled).toBeDefined();
-    expect(cooled!.color).toMatch(/120,200,235/);
     vi.restoreAllMocks();
   });
 
@@ -322,13 +322,12 @@ describe('ParticleField', () => {
     const { drawing, circles } = countingDrawing();
 
     field.emitExplosion({ x: 100, y: 0 });
-    field.update(1.2, stubModel(ship), camera, VIEWPORT);
+    field.update(2.6, stubModel(ship), camera, VIEWPORT);
     field.draw(drawing);
 
     expect(circles.length).toBeGreaterThanOrEqual(150);
-    const cooled = circles.find((c) => Math.abs(c.x + 146) < 3 && Math.abs(c.y) < 3);
+    const cooled = circles.find((c) => c.color.match(/120,200,235/));
     expect(cooled).toBeDefined();
-    expect(cooled!.color).toMatch(/120,200,235/);
     vi.restoreAllMocks();
   });
 
@@ -342,5 +341,47 @@ describe('ParticleField', () => {
 
     expect(circles.some((c) => c.color.startsWith('rgba(93,184,255,'))).toBe(true);
     vi.restoreAllMocks();
+  });
+
+  it('REQ-71 freshly-spawned explosion and collision particles burn brighter and longer before cooling to dust', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const explosionDrawing = countingDrawing();
+    const field = new ParticleField();
+
+    field.emitExplosion({ x: 0, y: 0 });
+    field.draw(explosionDrawing.drawing);
+
+    const hot = explosionDrawing.circles.filter((c) => c.color.startsWith('rgba(220,250,255,'));
+    expect(hot.length).toBeGreaterThan(explosionDrawing.circles.length * 0.8);
+
+    const collisionDrawing = countingDrawing();
+    const collisionField = new ParticleField();
+    collisionField.emitCollision(new Collision({ x: 100, y: 0 }, { x: 1, y: 0 }, 100));
+    collisionField.update(0.7, stubModel(new Ship()), new Camera(), VIEWPORT);
+    collisionField.draw(collisionDrawing.drawing);
+
+    const stillBurning = collisionDrawing.circles.filter((c) => !c.color.match(/120,200,235/));
+    expect(stillBurning.length).toBeGreaterThan(0);
+    vi.restoreAllMocks();
+  });
+
+  it('REQ-71 darkens atmospheric particles that fall within an asteroid shadow', () => {
+    const field = new ParticleField();
+    const star = new StarLight({ x: 0.6, y: 0.8 }, 2400);
+    const casters: ShadowCasters = { forEachCaster: (fn) => fn({ position: { x: 0, y: 0 }, radius: 500 }) };
+    field.adopt({ x: 0.6 * 100, y: 0.8 * 100 }, { x: 0, y: 0 });
+    field.adopt({ x: -1000, y: -1000 }, { x: 0, y: 0 });
+
+    const lit = countingDrawing();
+    field.draw(lit.drawing);
+    const shadowed = countingDrawing();
+    field.draw(shadowed.drawing, star, casters);
+
+    expect(lit.circles).toHaveLength(2);
+    expect(shadowed.circles).toHaveLength(2);
+    const alphaOf = (c: DrawnCircle): number => parseFloat(c.color.split(',')[3]);
+    const litSum = lit.circles.reduce((s, c) => s + alphaOf(c), 0);
+    const shadowedSum = shadowed.circles.reduce((s, c) => s + alphaOf(c), 0);
+    expect(shadowedSum).toBeLessThan(litSum);
   });
 });

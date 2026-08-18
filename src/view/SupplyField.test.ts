@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SupplyField as ModelSupplyField } from '../model/SupplyField';
 import { WeaponPod } from '../model/WeaponPod';
 import type { Drawing } from './Drawing';
+import { StarLight } from './StarLight';
 import { SupplyField } from './SupplyField';
 
 describe('SupplyField view', () => {
@@ -19,7 +20,7 @@ describe('SupplyField view', () => {
     const pod = new WeaponPod({ x: 0, y: 0 });
     const field = new ModelSupplyField({ x: 0, y: 0 }, [pod]);
 
-    new SupplyField().draw(drawing, field);
+    new SupplyField().draw(drawing, field, new StarLight(), null);
 
     const ring = circles.find((c) => c.position.x === 0 && c.position.y === 0 && c.radius === pod.radius);
     expect(ring).toBeDefined();

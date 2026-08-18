@@ -117,6 +117,26 @@ describe('AsteroidBelt', () => {
     expect(islands.length).toBe(1);
   });
 
+  it('REQ-73 marks roughly 30% of islands to carry 1-8 drones and the rest none', () => {
+    const carrying: number[] = [];
+    let noneCount = 0;
+    for (let seed = 0; seed < 100; seed++) {
+      vi.spyOn(Math, 'random').mockReturnValue(seed / 100);
+      const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+      belt.update(0, { x: 0, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+      vi.restoreAllMocks();
+      belt.forEachIsland((island) => {
+        if (island.droneCount > 0) carrying.push(island.droneCount);
+        else noneCount++;
+      });
+    }
+    expect(carrying.length).toBeGreaterThan(0);
+    expect(noneCount).toBeGreaterThan(0);
+    expect(carrying.length / (carrying.length + noneCount)).toBeLessThan(0.4);
+    expect(Math.min(...carrying)).toBeGreaterThanOrEqual(1);
+    expect(Math.max(...carrying)).toBeLessThanOrEqual(8);
+  });
+
   it('REQ-12 transfers momentum and spin during ship-asteroid collisions', () => {
     const ship = new Ship();
     ship.previousPosition = { x: 70, y: 0 };

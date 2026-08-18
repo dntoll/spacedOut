@@ -30,12 +30,16 @@ const ISLAND_RING_MARGIN = 120;
 const ISLAND_LATERAL = 2000;
 const ISLAND_PERIPHERAL_FRACTION = 0.5;
 const ISLAND_RECYCLE_MARGIN = 600;
+const ISLAND_DRONE_FRACTION = 0.3;
+const ISLAND_DRONE_MIN = 1;
+const ISLAND_DRONE_MAX = 8;
 const ISLAND_MAX_RADIUS = ISLAND_BASE_SPREAD * Math.sqrt(ISLAND_MAX_ROCKS / ISLAND_BASE_ROCKS) * ISLAND_ASPECT_MAX + ISLAND_RING_MARGIN;
 
 export interface AsteroidIsland {
   center: Vec2;
   radius: number;
   outline: Vec2[];
+  droneCount: number;
 }
 
 export class AsteroidBelt {
@@ -221,7 +225,10 @@ export class AsteroidBelt {
         islandCenter = add(routeCenter, scale(perp, lateral));
       }
       const outline = this.buildOutline(islandCenter, a, b, rotation);
-      this.islands.push({ center: { ...islandCenter }, radius: Math.max(a, b) + ISLAND_RING_MARGIN, outline });
+      const droneCount = Math.random() < ISLAND_DRONE_FRACTION
+        ? Math.floor(random(ISLAND_DRONE_MIN, ISLAND_DRONE_MAX + 1))
+        : 0;
+      this.islands.push({ center: { ...islandCenter }, radius: Math.max(a, b) + ISLAND_RING_MARGIN, outline, droneCount });
       const cos = Math.cos(rotation);
       const sin = Math.sin(rotation);
       for (let i = 0; i < rockCount; i++) {

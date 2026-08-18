@@ -86,7 +86,7 @@
           <output id="sfx-collectable-value">100</output>
         </div>
       </div>
-      <div class="speed"><span id="speed">000</span><small>m/s</small></div>
+      <div class="speed"><b id="speed-warning">WARNING</b><span id="speed">000</span><small>m/s</small></div>
       <div class="distance hidden" id="distance" aria-label="Distance to destination">
         <div class="distance-label"><span>DISTANCE</span><b id="distance-value">0</b></div>
         <div class="distance-track"><i id="distance-fill"></i></div>
@@ -108,6 +108,10 @@
       <div class="hint" id="hint">
         <strong>HOLD TO THRUST</strong>
         <span>Point to steer · momentum carries you</span>
+      </div>
+      <div class="mission-goals hidden" id="mission-goals" aria-label="Mission goals">
+        <div class="mission-goals-header">OBJECTIVES</div>
+        <ul id="mission-goals-list"></ul>
       </div>
     </div>
     <div class="game-over hidden" id="game-over">

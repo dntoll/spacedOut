@@ -7,22 +7,25 @@ import { NebulaParticle, type NebulaColor } from './NebulaParticle';
 
 const CLOUD_GAP_BASE = 15000;
 const CLOUD_GAP_JITTER = 15000;
-const CLOUD_SIZE = 350;
-const WISP_CLOUD_SIZE = 450;
+const CLOUD_SIZE = 700;
+const WISP_CLOUD_SIZE = 900;
 const CLOUD_SPREAD = 1732;
 const CLOUD_ASPECT_MIN = 1.4;
 const CLOUD_ASPECT_MAX = 2.6;
 const WISP_ASPECT_MIN = 2.5;
 const WISP_ASPECT_MAX = 3.5;
-const BLOB_KERNEL_MIN = 2;
-const BLOB_KERNEL_MAX = 3;
+const BLOB_KERNEL_MIN = 3;
+const BLOB_KERNEL_MAX = 5;
 const BLOB_KERNEL_RADIUS = 1200;
 const PERIPHERAL_FRACTION = 0.5;
 const ISLAND_CLEARANCE = 600;
-const PARTICLE_MIN = 50;
-const PARTICLE_MAX = 120;
+const PARTICLE_MIN = 100;
+const PARTICLE_MAX = 240;
 const PARTICLE_ALPHA = 0.5;
-const CULL_MARGIN = 400 + CLOUD_SPREAD * WISP_ASPECT_MAX + 800;
+const MAX_CLOUD_EXTENT = CLOUD_SPREAD * WISP_ASPECT_MAX;
+const SPAWN_MARGIN = 400;
+const CULL_TAIL = 800;
+const SPEED_CLEARANCE_GAIN = 1.2;
 
 const PALETTE: NebulaColor[] = [
   { r: 180, g: 90, b: 220 },
@@ -46,12 +49,12 @@ export class NebulaField {
       this.nextGap = CLOUD_GAP_BASE;
       return;
     }
-    this.spawn(model, camera, viewport);
+    this.spawn(model, camera, viewport, model.ship.speed * SPEED_CLEARANCE_GAIN);
     const pushers: Vec2[] = [model.ship.position];
     model.pirateField.forEachPirate((pirate) => pushers.push(pirate.position));
     model.droneField.forEach((drone) => pushers.push(drone.position));
     for (const particle of this.particles) particle.update(dt, pushers);
-    this.cull(model.ship.position, camera, viewport);
+    this.cull(model.ship.position, camera, viewport, model.ship.speed * SPEED_CLEARANCE_GAIN);
   }
 
   draw(drawing: Drawing): void {
@@ -72,13 +75,13 @@ export class NebulaField {
     });
   }
 
-  private spawn(model: Model.Game, camera: Camera, viewport: Size): void {
+  private spawn(model: Model.Game, camera: Camera, viewport: Size, speedClearance: number): void {
     const direction = model.mission.signalDirection;
     if (!direction) return;
     const ship = model.ship.position;
     const progress = ship.x * direction.x + ship.y * direction.y;
     const visibleRadius = camera.getVisibleWorldRadius(viewport);
-    const spawnAhead = visibleRadius + 400;
+    const spawnAhead = visibleRadius + MAX_CLOUD_EXTENT + speedClearance + SPAWN_MARGIN;
     const perp: Vec2 = { x: -direction.y, y: direction.x };
     while (progress >= this.lastCloudProgress + this.nextGap) {
       this.lastCloudProgress += this.nextGap;
@@ -168,8 +171,8 @@ export class NebulaField {
     };
   }
 
-  private cull(shipPosition: Vec2, camera: Camera, viewport: Size): void {
-    const maxDist = camera.getVisibleWorldRadius(viewport) + CULL_MARGIN;
+  private cull(shipPosition: Vec2, camera: Camera, viewport: Size, speedClearance: number): void {
+    const maxDist = camera.getVisibleWorldRadius(viewport) + 2 * MAX_CLOUD_EXTENT + speedClearance + SPAWN_MARGIN + CULL_TAIL;
     this.particles = this.particles.filter((p) => length(sub(p.position, shipPosition)) <= maxDist);
   }
 }

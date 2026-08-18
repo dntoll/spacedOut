@@ -20,7 +20,7 @@ const stubDrawing = (): { drawing: Drawing; circles: ReturnType<typeof vi.fn> } 
 const traversalModel = (shipPosition: Vec2 = { x: 0, y: 0 }): Model.Game =>
   ({
     mission: { isTraversal: true, signalDirection: { x: 1, y: 0 } },
-    ship: { position: shipPosition },
+    ship: { position: shipPosition, speed: 0 },
     asteroidBelt: { forEachIsland: () => {} },
     pirateField: { forEachPirate: () => {} },
     droneField: { forEach: () => {} },
@@ -31,7 +31,7 @@ describe('NebulaField', () => {
     const { drawing, circles } = stubDrawing();
     const field = new NebulaField();
     const camera = new Camera();
-    camera.update({ x: 0, y: 0 }, 0, 1);
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
 
     field.update(0.016, traversalModel(), camera, { width: 800, height: 600 });
     field.draw(drawing);
@@ -93,7 +93,7 @@ describe('NebulaField', () => {
     const { drawing, circles } = stubDrawing();
     const field = new NebulaField();
     const camera = new Camera();
-    camera.update({ x: 0, y: 0 }, 0, 1);
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
 
     field.update(0.016, traversalModel(), camera, { width: 800, height: 600 });
     field.draw(drawing);
@@ -109,22 +109,22 @@ describe('NebulaField', () => {
     const { drawing, circles } = stubDrawing();
     const field = new NebulaField();
     const camera = new Camera();
-    camera.update({ x: 0, y: 0 }, 0, 1);
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
 
     field.update(0.016, traversalModel(), camera, { width: 800, height: 600 });
     field.draw(drawing);
 
-    expect(circles.mock.calls.length).toBeGreaterThanOrEqual(350);
+    expect(circles.mock.calls.length).toBeGreaterThanOrEqual(700);
   });
 
   it('REQ-67 defers to asteroid islands so nebulas and belts rarely co-occur', () => {
     const { drawing, circles } = stubDrawing();
     const field = new NebulaField();
     const camera = new Camera();
-    camera.update({ x: 0, y: 0 }, 0, 1);
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
     const model = {
       mission: { isTraversal: true, signalDirection: { x: 1, y: 0 } },
-      ship: { position: { x: 0, y: 0 } },
+      ship: { position: { x: 0, y: 0 }, speed: 0 },
       asteroidBelt: {
         forEachIsland: (visitor: (island: { center: Vec2; radius: number; outline: Vec2[] }) => void) =>
           visitor({ center: { x: 0, y: 0 }, radius: 100000, outline: [] }),
@@ -144,7 +144,7 @@ describe('NebulaField', () => {
     const { drawing, circles } = stubDrawing();
     const field = new NebulaField();
     const camera = new Camera();
-    camera.update({ x: 0, y: 0 }, 0, 1);
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
 
     field.update(0.016, traversalModel(), camera, { width: 800, height: 600 });
     field.draw(drawing);
@@ -152,5 +152,51 @@ describe('NebulaField', () => {
 
     const ys = circles.mock.calls.map((c) => (c[0] as Vec2).y);
     expect(ys.every((y) => Math.abs(y) > 200)).toBe(true);
+  });
+
+  it('REQ-25 spawns nebulas beyond the visible boundary so they do not pop into view', () => {
+    const { drawing, circles } = stubDrawing();
+    const field = new NebulaField();
+    const camera = new Camera();
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
+    const viewport = { width: 800, height: 600 };
+    const visibleRadius = camera.getVisibleWorldRadius(viewport);
+
+    field.update(0.016, traversalModel(), camera, viewport);
+    field.draw(drawing);
+
+    expect(circles).toHaveBeenCalled();
+    for (const call of circles.mock.calls) {
+      const pos = call[0] as Vec2;
+      const dist = Math.hypot(pos.x, pos.y);
+      expect(dist).toBeGreaterThan(visibleRadius);
+    }
+  });
+
+  it('REQ-25 adds extra spawn clearance when the ship is moving fast', () => {
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const slow = traversalModel();
+    const fast = traversalModel();
+    (fast.ship as { speed: number }).speed = 1200;
+
+    const { drawing: slowDrawing, circles: slowCircles } = stubDrawing();
+    const { drawing: fastDrawing, circles: fastCircles } = stubDrawing();
+    const camera = new Camera();
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
+    const viewport = { width: 800, height: 600 };
+    const visibleRadius = camera.getVisibleWorldRadius(viewport);
+
+    const slowField = new NebulaField();
+    slowField.update(0.016, slow, camera, viewport);
+    slowField.draw(slowDrawing);
+    const fastField = new NebulaField();
+    fastField.update(0.016, fast, camera, viewport);
+    fastField.draw(fastDrawing);
+    spy.mockRestore();
+
+    const slowMin = Math.min(...slowCircles.mock.calls.map((c) => Math.hypot((c[0] as Vec2).x, (c[0] as Vec2).y)));
+    const fastMin = Math.min(...fastCircles.mock.calls.map((c) => Math.hypot((c[0] as Vec2).x, (c[0] as Vec2).y)));
+    expect(fastMin).toBeGreaterThan(slowMin);
+    expect(fastMin).toBeGreaterThan(visibleRadius + 1200 * 1.2);
   });
 });

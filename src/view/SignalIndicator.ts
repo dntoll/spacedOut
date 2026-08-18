@@ -29,7 +29,7 @@ export class SignalIndicator {
       if (!drone.isHunting) return;
       if (drone.position.x >= bounds.left && drone.position.x <= bounds.right
         && drone.position.y >= bounds.top && drone.position.y <= bounds.bottom) return;
-      const droneDir = normalize(sub(drone.position, camera.worldPosition));
+      const droneDir = normalize(sub(drone.position, camera.focusPosition));
       if (droneDir.x === 0 && droneDir.y === 0) return;
       const edge = this.edgePoint(center, droneDir, size);
       this.drawWave(drawing, edge, droneDir, DRONE_COLOR, model.elapsed, WAVE_MAX_RADIUS);
@@ -76,7 +76,7 @@ export class SignalIndicator {
   private aimDirection(model: Model.Game, camera: Camera): Vec2 | null {
     const destination = model.mission.destinationPosition;
     if (destination) {
-      const dir = normalize(sub(destination, camera.worldPosition));
+      const dir = normalize(sub(destination, camera.focusPosition));
       if (dir.x !== 0 || dir.y !== 0) return dir;
     }
     return model.mission.signalDirection;

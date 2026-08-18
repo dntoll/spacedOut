@@ -2,6 +2,7 @@ import type * as Model from '../model';
 import type { ControlTuning, Vec2 } from '../types';
 import { AsteroidBelt } from './AsteroidBelt';
 import { Camera } from './Camera';
+import { CompositeShadowCasters } from './CompositeShadowCasters';
 import { DistanceMeter } from './DistanceMeter';
 import { Drawing } from './Drawing';
 import { DroneField } from './DroneField';
@@ -11,6 +12,7 @@ import { LaserField } from './LaserField';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Minimap } from './Minimap';
 import { MissionOverlay } from './MissionOverlay';
+import { MissionGoals } from './MissionGoals';
 import { MissionsMenu, type MissionSelection } from './MissionsMenu';
 import { MusicSystem } from './MusicSystem';
 import { NebulaField } from './NebulaField';
@@ -18,11 +20,13 @@ import { ParticleField } from './ParticleField';
 import { PirateField } from './PirateField';
 import { PlayerInput } from './PlayerInput';
 import { SettingsMenu } from './SettingsMenu';
+import { ShadowVolume } from './ShadowVolume';
 import { Ship } from './Ship';
 import { SignalIndicator } from './SignalIndicator';
 import { SoundGate } from './SoundGate';
 import { SoundSystem } from './SoundSystem';
 import { SpaceBackground } from './SpaceBackground';
+import { StarLight } from './StarLight';
 import { StorageAdapter } from './StorageAdapter';
 import { SupplyField } from './SupplyField';
 
@@ -34,6 +38,8 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly settings: SettingsMenu;
   private readonly input: PlayerInput;
   private readonly background = new SpaceBackground();
+  private readonly starLight = new StarLight();
+  private readonly shadowVolume = new ShadowVolume();
   private readonly ship = new Ship();
   private readonly asteroidBelt = new AsteroidBelt();
   private readonly massiveAsteroidField = new MassiveAsteroidField();
@@ -46,6 +52,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly explorationMap = new ExplorationMap();
   private readonly minimap = new Minimap();
   private readonly missionOverlay = new MissionOverlay();
+  private readonly missionGoals = new MissionGoals();
   private readonly missionsMenu = new MissionsMenu();
   private readonly signalIndicator = new SignalIndicator();
   private readonly music = MusicSystem.create();
@@ -142,7 +149,8 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
 
   render(model: Model.Game, dt: number): void {
     this.camera.setBaseZoom(this.settings.getDefaultZoomLevel());
-    this.camera.update(model.ship.position, model.speed, dt, model.droneField.anyHunting(), model.mission.isTraversal);
+    this.camera.setViewport(this.drawing.size);
+    this.camera.update(model.ship.position, model.ship.velocity, dt, model.droneField.anyHunting(), model.mission.isTraversal);
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
     this.particleField.update(dt, model, this.camera, this.drawing.size);
     this.nebulaField.update(dt, model, this.camera, this.drawing.size);
@@ -155,23 +163,27 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.sounds.update();
 
     this.background.draw(this.drawing, this.camera.worldPosition);
+    const casters = new CompositeShadowCasters(model.massiveAsteroidField, model.asteroidBelt);
+    this.shadowVolume.render(this.drawing, casters, this.starLight, this.camera);
+    this.drawing.compositeShadowLayer('multiply');
     this.camera.drawWorld(this.drawing, () => {
-      this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera);
+      this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera, this.starLight);
       this.nebulaField.draw(this.drawing);
-      this.particleField.draw(this.drawing);
-      this.supplyField.draw(this.drawing, model.supplyField);
-      this.asteroidBelt.draw(this.drawing, model.asteroidBelt, model.ship.position, this.camera);
-      this.droneField.draw(this.drawing, model.droneField, model.ship, this.camera);
-      this.pirateField.draw(this.drawing, model.pirateField, model.ship, this.camera);
+      this.particleField.draw(this.drawing, this.starLight, casters);
+      this.supplyField.draw(this.drawing, model.supplyField, this.starLight, casters);
+      this.asteroidBelt.draw(this.drawing, model.asteroidBelt, model.ship.position, this.camera, this.starLight, casters);
+      this.droneField.draw(this.drawing, model.droneField, model.ship, this.camera, this.starLight, casters);
+      this.pirateField.draw(this.drawing, model.pirateField, model.ship, this.camera, this.starLight, casters);
       this.laserField.draw(this.drawing, model.laserField);
-      if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship);
+      if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship, this.starLight, casters);
     });
     this.background.drawVignette(this.drawing);
     this.minimap.draw(this.drawing, this.explorationMap, model, this.camera);
     this.signalIndicator.draw(this.drawing, model, this.camera);
-    this.hud.updateSpeed(model.speed);
+    this.hud.updateSpeed(model.speed, model.damageSpeedThreshold);
     this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);
     this.distanceMeter.update(model.mission);
+    this.missionGoals.update(model.mission.currentGoals);
     if (model.isGameOver) {
       this.gameOverNode?.classList.remove('hidden');
       this.missionOverlay.hide();

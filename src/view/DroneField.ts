@@ -1,7 +1,8 @@
 import { length, sub } from '../math';
 import type * as Model from '../model';
 import type { Camera } from './Camera';
-import type { Drawing, RadialPaint } from './Drawing';
+import type { Drawing } from './Drawing';
+import type { StarLight, ShadowCasters } from './StarLight';
 
 const ARM_COLOR = '#9dc8ff';
 const BODY_STROKE = 'rgba(150,200,255,.55)';
@@ -9,7 +10,7 @@ const DETECTION_RING_COLOR = 'rgba(120,180,255,.28)';
 const ESCAPE_RING_COLOR = 'rgba(120,180,255,.22)';
 
 export class DroneField {
-  draw(drawing: Drawing, field: Model.DroneField, ship: Model.Ship, camera: Camera): void {
+  draw(drawing: Drawing, field: Model.DroneField, ship: Model.Ship, camera: Camera, starLight: StarLight, casters: ShadowCasters | null): void {
     const { width, height } = drawing.size;
     const visibleRange = Math.hypot(width, height) / camera.zoom * 0.7 + 100;
     const shipPosition = ship.position;
@@ -20,29 +21,23 @@ export class DroneField {
       if (!drone.isHunting) {
         drawing.arc(drone.position, detectionRange, 0, Math.PI * 2, DETECTION_RING_COLOR, 1 / camera.zoom);
       }
-      this.drawDrone(drawing, drone, camera.zoom);
+      this.drawDrone(drawing, drone, camera.zoom, starLight, casters);
     });
     if (hunting) {
       drawing.arc(shipPosition, field.giveUpRadius(), 0, Math.PI * 2, ESCAPE_RING_COLOR, 1.5 / camera.zoom);
     }
   }
 
-  private drawDrone(drawing: Drawing, drone: Model.Drone, zoom: number): void {
+  private drawDrone(drawing: Drawing, drone: Model.Drone, zoom: number, starLight: StarLight, casters: ShadowCasters | null): void {
     drawing.withTransform(drone.position, drone.angle, () => {
       const points = drone.vertices.map((variation, index) => {
         const angle = (index / drone.vertices.length) * Math.PI * 2;
         const radius = drone.radius * variation;
         return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
       });
-      const body: RadialPaint = {
-        from: { x: drone.radius * 0.3, y: 0 }, fromRadius: 0,
-        to: { x: 0, y: 0 }, toRadius: drone.radius * 1.3,
-        stops: [
-          { offset: 0, color: '#8accff' },
-          { offset: 0.5, color: '#3a8fd6' },
-          { offset: 1, color: '#1c4e7a' },
-        ],
-      };
+      const localLight = starLight.localDirection(drone.angle);
+      const shadow = starLight.shadowFactor(drone.position, drone.radius, casters);
+      const body = starLight.bodyPaint(localLight, drone.radius, '#8accff', '#1c4e7a', shadow);
       drawing.withShadow('#5db8ff', 10, () => {
         drawing.polygon(points, body, BODY_STROKE, 1.2 / zoom);
       });

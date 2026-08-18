@@ -22,6 +22,21 @@ export enum SpawnMode {
   Mission2Travel,
 }
 
+export enum MissionGoalKind {
+  RefillFuel,
+  RefillHull,
+  RefillAmmo,
+  AvoidDrones,
+  TraverseToSignal,
+  RecoverLeftWingGun,
+  RecoverRightWingGun,
+}
+
+export interface MissionGoal {
+  readonly kind: MissionGoalKind;
+  readonly complete: boolean;
+}
+
 const TRAVEL_DISTANCE = 80000;
 const DESTINATION_RADII = 100;
 const REQUIRED_WEAPON_LEVEL = 2;
@@ -35,6 +50,13 @@ export class Mission {
   private destinationRadius = 0;
   private initialDistance = TRAVEL_DISTANCE;
   private cachedRemaining = TRAVEL_DISTANCE;
+  private fuelRefilled = false;
+  private hullRefilled = false;
+  private ammoRefilled = false;
+  private dronesAvoided = false;
+  private traverseComplete = false;
+  private leftWingGunRecovered = false;
+  private rightWingGunRecovered = false;
 
   get isPaused(): boolean {
     return this.phase === MissionPhase.Mission1Intro
@@ -56,6 +78,33 @@ export class Mission {
 
   get distanceRemaining(): number { return this.cachedRemaining; }
   get initialTravelDistance(): number { return this.initialDistance; }
+
+  get currentGoals(): readonly MissionGoal[] {
+    if (
+      this.phase === MissionPhase.Mission1Intro
+      || this.phase === MissionPhase.Mission1Active
+      || this.phase === MissionPhase.Mission1Done
+    ) {
+      return [
+        { kind: MissionGoalKind.RefillFuel, complete: this.fuelRefilled },
+        { kind: MissionGoalKind.RefillHull, complete: this.hullRefilled },
+        { kind: MissionGoalKind.RefillAmmo, complete: this.ammoRefilled },
+        { kind: MissionGoalKind.AvoidDrones, complete: this.dronesAvoided },
+      ];
+    }
+    if (
+      this.phase === MissionPhase.Mission2Intro
+      || this.phase === MissionPhase.Mission2Active
+      || this.phase === MissionPhase.Mission2Done
+    ) {
+      return [
+        { kind: MissionGoalKind.TraverseToSignal, complete: this.traverseComplete },
+        { kind: MissionGoalKind.RecoverLeftWingGun, complete: this.leftWingGunRecovered },
+        { kind: MissionGoalKind.RecoverRightWingGun, complete: this.rightWingGunRecovered },
+      ];
+    }
+    return [];
+  }
 
   advance(visited: VisitedMap): void {
     if (this.phase === MissionPhase.Mission1Intro) {
@@ -90,7 +139,11 @@ export class Mission {
     screenRadius: number,
   ): void {
     if (this.phase === MissionPhase.Mission1Active) {
-      if (ship.hp >= 100 && ship.ammo >= 100 && ship.fuel > 80 && !droneField.anyHunting()) {
+      this.fuelRefilled = ship.fuel > 90;
+      this.hullRefilled = ship.hp >= 100;
+      this.ammoRefilled = ship.ammo > 90;
+      this.dronesAvoided = !droneField.anyHunting();
+      if (this.fuelRefilled && this.hullRefilled && this.ammoRefilled && this.dronesAvoided) {
         this.randomizeSignal();
         this.phase = MissionPhase.Mission1Done;
       }
@@ -105,7 +158,10 @@ export class Mission {
     } else if (this.phase === MissionPhase.Mission2Active) {
       this.beginTraversalIfNeeded(ship, massiveAsteroidField);
       this.cachedRemaining = this.computeRemaining(ship, massiveAsteroidField);
-      if (this.destination && this.cachedRemaining <= ship.radius && ship.weaponLevel >= REQUIRED_WEAPON_LEVEL) {
+      this.traverseComplete = this.cachedRemaining <= ship.radius;
+      this.leftWingGunRecovered = ship.weaponLevel >= 1;
+      this.rightWingGunRecovered = ship.weaponLevel >= REQUIRED_WEAPON_LEVEL;
+      if (this.destination && this.traverseComplete && this.leftWingGunRecovered && this.rightWingGunRecovered) {
         this.phase = MissionPhase.Mission2Done;
       }
     }

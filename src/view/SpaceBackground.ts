@@ -10,7 +10,7 @@ export class SpaceBackground {
   }
 
   draw(drawing: Drawing, cameraPosition: Vec2): void {
-    drawing.clear('#04070f');
+    drawing.clear('#0a1426');
     this.stars.draw(drawing, cameraPosition);
   }
 

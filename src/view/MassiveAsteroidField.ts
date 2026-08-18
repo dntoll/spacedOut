@@ -3,19 +3,20 @@ import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
 import type { Drawing, RadialPaint } from './Drawing';
+import type { StarLight } from './StarLight';
 
 export class MassiveAsteroidField {
-  draw(drawing: Drawing, field: Model.MassiveAsteroidField, shipPosition: Vec2, camera: Camera): void {
+  draw(drawing: Drawing, field: Model.MassiveAsteroidField, shipPosition: Vec2, camera: Camera, starLight: StarLight): void {
     const { width, height } = drawing.size;
     const visibleRange = Math.hypot(width, height) / camera.zoom * 0.7;
     field.forEachActive((asteroid) => {
       if (length(sub(asteroid.position, shipPosition)) <= visibleRange + asteroid.radius) {
-        this.drawAsteroid(drawing, asteroid, camera.zoom);
+        this.drawAsteroid(drawing, asteroid, camera.zoom, starLight);
       }
     });
   }
 
-  private drawAsteroid(drawing: Drawing, asteroid: Model.MassiveAsteroid, zoom: number): void {
+  private drawAsteroid(drawing: Drawing, asteroid: Model.MassiveAsteroid, zoom: number, starLight: StarLight): void {
     drawing.withTransform(asteroid.position, asteroid.angle, () => {
       const points = asteroid.vertices.map((variation, index) => {
         const angle = (index / asteroid.vertices.length) * Math.PI * 2;
@@ -24,15 +25,9 @@ export class MassiveAsteroidField {
           y: Math.sin(angle) * asteroid.radius * variation,
         };
       });
-      const rock: RadialPaint = {
-        from: { x: -asteroid.radius * 0.28, y: -asteroid.radius * 0.34 }, fromRadius: 0,
-        to: { x: 0, y: 0 }, toRadius: asteroid.radius * 1.08,
-        stops: [
-          { offset: 0, color: asteroid.shade > 0.5 ? '#35465a' : '#303c50' },
-          { offset: 0.5, color: '#182333' },
-          { offset: 1, color: '#070b12' },
-        ],
-      };
+      const localLight = starLight.localDirection(asteroid.angle);
+      const lit = asteroid.shade > 0.5 ? '#35465a' : '#303c50';
+      const rock = starLight.bodyPaint(localLight, asteroid.radius, lit, '#070b12', 0);
       drawing.polygon(points, rock, 'rgba(132,170,205,.34)', 2 / zoom);
 
       for (const cavity of asteroid.cavities) {

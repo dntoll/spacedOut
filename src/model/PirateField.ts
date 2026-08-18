@@ -87,6 +87,7 @@ export class PirateField {
     this.awakenInRange(ship);
     this.rideAndHunt(dt, ship);
     this.resolveAsteroidCollisions(asteroidBelt);
+    this.resolveShipCollisions(ship);
     this.updateLasers(dt, ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
     this.recycleDistant(ship, spawnExclusionRadius);
     if (spawnEnabled) this.spawnSquads(ship, spawnExclusionRadius, travelDirection);
@@ -105,6 +106,29 @@ export class PirateField {
           for (const observer of this.destroyedObservers) observer.onPirateDestroyed(event);
         }
       });
+    }
+  }
+
+  private resolveShipCollisions(ship: Ship): void {
+    for (let i = this.pirates.length - 1; i >= 0; i--) {
+      const pirate = this.pirates[i];
+      const collision = CollisionResolver.resolve(pirate, ship);
+      if (!collision) continue;
+      for (const observer of this.collisionObservers) observer.onCollision(collision);
+      if (collision.impactSpeed > DamageCalculator.violentThreshold) {
+        if (!ship.isInvulnerable) {
+          const damage = DamageCalculator.damageFor(collision.impactSpeed, false);
+          ship.takeDamage(damage);
+          for (const observer of this.damageObservers) {
+            observer.onDamage(new Damage({ ...collision.position }, damage, !ship.isAlive));
+          }
+        }
+        if (pirate.takeImpact()) {
+          this.pirates.splice(i, 1);
+          const event = new PirateDestroyed({ ...pirate.position });
+          for (const observer of this.destroyedObservers) observer.onPirateDestroyed(event);
+        }
+      }
     }
   }
 

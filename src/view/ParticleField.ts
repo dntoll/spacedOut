@@ -4,6 +4,7 @@ import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
 import type { Drawing, Size } from './Drawing';
 import { Particle } from './Particle';
+import type { ShadowCasters, StarLight } from './StarLight';
 
 interface Circle { position: Vec2; radius: number }
 
@@ -21,6 +22,7 @@ const IMPACT_HOT_COLOR = { r: 220, g: 250, b: 255 };
 const IMPACT_COOL_COLOR = { r: 70, g: 180, b: 255 };
 const IMPACT_HOT_ALPHA = 1;
 const IMPACT_COOL_ALPHA = 0.8;
+const BRIGHT_HEAT_THRESHOLD = 0.6;
 
 export class ParticleField {
   private particles: Particle[] = [];
@@ -51,7 +53,7 @@ export class ParticleField {
       const side = i % 2 === 0 ? 1 : -1;
       const angle = normalAngle + (side < 0 ? Math.PI : 0) + random(-1.15, 1.15);
       const speed = random(22, 75 + collision.impactSpeed * 0.65);
-      const life = random(0.18, 0.58);
+      const life = random(0.5, 1.4);
       const heat = random(0.55, 1);
       this.particles.push(new Particle(
         { ...collision.position },
@@ -59,18 +61,18 @@ export class ParticleField {
         random(1, 3.4),
         life,
         life,
-        heat > 0.78 ? IMPACT_HOT_COLOR : IMPACT_COOL_COLOR,
-        heat > 0.78 ? IMPACT_HOT_ALPHA : IMPACT_COOL_ALPHA,
+        heat > BRIGHT_HEAT_THRESHOLD ? IMPACT_HOT_COLOR : IMPACT_COOL_COLOR,
+        heat > BRIGHT_HEAT_THRESHOLD ? IMPACT_HOT_ALPHA : IMPACT_COOL_ALPHA,
       ));
     }
   }
 
   emitDamageBurst(position: Vec2): void {
-    this.burst(position, 40, 40, 220, 0.25, 0.7, 1.5, 3.8);
+    this.burst(position, 40, 40, 220, 0.7, 1.8, 1.5, 3.8);
   }
 
   emitExplosion(position: Vec2, hotColor: { r: number; g: number; b: number } = IMPACT_HOT_COLOR): void {
-    this.burst(position, 150, 30, 380, 0.4, 1.2, 2, 5.5, hotColor);
+    this.burst(position, 150, 30, 380, 1.0, 2.5, 2, 5.5, hotColor);
   }
 
   private burst(
@@ -95,8 +97,8 @@ export class ParticleField {
         random(sizeMin, sizeMax),
         life,
         life,
-        heat > 0.78 ? hotColor : IMPACT_COOL_COLOR,
-        heat > 0.78 ? IMPACT_HOT_ALPHA : IMPACT_COOL_ALPHA,
+        heat > BRIGHT_HEAT_THRESHOLD ? hotColor : IMPACT_COOL_COLOR,
+        heat > BRIGHT_HEAT_THRESHOLD ? IMPACT_HOT_ALPHA : IMPACT_COOL_ALPHA,
       ));
     }
   }
@@ -110,14 +112,16 @@ export class ParticleField {
     this.spawn(dt, camera, viewport);
   }
 
-  draw(drawing: Drawing): void {
+  draw(drawing: Drawing, starLight?: StarLight, casters?: ShadowCasters | null): void {
+    const shadowCasters = casters ?? null;
     drawing.withAdditiveBlend(() => {
       for (const particle of this.particles) {
         const t = particle.burnMax > 0 ? particle.burn / particle.burnMax : 0;
         const r = Math.round(DUST_COLOR.r + (particle.hotColor.r - DUST_COLOR.r) * t);
         const g = Math.round(DUST_COLOR.g + (particle.hotColor.g - DUST_COLOR.g) * t);
         const b = Math.round(DUST_COLOR.b + (particle.hotColor.b - DUST_COLOR.b) * t);
-        const a = (COOL_ALPHA + (particle.hotAlpha - COOL_ALPHA) * t) * this.visibility;
+        let a = (COOL_ALPHA + (particle.hotAlpha - COOL_ALPHA) * t) * this.visibility;
+        if (starLight) a = starLight.particleAlpha(particle.position, a, shadowCasters);
         drawing.circle(particle.position, particle.size * (0.5 + 0.5 * (1 - t)), `rgba(${r},${g},${b},${a})`);
       }
     });

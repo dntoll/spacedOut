@@ -30,7 +30,7 @@ export type { LaserShotObserver } from './LaserShotObserver';
 export { MassiveAsteroid, type AsteroidCavity } from './MassiveAsteroid';
 export { MassiveAsteroidField } from './MassiveAsteroidField';
 export { MassiveAsteroidRegion } from './MassiveAsteroidRegion';
-export { Mission, MissionPhase, SpawnMode } from './Mission';
+export { Mission, MissionPhase, MissionGoalKind, SpawnMode, type MissionGoal } from './Mission';
 export { PhysicsBody } from './PhysicsBody';
 export { Pirate, PIRATE_RADIUS } from './Pirate';
 export { PirateField } from './PirateField';

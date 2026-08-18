@@ -1,5 +1,6 @@
 export class Hud {
   private readonly speedNode = document.querySelector<HTMLElement>('#speed');
+  private readonly speedBoxNode = document.querySelector<HTMLElement>('.speed');
   private readonly hintNode = document.querySelector<HTMLElement>('#hint');
   private readonly fuelValueNode = document.querySelector<HTMLElement>('#fuel-value');
   private readonly hpValueNode = document.querySelector<HTMLElement>('#hp-value');
@@ -8,8 +9,9 @@ export class Hud {
   private readonly hpFillNode = document.querySelector<HTMLElement>('#hp-fill');
   private readonly ammoFillNode = document.querySelector<HTMLElement>('#ammo-fill');
 
-  updateSpeed(speed: number): void {
+  updateSpeed(speed: number, damageThreshold: number): void {
     if (this.speedNode) this.speedNode.textContent = Math.round(speed).toString().padStart(3, '0');
+    if (this.speedBoxNode) this.speedBoxNode.classList.toggle('warning', speed > damageThreshold);
   }
 
   updateResources(fuel: number, hp: number, ammo: number): void {

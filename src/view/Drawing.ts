@@ -10,11 +10,19 @@ export interface RadialPaint {
   toRadius: number;
   stops: GradientStop[];
 }
-export type Paint = string | RadialPaint;
+export interface LinearPaint {
+  from: Vec2;
+  to: Vec2;
+  stops: GradientStop[];
+}
+export type Paint = string | RadialPaint | LinearPaint;
 
 export class Drawing {
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
+  private offscreen: HTMLCanvasElement | null = null;
+  private offscreenCtx: CanvasRenderingContext2D | null = null;
+  private activeCtx: CanvasRenderingContext2D;
   private viewport: Size = { width: 0, height: 0 };
   private pixelRatio = 1;
 
@@ -25,6 +33,7 @@ export class Drawing {
     if (!context) throw new Error('Canvas 2D is unavailable');
     this.canvas = canvas;
     this.context = context;
+    this.activeCtx = context;
     this.resize();
   }
 
@@ -37,6 +46,10 @@ export class Drawing {
     this.canvas.height = this.viewport.height * this.pixelRatio;
     this.canvas.style.width = `${this.viewport.width}px`;
     this.canvas.style.height = `${this.viewport.height}px`;
+    if (this.offscreen) {
+      this.offscreen.width = this.viewport.width * this.pixelRatio;
+      this.offscreen.height = this.viewport.height * this.pixelRatio;
+    }
   }
 
   clear(color: string): void {
@@ -45,109 +58,149 @@ export class Drawing {
     this.context.fillRect(0, 0, this.viewport.width, this.viewport.height);
   }
 
+  beginShadowLayer(): void {
+    if (!this.offscreen) {
+      this.offscreen = document.createElement('canvas');
+      const ctx = this.offscreen.getContext('2d');
+      if (!ctx) throw new Error('Offscreen 2D is unavailable');
+      this.offscreenCtx = ctx;
+      this.offscreen.width = this.viewport.width * this.pixelRatio;
+      this.offscreen.height = this.viewport.height * this.pixelRatio;
+    }
+    this.offscreenCtx!.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+    this.offscreenCtx!.clearRect(0, 0, this.viewport.width, this.viewport.height);
+    this.activeCtx = this.offscreenCtx!;
+  }
+
+  endShadowLayer(): void { this.activeCtx = this.context; }
+
+  compositeShadowLayer(blend: GlobalCompositeOperation): void {
+    if (!this.offscreen) return;
+    this.context.save();
+    this.context.setTransform(1, 0, 0, 1, 0, 0);
+    this.context.globalCompositeOperation = blend;
+    this.context.drawImage(this.offscreen, 0, 0);
+    this.context.restore();
+  }
+
   withCamera(position: Vec2, zoom: number, draw: () => void): void {
     this.withState(() => {
-      this.context.translate(this.viewport.width / 2, this.viewport.height / 2);
-      this.context.scale(zoom, zoom);
-      this.context.translate(-position.x, -position.y);
+      this.activeCtx.translate(this.viewport.width / 2, this.viewport.height / 2);
+      this.activeCtx.scale(zoom, zoom);
+      this.activeCtx.translate(-position.x, -position.y);
       draw();
     });
   }
 
   withTransform(position: Vec2, angle: number, draw: () => void): void {
     this.withState(() => {
-      this.context.translate(position.x, position.y);
-      this.context.rotate(angle);
+      this.activeCtx.translate(position.x, position.y);
+      this.activeCtx.rotate(angle);
       draw();
     });
   }
 
   withAdditiveBlend(draw: () => void): void {
     this.withState(() => {
-      this.context.globalCompositeOperation = 'lighter';
+      this.activeCtx.globalCompositeOperation = 'lighter';
       draw();
     });
   }
 
   withShadow(color: string, blur: number, draw: () => void): void {
     this.withState(() => {
-      this.context.shadowColor = color;
-      this.context.shadowBlur = blur;
+      this.activeCtx.shadowColor = color;
+      this.activeCtx.shadowBlur = blur;
       draw();
     });
   }
 
   withClipRectangle(position: Vec2, size: Size, draw: () => void): void {
     this.withState(() => {
-      this.context.beginPath();
-      this.context.rect(position.x, position.y, size.width, size.height);
-      this.context.clip();
+      this.activeCtx.beginPath();
+      this.activeCtx.rect(position.x, position.y, size.width, size.height);
+      this.activeCtx.clip();
       draw();
     });
   }
 
   rectangle(position: Vec2, size: Size, fill: Paint): void {
-    this.context.fillStyle = this.resolvePaint(fill);
-    this.context.fillRect(position.x, position.y, size.width, size.height);
+    this.activeCtx.fillStyle = this.resolvePaint(fill);
+    this.activeCtx.fillRect(position.x, position.y, size.width, size.height);
   }
 
   circle(position: Vec2, radius: number, fill: Paint, stroke?: string, lineWidth = 1): void {
-    this.context.beginPath();
-    this.context.arc(position.x, position.y, radius, 0, Math.PI * 2);
-    this.context.fillStyle = this.resolvePaint(fill);
-    this.context.fill();
+    this.activeCtx.beginPath();
+    this.activeCtx.arc(position.x, position.y, radius, 0, Math.PI * 2);
+    this.activeCtx.fillStyle = this.resolvePaint(fill);
+    this.activeCtx.fill();
     if (stroke) {
-      this.context.strokeStyle = stroke;
-      this.context.lineWidth = lineWidth;
-      this.context.stroke();
+      this.activeCtx.strokeStyle = stroke;
+      this.activeCtx.lineWidth = lineWidth;
+      this.activeCtx.stroke();
     }
   }
 
   polygon(points: Vec2[], fill: Paint, stroke?: string, lineWidth = 1): void {
     if (points.length === 0) return;
-    this.context.beginPath();
-    this.context.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) this.context.lineTo(points[i].x, points[i].y);
-    this.context.closePath();
-    this.context.fillStyle = this.resolvePaint(fill);
-    this.context.fill();
+    this.activeCtx.beginPath();
+    this.activeCtx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) this.activeCtx.lineTo(points[i].x, points[i].y);
+    this.activeCtx.closePath();
+    this.activeCtx.fillStyle = this.resolvePaint(fill);
+    this.activeCtx.fill();
     if (stroke) {
-      this.context.strokeStyle = stroke;
-      this.context.lineWidth = lineWidth;
-      this.context.stroke();
+      this.activeCtx.strokeStyle = stroke;
+      this.activeCtx.lineWidth = lineWidth;
+      this.activeCtx.stroke();
     }
   }
 
+  fillPolygons(paths: Vec2[][], fill: Paint): void {
+    let any = false;
+    this.activeCtx.beginPath();
+    for (const points of paths) {
+      if (points.length < 3) continue;
+      this.activeCtx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) this.activeCtx.lineTo(points[i].x, points[i].y);
+      this.activeCtx.closePath();
+      any = true;
+    }
+    if (!any) return;
+    this.activeCtx.fillStyle = this.resolvePaint(fill);
+    this.activeCtx.fill();
+  }
+
   line(from: Vec2, to: Vec2, color: string, width: number): void {
-    this.context.beginPath();
-    this.context.moveTo(from.x, from.y);
-    this.context.lineTo(to.x, to.y);
-    this.context.strokeStyle = color;
-    this.context.lineWidth = width;
-    this.context.lineCap = 'round';
-    this.context.stroke();
+    this.activeCtx.beginPath();
+    this.activeCtx.moveTo(from.x, from.y);
+    this.activeCtx.lineTo(to.x, to.y);
+    this.activeCtx.strokeStyle = color;
+    this.activeCtx.lineWidth = width;
+    this.activeCtx.lineCap = 'round';
+    this.activeCtx.stroke();
   }
 
   dashedLine(from: Vec2, to: Vec2, color: string, width: number, dash: number[] = [7, 6]): void {
     this.withState(() => {
-      this.context.beginPath();
-      this.context.moveTo(from.x, from.y);
-      this.context.lineTo(to.x, to.y);
-      this.context.strokeStyle = color;
-      this.context.lineWidth = width;
-      this.context.lineCap = 'butt';
-      this.context.setLineDash(dash);
-      this.context.stroke();
+      this.activeCtx.beginPath();
+      this.activeCtx.moveTo(from.x, from.y);
+      this.activeCtx.lineTo(to.x, to.y);
+      this.activeCtx.strokeStyle = color;
+      this.activeCtx.lineWidth = width;
+      this.activeCtx.lineCap = 'butt';
+      this.activeCtx.setLineDash(dash);
+      this.activeCtx.stroke();
     });
   }
 
   arc(position: Vec2, radius: number, startAngle: number, endAngle: number, color: string, width: number): void {
     this.withState(() => {
-      this.context.beginPath();
-      this.context.arc(position.x, position.y, radius, startAngle, endAngle);
-      this.context.strokeStyle = color;
-      this.context.lineWidth = width;
-      this.context.stroke();
+      this.activeCtx.beginPath();
+      this.activeCtx.arc(position.x, position.y, radius, startAngle, endAngle);
+      this.activeCtx.strokeStyle = color;
+      this.activeCtx.lineWidth = width;
+      this.activeCtx.stroke();
     });
   }
 
@@ -172,16 +225,23 @@ export class Drawing {
   }
 
   private withState(draw: () => void): void {
-    this.context.save();
+    this.activeCtx.save();
     draw();
-    this.context.restore();
+    this.activeCtx.restore();
   }
 
   private resolvePaint(paint: Paint): string | CanvasGradient {
     if (typeof paint === 'string') return paint;
-    const gradient = this.context.createRadialGradient(
-      paint.from.x, paint.from.y, paint.fromRadius,
-      paint.to.x, paint.to.y, paint.toRadius,
+    if ('fromRadius' in paint) {
+      const gradient = this.activeCtx.createRadialGradient(
+        paint.from.x, paint.from.y, paint.fromRadius,
+        paint.to.x, paint.to.y, paint.toRadius,
+      );
+      for (const stop of paint.stops) gradient.addColorStop(stop.offset, stop.color);
+      return gradient;
+    }
+    const gradient = this.activeCtx.createLinearGradient(
+      paint.from.x, paint.from.y, paint.to.x, paint.to.y,
     );
     for (const stop of paint.stops) gradient.addColorStop(stop.offset, stop.color);
     return gradient;

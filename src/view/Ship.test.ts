@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Ship as ModelShip } from '../model/Ship';
 import type { Drawing, RadialPaint } from './Drawing';
 import { Ship } from './Ship';
+import { StarLight } from './StarLight';
 
 describe('Ship view', () => {
   it('REQ-04 draws the ship body as a triangle', () => {
@@ -13,7 +14,7 @@ describe('Ship view', () => {
       circle: vi.fn(),
     } as unknown as Drawing;
 
-    new Ship().draw(drawing, new ModelShip());
+    new Ship().draw(drawing, new ModelShip(), new StarLight(), null);
 
     expect(polygons[0]).toHaveLength(3);
   });
@@ -28,7 +29,7 @@ describe('Ship view', () => {
     } as unknown as Drawing;
 
     const idle = new ModelShip();
-    new Ship().draw(drawing, idle);
+    new Ship().draw(drawing, idle, new StarLight(), null);
     const idleCount = circles.length;
     expect(idleCount).toBe(0);
 
@@ -38,7 +39,7 @@ describe('Ship view', () => {
     ship.setDirectionalThrust({ x: 0, y: -1 });
     ship.applyControls(0.2);
     circles.length = 0;
-    new Ship().draw(drawing, ship);
+    new Ship().draw(drawing, ship, new StarLight(), null);
 
     expect(circles.length).toBeGreaterThan(0);
     const sideNozzle = circles.find((c) => c.position.y > 10);
@@ -55,21 +56,21 @@ describe('Ship view', () => {
     } as unknown as Drawing;
 
     const level0 = new ModelShip();
-    new Ship().draw(drawing, level0);
+    new Ship().draw(drawing, level0, new StarLight(), null);
     const baseCount = polygons.length;
     expect(baseCount).toBe(2);
 
     const level1 = new ModelShip();
     level1.upgradeWeapon();
     polygons.length = 0;
-    new Ship().draw(drawing, level1);
+    new Ship().draw(drawing, level1, new StarLight(), null);
     expect(polygons.length).toBe(baseCount + 1);
 
     const level2 = new ModelShip();
     level2.upgradeWeapon();
     level2.upgradeWeapon();
     polygons.length = 0;
-    new Ship().draw(drawing, level2);
+    new Ship().draw(drawing, level2, new StarLight(), null);
     expect(polygons.length).toBe(baseCount + 2);
     const wingGuns = polygons.filter((points) => points.length === 4);
     expect(wingGuns).toHaveLength(2);

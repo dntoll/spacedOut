@@ -1,3 +1,4 @@
+import { clamp } from '../math';
 import type { Vec2 } from '../types';
 import type { WorldBounds } from './Camera';
 
@@ -27,6 +28,29 @@ export class ExplorationMap {
       bottom: position.y + radius,
     }, (column, row) => {
       if (this.exploredRows.get(column)?.has(row)) explored = true;
+    });
+    return explored;
+  }
+
+  isCircleExplored(position: Vec2, radius: number): boolean {
+    let explored = false;
+    this.forEachCoordinate({
+      left: position.x - radius,
+      top: position.y - radius,
+      right: position.x + radius,
+      bottom: position.y + radius,
+    }, (column, row) => {
+      if (explored) return;
+      if (!this.exploredRows.get(column)?.has(row)) return;
+      const cellLeft = column * ExplorationMap.cellSize;
+      const cellRight = cellLeft + ExplorationMap.cellSize;
+      const cellTop = row * ExplorationMap.cellSize;
+      const cellBottom = cellTop + ExplorationMap.cellSize;
+      const closestX = clamp(position.x, cellLeft, cellRight);
+      const closestY = clamp(position.y, cellTop, cellBottom);
+      const dx = position.x - closestX;
+      const dy = position.y - closestY;
+      if (dx * dx + dy * dy <= radius * radius) explored = true;
     });
     return explored;
   }

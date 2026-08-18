@@ -47,7 +47,7 @@ describe('Minimap', () => {
       withTransform,
     } as unknown as Drawing;
     const camera = new Camera();
-    camera.update(ship.position, 0, 1);
+    camera.update(ship.position, { x: 0, y: 0 }, 1);
 
     new Minimap().draw(drawing, exploration, model, camera);
 
@@ -65,7 +65,7 @@ describe('Minimap', () => {
     expect(withTransform).toHaveBeenCalledWith({ x: 870, y: 162 }, ship.angle, expect.any(Function));
 
     ship.position = { x: 1000, y: 0 };
-    camera.update(ship.position, 0, 1);
+    camera.update(ship.position, { x: 0, y: 0 }, 1);
     exploration.observe(camera.getVisibleWorldBounds(drawing.size));
     circle.mockClear();
     withTransform.mockClear();
@@ -104,7 +104,7 @@ describe('Minimap', () => {
       withTransform: vi.fn((_position, _angle, draw: () => void) => draw()),
     } as unknown as Drawing;
     const camera = new Camera();
-    camera.update(ship.position, 0, 1);
+    camera.update(ship.position, { x: 0, y: 0 }, 1);
 
     new Minimap().draw(drawing, exploration, model, camera);
 
@@ -138,7 +138,7 @@ describe('Minimap', () => {
     const exploration = new ExplorationMap();
     exploration.observe({ left: 5800, top: -100, right: 6200, bottom: 100 });
     const camera = new Camera();
-    camera.update(ship.position, 0, 1);
+    camera.update(ship.position, { x: 0, y: 0 }, 1);
 
     const drawing = {
       size: { width: 1000, height: 700 },
@@ -174,7 +174,7 @@ describe('Minimap', () => {
     } as unknown as Model.Game;
     const exploration = new ExplorationMap();
     const camera = new Camera();
-    camera.update(ship.position, 0, 1);
+    camera.update(ship.position, { x: 0, y: 0 }, 1);
     const drawing = {
       size: { width: 1000, height: 700 },
       rectangle: vi.fn(),
@@ -193,5 +193,44 @@ describe('Minimap', () => {
     (drawing.circle as ReturnType<typeof vi.fn>).mockClear();
     new Minimap().draw(drawing, exploration, model, camera);
     expect(drawing.circle).toHaveBeenCalledWith(expect.any(Object), 2.6, '#ff6a4a');
+  });
+
+  it('REQ-23 does not show a massive asteroid whose bounding box but not its body touches explored space', () => {
+    const ship = new Model.Ship();
+    // Centered diagonally from spawn so its bounding-box corner overlaps the
+    // explored cell near the ship but its circular body stays off-screen.
+    const massive = new Model.MassiveAsteroid(
+      1, { x: 1500, y: 1500 }, 1200, 0, [1, 1, 1, 1], [], 0.5,
+    );
+    const model = {
+      ship,
+      supplyField: new Model.SupplyField({ x: 100000, y: 0 }, undefined, 1),
+      massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, [massive]),
+      asteroidBelt: { forEach: () => undefined },
+      droneField: { forEach: () => undefined },
+      pirateField: { forEachPirate: () => {} },
+      mission: { signalDirection: null },
+    } as unknown as Model.Game;
+    const exploration = new ExplorationMap();
+    exploration.observe({ left: -250, top: -250, right: 250, bottom: 250 });
+    const polygon = vi.fn();
+    const drawing = {
+      size: { width: 1000, height: 700 },
+      rectangle: vi.fn(),
+      circle: vi.fn(),
+      polygon,
+      dashedLine: vi.fn(),
+      arc: vi.fn(),
+      withClipRectangle: vi.fn((_position: unknown, _size: unknown, draw: () => void) => draw()),
+      withTransform: vi.fn((_position: unknown, _angle: unknown, draw: () => void) => draw()),
+    } as unknown as Drawing;
+    const camera = new Camera();
+    camera.update(ship.position, { x: 0, y: 0 }, 1);
+
+    new Minimap().draw(drawing, exploration, model, camera);
+
+    const drewMassiveOutline = polygon.mock.calls.some((call) =>
+      call[1] === 'rgba(90,112,132,.74)' && call[2] === 'rgba(157,203,220,.82)');
+    expect(drewMassiveOutline).toBe(false);
   });
 });

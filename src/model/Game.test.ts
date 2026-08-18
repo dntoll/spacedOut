@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AsteroidDestroyed } from './AsteroidDestroyed';
 import { AsteroidTier } from './AsteroidTier';
 import { CollectablePickup } from './CollectablePickup';
+import { DroneDestroyed } from './DroneDestroyed';
 import { FuelContainer } from './FuelContainer';
 import { Game } from './Game';
 import { LaserShot } from './LaserShot';
@@ -157,6 +158,33 @@ describe('Game', () => {
     game.update(0);
 
     expect(game.ship.weaponLevel).toBe(1);
+  });
+
+  it('REQ-72 drops a fuel/hp/ammo supply container from a destroyed drone at the 35% threshold', () => {
+    const game = new Game();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.1);
+
+    game.onDroneDestroyed(new DroneDestroyed({ x: 1000, y: 0 }));
+
+    random.mockRestore();
+    const active: SupplyContainer[] = [];
+    game.supplyField.forEachActive((container) => active.push(container));
+    expect(active.some((container) => !(container instanceof WeaponPod)
+      && container.position.x === 1000 && container.position.y === 0)).toBe(true);
+    expect(active.some((container) => container instanceof WeaponPod)).toBe(false);
+  });
+
+  it('REQ-72 does not drop a supply container from a destroyed drone above the 35% threshold', () => {
+    const game = new Game();
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+
+    game.onDroneDestroyed(new DroneDestroyed({ x: 1000, y: 0 }));
+
+    random.mockRestore();
+    const active: SupplyContainer[] = [];
+    game.supplyField.forEachActive((container) => active.push(container));
+    expect(active.some((container) => !(container instanceof WeaponPod)
+      && container.position.x === 1000 && container.position.y === 0)).toBe(false);
   });
 
   it('REQ-63 does not spawn pirates during the first quarter of the traversal', () => {

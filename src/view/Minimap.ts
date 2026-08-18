@@ -23,7 +23,7 @@ export class Minimap {
     const margin = compact ? 22 : clamp(drawing.size.width * 0.04, 20, 48);
     const position = { x: drawing.size.width - mapSize - margin, y: compact ? 56 : 72 };
     const size = { width: mapSize, height: mapSize };
-    const center = camera.worldPosition;
+    const center = camera.focusPosition;
 
     drawing.rectangle(
       { x: position.x - 1, y: position.y - 1 },
@@ -68,7 +68,7 @@ export class Minimap {
     span: number,
   ): void {
     field.forEachKnown((asteroid) => {
-      if (!exploration.isExplored(asteroid.position, asteroid.radius)) return;
+      if (!exploration.isCircleExplored(asteroid.position, asteroid.radius)) return;
       if (!this.intersectsMap(asteroid.position, asteroid.radius, center, span)) return;
       const point = this.toMap(asteroid.position, center, position, size, span);
       const radius = clamp(asteroid.radius / span * size.width, 3, size.width * 0.18);

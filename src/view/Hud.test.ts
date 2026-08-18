@@ -1,12 +1,21 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Hud } from './Hud';
 
-type StubNode = { textContent: string; style: { width: string }; classList: { add: ReturnType<typeof vi.fn> } };
+type StubNode = {
+  textContent: string;
+  style: { width: string };
+  classList: { add: ReturnType<typeof vi.fn>; toggle: ReturnType<typeof vi.fn> };
+};
 
 const stubHudNodes = (): Map<string, StubNode> => {
   const nodes = new Map<string, StubNode>();
-  for (const selector of ['#speed', '#hint', '#fuel-value', '#hp-value', '#ammo-value', '#fuel-fill', '#hp-fill', '#ammo-fill']) {
-    nodes.set(selector, { textContent: '', style: { width: '' }, classList: { add: vi.fn() } });
+  const make = (): StubNode => ({
+    textContent: '',
+    style: { width: '' },
+    classList: { add: vi.fn(), toggle: vi.fn() },
+  });
+  for (const selector of ['#speed', '#hint', '#fuel-value', '#hp-value', '#ammo-value', '#fuel-fill', '#hp-fill', '#ammo-fill', '.speed']) {
+    nodes.set(selector, make());
   }
   vi.stubGlobal('document', { querySelector: (selector: string) => nodes.get(selector) });
   return nodes;
@@ -43,5 +52,25 @@ describe('Hud', () => {
 
     expect(nodes.get('#ammo-value')?.textContent).toBe('49');
     expect(nodes.get('#ammo-fill')?.style.width).toBe('48.6%');
+  });
+
+  it('REQ-70 shows the speed in red with a warning when above the damage threshold', () => {
+    const nodes = stubHudNodes();
+    const hud = new Hud();
+
+    hud.updateSpeed(640, 500);
+
+    expect(nodes.get('#speed')?.textContent).toBe('640');
+    const box = nodes.get('.speed');
+    expect(box?.classList.toggle).toHaveBeenCalledWith('warning', true);
+  });
+
+  it('REQ-70 clears the speed warning when at or below the damage threshold', () => {
+    const nodes = stubHudNodes();
+    const hud = new Hud();
+
+    hud.updateSpeed(500, 500);
+
+    expect(nodes.get('.speed')?.classList.toggle).toHaveBeenCalledWith('warning', false);
   });
 });

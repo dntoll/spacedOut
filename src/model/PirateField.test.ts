@@ -69,18 +69,71 @@ describe('PirateField', () => {
     expect(ship.hp).toBeLessThan(hpBefore);
   });
 
-  it('REQ-63 does not damage the ship by ramming', () => {
+  it('REQ-63 pirates steer away to avoid colliding with the ship at close range', () => {
     const ship = new Ship();
-    const pirate = new Pirate({ x: ship.radius + 42 - 1, y: 0 }, VERTICES, 3);
+    const pirate = new Pirate({ x: 200, y: 0 }, VERTICES, 3);
+    pirate.angle = 0;
+    pirate.awaken();
+    const field = new PirateField([pirate]);
+
+    field.update(0.05, ship, emptyBelt(), emptyMassive(), 1500, false);
+
+    expect(pirate.position.x).toBeGreaterThan(200);
+  });
+
+  it('REQ-63 a high-speed pirate-ship ram damages both and bounces them apart', () => {
+    const ship = new Ship();
+    ship.velocity = { x: 400, y: 0 };
+    const pirate = new Pirate({ x: 59, y: 0 }, VERTICES, 3);
+    pirate.velocity = { x: -400, y: 0 };
     const field = new PirateField([pirate]);
     const damages: Damage[] = [];
-    field.addDamageObserver({ onDamage: (damage) => damages.push(damage) });
-    const hpBefore = ship.hp;
+    field.addDamageObserver({ onDamage: (d) => damages.push(d) });
+    const shipHpBefore = ship.hp;
+    const pirateHpBefore = pirate.hp;
 
-    field.update(0.01, ship, emptyBelt(), emptyMassive(), 1500, false);
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, false);
+
+    expect(damages.length).toBeGreaterThan(0);
+    expect(ship.hp).toBeLessThan(shipHpBefore);
+    expect(pirate.hp).toBeLessThan(pirateHpBefore);
+    expect(pirate.velocity.x).toBeGreaterThan(-400);
+    expect(ship.velocity.x).toBeLessThan(400);
+  });
+
+  it('REQ-63 a low-speed pirate-ship contact bounces without damage', () => {
+    const ship = new Ship();
+    ship.velocity = { x: 100, y: 0 };
+    const pirate = new Pirate({ x: 59, y: 0 }, VERTICES, 3);
+    pirate.velocity = { x: -100, y: 0 };
+    const field = new PirateField([pirate]);
+    const damages: Damage[] = [];
+    field.addDamageObserver({ onDamage: (d) => damages.push(d) });
+    const shipHpBefore = ship.hp;
+    const pirateHpBefore = pirate.hp;
+
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, false);
 
     expect(damages).toHaveLength(0);
-    expect(ship.hp).toBe(hpBefore);
+    expect(ship.hp).toBe(shipHpBefore);
+    expect(pirate.hp).toBe(pirateHpBefore);
+    expect(pirate.velocity.x).toBeGreaterThan(-100);
+    expect(ship.velocity.x).toBeLessThan(100);
+  });
+
+  it('REQ-63 a pirate rammed to zero hit-points crashes and is destroyed', () => {
+    const ship = new Ship();
+    ship.velocity = { x: 400, y: 0 };
+    const pirate = new Pirate({ x: 59, y: 0 }, VERTICES, 1);
+    pirate.velocity = { x: -400, y: 0 };
+    const field = new PirateField([pirate]);
+    const events: PirateDestroyed[] = [];
+    field.addPirateDestroyedObserver({ onPirateDestroyed: (e) => events.push(e) });
+
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, false);
+
+    expect(field.has(pirate)).toBe(false);
+    expect(events).toHaveLength(1);
   });
 
   it('REQ-63 takes three laser hits to destroy a pirate ship', () => {

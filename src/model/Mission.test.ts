@@ -5,7 +5,7 @@ import { Drone } from './Drone';
 import { DroneField } from './DroneField';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
-import { Mission, MissionPhase, SpawnMode } from './Mission';
+import { Mission, MissionGoalKind, MissionPhase, SpawnMode } from './Mission';
 import { Ship } from './Ship';
 import { VisitedMap } from './VisitedMap';
 import { length } from '../math';
@@ -42,7 +42,7 @@ describe('Mission', () => {
     expect(mission.isPaused).toBe(false);
   });
 
-  it('REQ-53 ends mission 1 when hull and ammo are full, fuel exceeds 80, and no drones hunt', () => {
+  it('REQ-53 ends mission 1 when fuel exceeds 90, hull is full, ammo exceeds 90, and no drones hunt', () => {
     const mission = new Mission();
     const visited = new VisitedMap();
     mission.advance(visited);
@@ -53,6 +53,28 @@ describe('Mission', () => {
 
     expect(mission.phase).toBe(MissionPhase.Mission1Done);
     expect(mission.isPaused).toBe(true);
+  });
+
+  it('REQ-53 does not end mission 1 while fuel is 90 or below', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    mission.advance(visited);
+    const ship = new Ship({ fuel: 90, hp: 100, ammo: 100 });
+
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), visited, SCREEN_RADIUS);
+
+    expect(mission.phase).toBe(MissionPhase.Mission1Active);
+  });
+
+  it('REQ-53 does not end mission 1 while ammo is 90 or below', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    mission.advance(visited);
+    const ship = new Ship({ fuel: 100, hp: 100, ammo: 90 });
+
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), visited, SCREEN_RADIUS);
+
+    expect(mission.phase).toBe(MissionPhase.Mission1Active);
   });
 
   it('REQ-53 does not end mission 1 while a drone is hunting', () => {
@@ -298,5 +320,102 @@ describe('Mission', () => {
     expect(mission.isPaused).toBe(true);
     expect(mission.signalDirection).not.toBeNull();
     expect(length(mission.signalDirection!)).toBeCloseTo(1, 6);
+  });
+
+  it('REQ-74 lists the fuel, hull, ammo, and drone goals during mission 1', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    mission.advance(visited);
+
+    const goals = mission.currentGoals;
+    expect(goals.map((g) => g.kind)).toEqual([
+      MissionGoalKind.RefillFuel,
+      MissionGoalKind.RefillHull,
+      MissionGoalKind.RefillAmmo,
+      MissionGoalKind.AvoidDrones,
+    ]);
+    expect(goals.every((g) => !g.complete)).toBe(true);
+
+    const ship = new Ship();
+    ship.collectFuel(100);
+    ship.repair(100);
+    ship.collectAmmo(100);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), visited, SCREEN_RADIUS);
+
+    const updated = mission.currentGoals;
+    expect(updated[0].complete).toBe(true);
+    expect(updated[1].complete).toBe(true);
+    expect(updated[2].complete).toBe(true);
+    expect(updated[3].complete).toBe(true);
+  });
+
+  it('REQ-74 marks the drone goal complete only while no drones hunt', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    mission.advance(visited);
+    const ship = new Ship();
+    ship.collectFuel(100);
+    ship.repair(100);
+    ship.collectAmmo(100);
+    const huntingDrone = new Drone(null, 0, [1, 1, 1], 2);
+    const drones = new DroneField([huntingDrone]);
+
+    mission.update(0, ship, drones, emptyBelt(), emptyField(), visited, SCREEN_RADIUS);
+
+    expect(mission.currentGoals[0].complete).toBe(true);
+    expect(mission.currentGoals[3].complete).toBe(false);
+  });
+
+  it('REQ-74 lists the traverse and left/right wing-gun goals during mission 2', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+
+    expect(mission.currentGoals.map((g) => g.kind)).toEqual([
+      MissionGoalKind.TraverseToSignal,
+      MissionGoalKind.RecoverLeftWingGun,
+      MissionGoalKind.RecoverRightWingGun,
+    ]);
+    expect(mission.currentGoals.every((g) => !g.complete)).toBe(true);
+
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    ship.upgradeWeapon();
+    ship.upgradeWeapon();
+    ship.position = { ...mission.destinationPosition! };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+
+    expect(mission.currentGoals[0].complete).toBe(true);
+    expect(mission.currentGoals[1].complete).toBe(true);
+    expect(mission.currentGoals[2].complete).toBe(true);
+  });
+
+  it('REQ-74 completes the left wing-gun goal after the first upgrade and the right after the second', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+
+    expect(mission.currentGoals[1].complete).toBe(false);
+    expect(mission.currentGoals[2].complete).toBe(false);
+
+    ship.upgradeWeapon();
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.currentGoals[1].complete).toBe(true);
+    expect(mission.currentGoals[2].complete).toBe(false);
+
+    ship.upgradeWeapon();
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.currentGoals[1].complete).toBe(true);
+    expect(mission.currentGoals[2].complete).toBe(true);
+  });
+
+  it('REQ-74 returns no goals during the transition between missions', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    mission.advance(visited);
+    mission.update(0, new Ship(), emptyDroneField(), emptyBelt(), emptyField(), visited, SCREEN_RADIUS);
+    visited.visit({ x: 0, y: 0 });
+    mission.advance(visited);
+
+    expect(mission.phase).toBe(MissionPhase.Transition);
+    expect(mission.currentGoals).toEqual([]);
   });
 });

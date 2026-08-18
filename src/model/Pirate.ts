@@ -12,6 +12,8 @@ const BASE_DAMP_RATE = 1;
 const TURN_RATE = 2.2;
 const PASS_RANGE = 600;
 const PASS_OFFSET = 400;
+const AVOID_RANGE = 220;
+const AVOID_ACCEL_BOOST = 1.6;
 const AIM_CONE_HALF_ANGLE = 35 * Math.PI / 180;
 const FIRE_COOLDOWN = 0.8;
 const FIRE_RANGE = 1200;
@@ -72,7 +74,11 @@ export class Pirate extends PhysicsBody {
     const forward = { x: Math.cos(this.angle), y: Math.sin(this.angle) };
 
     let target: Vec2;
-    if (dist < PASS_RANGE) {
+    let accelMult = 1;
+    if (dist < AVOID_RANGE) {
+      target = add(this.position, scale(dirToShip, -1));
+      accelMult = AVOID_ACCEL_BOOST;
+    } else if (dist < PASS_RANGE) {
       const cross = forward.x * dirToShip.y - forward.y * dirToShip.x;
       const side = cross >= 0 ? 1 : -1;
       const perp = { x: -dirToShip.y, y: dirToShip.x };
@@ -88,7 +94,7 @@ export class Pirate extends PhysicsBody {
     this.angle += clamp(diff, -TURN_RATE * dt, TURN_RATE * dt);
 
     const noseForward = { x: Math.cos(this.angle), y: Math.sin(this.angle) };
-    this.velocity = add(this.velocity, scale(noseForward, HUNT_ACCEL * dt));
+    this.velocity = add(this.velocity, scale(noseForward, HUNT_ACCEL * accelMult * dt));
 
     const along = Math.max(0, dot(this.velocity, noseForward));
     const across = sub(this.velocity, scale(noseForward, along));

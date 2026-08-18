@@ -3,6 +3,7 @@ import { Drone } from '../model/Drone';
 import type { DroneField as ModelDroneField, Ship as ModelShip } from '../model';
 import type { Drawing, RadialPaint } from './Drawing';
 import { DroneField } from './DroneField';
+import { StarLight } from './StarLight';
 
 interface ArcCall { position: { x: number; y: number }; radius: number; }
 
@@ -42,6 +43,8 @@ describe('DroneField view', () => {
       stubField([drone], true, 216, 1200),
       stubShip(18),
       { zoom: 1 } as never,
+      new StarLight(),
+      null,
     );
 
     expect(polygons).toHaveLength(1);
@@ -60,7 +63,7 @@ describe('DroneField view', () => {
     const arcs: ArcCall[] = [];
     const ship = stubShip(18);
 
-    new DroneField().draw(createDrawing(arcs), stubField([attached], false, 216, 1200), ship, { zoom: 1 } as never);
+    new DroneField().draw(createDrawing(arcs), stubField([attached], false, 216, 1200), ship, { zoom: 1 } as never, new StarLight(), null);
 
     const detection = arcs.find((a) => Math.abs(a.radius - 216) < 1);
     expect(detection).toBeDefined();
@@ -72,7 +75,7 @@ describe('DroneField view', () => {
     hunter.position = { x: 300, y: 0 };
     const arcs: ArcCall[] = [];
 
-    new DroneField().draw(createDrawing(arcs), stubField([hunter], true, 216, 1200), stubShip(18), { zoom: 1 } as never);
+    new DroneField().draw(createDrawing(arcs), stubField([hunter], true, 216, 1200), stubShip(18), { zoom: 1 } as never, new StarLight(), null);
 
     const detection = arcs.find((a) => Math.abs(a.radius - 216) < 1);
     expect(detection).toBeUndefined();
@@ -83,7 +86,7 @@ describe('DroneField view', () => {
     hunter.position = { x: 300, y: 0 };
     const arcs: ArcCall[] = [];
 
-    new DroneField().draw(createDrawing(arcs), stubField([hunter], true, 216, 1200), stubShip(18), { zoom: 1 } as never);
+    new DroneField().draw(createDrawing(arcs), stubField([hunter], true, 216, 1200), stubShip(18), { zoom: 1 } as never, new StarLight(), null);
 
     const escape = arcs.find((a) => Math.abs(a.radius - 1200) < 1);
     expect(escape).toBeDefined();
@@ -96,7 +99,7 @@ describe('DroneField view', () => {
     attached.position = { x: 300, y: 0 };
     const arcs: ArcCall[] = [];
 
-    new DroneField().draw(createDrawing(arcs), stubField([attached], false, 216, 1200), stubShip(18), { zoom: 1 } as never);
+    new DroneField().draw(createDrawing(arcs), stubField([attached], false, 216, 1200), stubShip(18), { zoom: 1 } as never, new StarLight(), null);
 
     const escape = arcs.find((a) => Math.abs(a.radius - 1200) < 1);
     expect(escape).toBeUndefined();
