@@ -84,4 +84,34 @@ describe('Camera', () => {
 
     expect(camera.zoom).toBeGreaterThan(threatenedZoom);
   });
+
+  it('REQ-60 zooms farther out while traversing empty space', () => {
+    const calm = new Camera();
+    const desolate = new Camera();
+    calm.update({ x: 0, y: 0 }, 0, 1, false, false);
+    desolate.update({ x: 0, y: 0 }, 0, 1, false, true);
+
+    expect(desolate.zoom).toBeLessThan(calm.zoom);
+
+    const fastCalm = new Camera();
+    const fastDesolate = new Camera();
+    fastCalm.update({ x: 0, y: 0 }, 600, 1, false, false);
+    fastDesolate.update({ x: 0, y: 0 }, 600, 1, false, true);
+    expect(fastDesolate.zoom).toBeLessThan(fastCalm.zoom);
+  });
+
+  it('REQ-60 composes the desolation zoom with the hunting-drone pullback', () => {
+    const camera = new Camera();
+    camera.update({ x: 0, y: 0 }, 0, 1, false, false);
+    const base = camera.zoom;
+
+    camera.update({ x: 0, y: 0 }, 0, 1, true, false);
+    const threatened = camera.zoom;
+
+    camera.update({ x: 0, y: 0 }, 0, 1, true, true);
+    const both = camera.zoom;
+
+    expect(threatened).toBeLessThan(base);
+    expect(both).toBeLessThan(threatened);
+  });
 });

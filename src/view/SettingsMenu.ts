@@ -13,7 +13,7 @@ const DEFAULT_SFX_PERCENT = 100;
 const DEFAULT_ZOOM = 1.15;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
-const DEFAULT_TUNING: ControlTuning = { dampening: 1.5, thrustAccel: 170, maxSpeed: 650 };
+const DEFAULT_TUNING: ControlTuning = { dampening: 1.5, thrustAccel: 170, maxSpeed: 1000 };
 
 interface SfxSliderConfig {
   channel: SfxChannel;

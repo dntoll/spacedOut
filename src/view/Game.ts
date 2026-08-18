@@ -2,6 +2,7 @@ import type * as Model from '../model';
 import type { ControlTuning, Vec2 } from '../types';
 import { AsteroidBelt } from './AsteroidBelt';
 import { Camera } from './Camera';
+import { DistanceMeter } from './DistanceMeter';
 import { Drawing } from './Drawing';
 import { DroneField } from './DroneField';
 import { ExplorationMap } from './ExplorationMap';
@@ -10,8 +11,11 @@ import { LaserField } from './LaserField';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Minimap } from './Minimap';
 import { MissionOverlay } from './MissionOverlay';
+import { MissionsMenu, type MissionSelection } from './MissionsMenu';
 import { MusicSystem } from './MusicSystem';
+import { NebulaField } from './NebulaField';
 import { ParticleField } from './ParticleField';
+import { PirateField } from './PirateField';
 import { PlayerInput } from './PlayerInput';
 import { SettingsMenu } from './SettingsMenu';
 import { Ship } from './Ship';
@@ -22,10 +26,11 @@ import { SpaceBackground } from './SpaceBackground';
 import { StorageAdapter } from './StorageAdapter';
 import { SupplyField } from './SupplyField';
 
-export class Game implements Model.CollisionObserver, Model.DamageObserver, Model.AsteroidDestroyedObserver, Model.LaserShotObserver, Model.LaserImpactObserver, Model.AsteroidCollisionObserver, Model.CollectablePickupObserver, Model.DroneDestroyedObserver {
+export class Game implements Model.CollisionObserver, Model.DamageObserver, Model.AsteroidDestroyedObserver, Model.LaserShotObserver, Model.LaserImpactObserver, Model.AsteroidCollisionObserver, Model.CollectablePickupObserver, Model.DroneDestroyedObserver, Model.PirateDestroyedObserver {
   private readonly drawing: Drawing;
   private readonly camera = new Camera();
   private readonly hud = new Hud();
+  private readonly distanceMeter = new DistanceMeter();
   private readonly settings: SettingsMenu;
   private readonly input: PlayerInput;
   private readonly background = new SpaceBackground();
@@ -35,10 +40,13 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly supplyField = new SupplyField();
   private readonly laserField = new LaserField();
   private readonly droneField = new DroneField();
+  private readonly pirateField = new PirateField();
   private readonly particleField = new ParticleField();
+  private readonly nebulaField = new NebulaField();
   private readonly explorationMap = new ExplorationMap();
   private readonly minimap = new Minimap();
   private readonly missionOverlay = new MissionOverlay();
+  private readonly missionsMenu = new MissionsMenu();
   private readonly signalIndicator = new SignalIndicator();
   private readonly music = MusicSystem.create();
   private readonly sounds = SoundSystem.create();
@@ -98,6 +106,10 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.particleField.emitExplosion(event.position);
   }
 
+  onPirateDestroyed(event: Model.PirateDestroyed): void {
+    this.particleField.emitExplosion(event.position);
+  }
+
   consumeRestartRequest(): boolean {
     if (this.restartRequested) {
       this.restartRequested = false;
@@ -108,9 +120,12 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
 
   consumeMissionContinueClick(): boolean { return this.missionOverlay.consumeClick(); }
 
+  consumeMissionSelection(): MissionSelection | null { return this.missionsMenu.consumeSelection(); }
+
   reset(): void {
     this.explorationMap.reset();
     this.particleField.reset();
+    this.nebulaField.reset();
     this.sounds.reset();
   }
 
@@ -127,10 +142,11 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
 
   render(model: Model.Game, dt: number): void {
     this.camera.setBaseZoom(this.settings.getDefaultZoomLevel());
-    this.camera.update(model.ship.position, model.speed, dt, model.droneField.anyHunting());
+    this.camera.update(model.ship.position, model.speed, dt, model.droneField.anyHunting(), model.mission.isTraversal);
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
     this.particleField.update(dt, model, this.camera, this.drawing.size);
-    this.music.update(this.getMusicLevel(), dt, model.droneField.anyHunting());
+    this.nebulaField.update(dt, model, this.camera, this.drawing.size);
+    this.music.update(this.getMusicLevel(), dt, model.droneField.anyHunting() || model.pirateField.anyHunting());
     const particleVisibility = this.settings.getParticleVisibility();
     this.particleField.setVisibility(particleVisibility);
     this.sounds.setSettings(this.settings.getSfxSettings());
@@ -141,10 +157,12 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.background.draw(this.drawing, this.camera.worldPosition);
     this.camera.drawWorld(this.drawing, () => {
       this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera);
+      this.nebulaField.draw(this.drawing);
       this.particleField.draw(this.drawing);
       this.supplyField.draw(this.drawing, model.supplyField);
       this.asteroidBelt.draw(this.drawing, model.asteroidBelt, model.ship.position, this.camera);
       this.droneField.draw(this.drawing, model.droneField, model.ship, this.camera);
+      this.pirateField.draw(this.drawing, model.pirateField, model.ship, this.camera);
       this.laserField.draw(this.drawing, model.laserField);
       if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship);
     });
@@ -153,6 +171,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.signalIndicator.draw(this.drawing, model, this.camera);
     this.hud.updateSpeed(model.speed);
     this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);
+    this.distanceMeter.update(model.mission);
     if (model.isGameOver) {
       this.gameOverNode?.classList.remove('hidden');
       this.missionOverlay.hide();
@@ -160,6 +179,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
       this.gameOverNode?.classList.add('hidden');
       this.missionOverlay.show(model.mission.phase);
     }
+    this.missionsMenu.setCurrentMissionFrom(model.mission.phase);
   }
 
   private resize(): void {

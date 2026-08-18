@@ -5,7 +5,7 @@ import { Drone } from './Drone';
 import { DroneField } from './DroneField';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
-import { Mission, MissionPhase } from './Mission';
+import { Mission, MissionPhase, SpawnMode } from './Mission';
 import { Ship } from './Ship';
 import { VisitedMap } from './VisitedMap';
 import { length } from '../math';
@@ -14,6 +14,20 @@ const emptyDroneField = () => new DroneField();
 const emptyBelt = () => new AsteroidBelt({ x: 0, y: 0 }, []);
 const emptyField = () => new MassiveAsteroidField({ x: 0, y: 0 }, 18, []);
 const SCREEN_RADIUS = 1000;
+
+const reachMission2Intro = (): { mission: Mission; visited: VisitedMap; ship: Ship; field: MassiveAsteroidField } => {
+  const mission = new Mission();
+  const visited = new VisitedMap();
+  const field = emptyField();
+  mission.advance(visited);
+  mission.update(0, new Ship(), emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+  visited.visit({ x: 0, y: 0 });
+  mission.advance(visited);
+  const ship = new Ship();
+  ship.position = { x: 5000, y: 5000 };
+  mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+  return { mission, visited, ship, field };
+};
 
 describe('Mission', () => {
   it('REQ-52 starts paused on the intro and advances to active on the continue click', () => {
@@ -91,7 +105,7 @@ describe('Mission', () => {
 
     mission.advance(visited);
     expect(mission.phase).toBe(MissionPhase.Transition);
-    expect(mission.suppressSpawning).toBe(true);
+    expect(mission.spawnMode).toBe(SpawnMode.Suppressed);
     expect(mission.isPaused).toBe(false);
 
     const ship = new Ship();
@@ -160,20 +174,129 @@ describe('Mission', () => {
     expect(mission.phase).toBe(MissionPhase.Transition);
   });
 
-  it('REQ-55 requests a restart on the mission 2 continue click', () => {
-    const mission = new Mission();
-    const visited = new VisitedMap();
-    mission.advance(visited);
-    mission.update(0, new Ship(), emptyDroneField(), emptyBelt(), emptyField(), visited, SCREEN_RADIUS);
-    mission.advance(visited);
-    const ship = new Ship();
-    ship.position = { x: 5000, y: 5000 };
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), visited, SCREEN_RADIUS);
+  it('REQ-55 begins the traversal mission on the mission 2 continue click instead of restarting', () => {
+    const { mission, visited } = reachMission2Intro();
+
     expect(mission.phase).toBe(MissionPhase.Mission2Intro);
     expect(mission.requestsRestart).toBe(false);
 
     mission.advance(visited);
 
+    expect(mission.phase).toBe(MissionPhase.Mission2Active);
+    expect(mission.isPaused).toBe(false);
+    expect(mission.requestsRestart).toBe(false);
+  });
+
+  it('REQ-60 runs the traversal in the mission-2 travel spawn mode', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+
+    expect(mission.spawnMode).toBe(SpawnMode.Mission2Travel);
+    expect(mission.isTraversal).toBe(true);
+
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.spawnMode).toBe(SpawnMode.Mission2Travel);
+  });
+
+  it('REQ-61 reports a remaining distance that shrinks as the ship approaches the destination', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+
+    expect(mission.destinationPosition).not.toBeNull();
+    const initial = mission.distanceRemaining;
+    expect(initial).toBeGreaterThan(0);
+
+    const destination = mission.destinationPosition!;
+    const dir = { x: destination.x - ship.position.x, y: destination.y - ship.position.y };
+    const step = 1000;
+    const dist = length(dir);
+    ship.position = {
+      x: ship.position.x + (dir.x / dist) * step,
+      y: ship.position.y + (dir.y / dist) * step,
+    };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+
+    expect(mission.distanceRemaining).toBeLessThan(initial);
+  });
+
+  it('REQ-64 places a huge destination asteroid and ends the mission when the ship arrives', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+
+    expect(field.destination).not.toBeNull();
+    expect(field.destination!.radius).toBeGreaterThan(ship.radius * 30);
+
+    ship.position = { ...mission.destinationPosition! };
+    ship.upgradeWeapon();
+    ship.upgradeWeapon();
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+
+    expect(mission.phase).toBe(MissionPhase.Mission2Done);
+    expect(mission.isPaused).toBe(true);
+  });
+
+  it('REQ-64 does not end until the ship reaches the destination body', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    ship.upgradeWeapon();
+    ship.upgradeWeapon();
+    const destination = { ...mission.destinationPosition! };
+
+    ship.position = { x: destination.x + 5400, y: destination.y };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.phase).toBe(MissionPhase.Mission2Active);
+
+    ship.position = { ...destination };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.phase).toBe(MissionPhase.Mission2Done);
+  });
+
+  it('REQ-64 does not end on arrival until both wing guns are recovered', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    ship.position = { ...mission.destinationPosition! };
+
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.phase).toBe(MissionPhase.Mission2Active);
+
+    ship.upgradeWeapon();
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.phase).toBe(MissionPhase.Mission2Active);
+
+    ship.upgradeWeapon();
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.phase).toBe(MissionPhase.Mission2Done);
+  });
+
+  it('REQ-65 requests a restart on the mission 2 done continue click', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    ship.upgradeWeapon();
+    ship.upgradeWeapon();
+    ship.position = { ...mission.destinationPosition! };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    expect(mission.phase).toBe(MissionPhase.Mission2Done);
+    expect(mission.requestsRestart).toBe(false);
+
+    mission.advance(visited);
+
     expect(mission.requestsRestart).toBe(true);
+  });
+
+  it('REQ-66 jumps straight to the mission 2 briefing with a randomized signal direction', () => {
+    const mission = new Mission();
+    expect(mission.signalDirection).toBeNull();
+
+    mission.jumpToMission2Briefing();
+
+    expect(mission.phase).toBe(MissionPhase.Mission2Intro);
+    expect(mission.isPaused).toBe(true);
+    expect(mission.signalDirection).not.toBeNull();
+    expect(length(mission.signalDirection!)).toBeCloseTo(1, 6);
   });
 });

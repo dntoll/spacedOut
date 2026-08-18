@@ -222,4 +222,63 @@ describe('LaserField', () => {
 
     expect(impacts).toHaveLength(1);
   });
+
+  it('REQ-69 fires one, two, then three forward lasers as the weapon level rises', () => {
+    const countAt = (level: number): number => {
+      const ship = new Ship();
+      ship.aimAt({ x: 100, y: 0 });
+      ship.applyControls(0);
+      for (let i = 0; i < level; i++) ship.upgradeWeapon();
+      const field = new LaserField();
+      field.fire(ship);
+      let count = 0;
+      field.forEach(() => count++);
+      return count;
+    };
+
+    expect(countAt(0)).toBe(1);
+    expect(countAt(1)).toBe(2);
+    expect(countAt(2)).toBe(3);
+  });
+
+  it('REQ-69 fires wing lasers parallel to the nose with lateral offsets', () => {
+    const ship = new Ship();
+    ship.aimAt({ x: 100, y: 0 });
+    ship.applyControls(0);
+    ship.upgradeWeapon();
+    ship.upgradeWeapon();
+    const field = new LaserField();
+    field.fire(ship);
+
+    const lasers: { x: number; y: number; vx: number; angle: number }[] = [];
+    field.forEach((laser) => lasers.push({
+      x: laser.position.x,
+      y: laser.position.y,
+      vx: laser.velocity.x,
+      angle: laser.angle,
+    }));
+
+    expect(lasers).toHaveLength(3);
+    for (const laser of lasers) {
+      expect(laser.vx).toBeGreaterThan(0);
+      expect(laser.angle).toBeCloseTo(ship.angle, 6);
+    }
+    const ys = lasers.map((laser) => laser.y).sort((a, b) => a - b);
+    expect(ys[0]).toBeLessThan(ys[1]);
+    expect(ys[1]).toBeLessThan(ys[2]);
+  });
+
+  it('REQ-69 consumes one ammo per volley regardless of weapon level', () => {
+    const ship = new Ship();
+    ship.aimAt({ x: 100, y: 0 });
+    ship.applyControls(0);
+    ship.upgradeWeapon();
+    ship.upgradeWeapon();
+    const ammoBefore = ship.ammo;
+    const field = new LaserField();
+
+    field.fire(ship);
+
+    expect(ship.ammo).toBe(ammoBefore - 1);
+  });
 });

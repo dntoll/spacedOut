@@ -118,4 +118,41 @@ describe('Minimap', () => {
       expect(arcColor).toMatch(/^rgba\(255,59,59,/);
     }
   });
+
+  it('REQ-60 enlarges the minimap world span during the mission 2 traversal', () => {
+    const ship = new Model.Ship();
+    ship.position = { x: 0, y: 0 };
+    const asteroid = new Model.Asteroid(1, { x: 6000, y: 0 }, { x: 0, y: 0 }, 24, 0, 0, [1, 1, 1], 0.5);
+    const buildModel = (isTraversal: boolean) => ({
+      ship,
+      supplyField: new Model.SupplyField({ x: 100000, y: 0 }, undefined, 1),
+      massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, []),
+      asteroidBelt: { forEach: (fn: (a: Model.Asteroid) => void) => fn(asteroid) },
+      droneField: { forEach: () => undefined },
+      mission: { signalDirection: null, isTraversal },
+      elapsed: 0,
+    } as unknown as Model.Game);
+    const exploration = new ExplorationMap();
+    exploration.observe({ left: 5800, top: -100, right: 6200, bottom: 100 });
+    const camera = new Camera();
+    camera.update(ship.position, 0, 1);
+
+    const drawing = {
+      size: { width: 1000, height: 700 },
+      rectangle: vi.fn(),
+      circle: vi.fn(),
+      polygon: vi.fn(),
+      dashedLine: vi.fn(),
+      arc: vi.fn(),
+      withClipRectangle: vi.fn((_position, _size, draw: () => void) => draw()),
+      withTransform: vi.fn((_position, _angle, draw: () => void) => draw()),
+    } as unknown as Drawing;
+
+    new Minimap().draw(drawing, exploration, buildModel(false), camera);
+    expect(drawing.circle).not.toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
+
+    (drawing.circle as ReturnType<typeof vi.fn>).mockClear();
+    new Minimap().draw(drawing, exploration, buildModel(true), camera);
+    expect(drawing.circle).toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
+  });
 });

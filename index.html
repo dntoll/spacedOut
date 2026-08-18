@@ -14,6 +14,11 @@
         <span class="status"><i></i> FLIGHT SYSTEM ONLINE</span>
       </header>
       <button class="settings-toggle" id="settings-toggle" type="button">SETTINGS</button>
+      <button class="missions-toggle" id="missions-toggle" type="button">MISSIONS</button>
+      <div class="missions-panel hidden" id="missions-panel" aria-label="Mission selection">
+        <button class="mission-option" id="mission-1" type="button">MISSION 1</button>
+        <button class="mission-option" id="mission-2" type="button">MISSION 2</button>
+      </div>
       <div class="settings-panel hidden" id="settings-panel" aria-label="Ship control tuning">
         <div class="settings-row">
           <label for="dampening-slider">DAMPENING</label>
@@ -27,8 +32,8 @@
         </div>
         <div class="settings-row">
           <label for="maxspeed-slider">MAX SPEED</label>
-          <input type="range" id="maxspeed-slider" min="100" max="1500" step="50" value="650" />
-          <output id="maxspeed-value">650</output>
+          <input type="range" id="maxspeed-slider" min="100" max="1500" step="50" value="1000" />
+          <output id="maxspeed-value">1000</output>
         </div>
         <div class="settings-row">
           <label for="music-slider">MUSIC</label>
@@ -82,6 +87,10 @@
         </div>
       </div>
       <div class="speed"><span id="speed">000</span><small>m/s</small></div>
+      <div class="distance hidden" id="distance" aria-label="Distance to destination">
+        <div class="distance-label"><span>DISTANCE</span><b id="distance-value">0</b></div>
+        <div class="distance-track"><i id="distance-fill"></i></div>
+      </div>
       <div class="resources" aria-label="Ship resources">
         <div class="resource fuel">
           <div class="resource-label"><span>FUEL</span><b id="fuel-value">100</b></div>

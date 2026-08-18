@@ -20,7 +20,10 @@ export class MissionOverlay {
       this.setText('well done', 'We have picked up a long distance signal.', 'Click to continue.');
       this.node.classList.remove('hidden');
     } else if (phase === MissionPhase.Mission2Intro) {
-      this.setText('Mission 2: Traverse empty space towards signal.', '', 'Click to continue.');
+      this.setText('Mission 2: Traverse empty space towards signal.', 'Destroy pirates to recover both wing-gun upgrades.', 'Click to continue.');
+      this.node.classList.remove('hidden');
+    } else if (phase === MissionPhase.Mission2Done) {
+      this.setText('Well done', '', 'Click to continue.');
       this.node.classList.remove('hidden');
     } else {
       this.hide();

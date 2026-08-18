@@ -189,4 +189,15 @@ describe('Ship controls', () => {
     expect(fresh.hp).toBe(100);
     expect(fresh.ammo).toBe(100);
   });
+
+  it('REQ-69 upgrades the weapon level in two steps and caps at two', () => {
+    const ship = new Ship();
+    expect(ship.weaponLevel).toBe(0);
+    ship.upgradeWeapon();
+    expect(ship.weaponLevel).toBe(1);
+    ship.upgradeWeapon();
+    expect(ship.weaponLevel).toBe(2);
+    ship.upgradeWeapon();
+    expect(ship.weaponLevel).toBe(2);
+  });
 });

@@ -16,13 +16,37 @@ const MEDIUM_MAX_RADIUS = 46;
 const SPLIT_PROBABILITY = 0.7;
 const SMALL_WEIGHT = 0.5;
 const MEDIUM_WEIGHT = 0.3;
+const ISLAND_MIN_ROCKS = 10;
+const ISLAND_MAX_ROCKS = 100;
+const ISLAND_BASE_SPREAD = 600;
+const ISLAND_BASE_ROCKS = 12;
+const ISLAND_ASPECT_MIN = 1.4;
+const ISLAND_ASPECT_MAX = 2.6;
+const ISLAND_OUTLINE_SEGMENTS = 22;
+const ISLAND_GAP_BASE = 14000;
+const ISLAND_GAP_JITTER = 10000;
+const ISLAND_LEAD = 1800;
+const ISLAND_RING_MARGIN = 120;
+const ISLAND_LATERAL = 2000;
+const ISLAND_PERIPHERAL_FRACTION = 0.5;
+const ISLAND_RECYCLE_MARGIN = 600;
+const ISLAND_MAX_RADIUS = ISLAND_BASE_SPREAD * Math.sqrt(ISLAND_MAX_ROCKS / ISLAND_BASE_ROCKS) * ISLAND_ASPECT_MAX + ISLAND_RING_MARGIN;
+
+export interface AsteroidIsland {
+  center: Vec2;
+  radius: number;
+  outline: Vec2[];
+}
 
 export class AsteroidBelt {
   private readonly asteroids: Asteroid[] = [];
   private readonly collisionObservers = new Set<CollisionObserver>();
   private readonly asteroidCollisionObservers = new Set<AsteroidCollisionObserver>();
   private readonly destructionObservers = new Set<AsteroidDestroyedObserver>();
+  private readonly islands: AsteroidIsland[] = [];
   private nextId = 0;
+  private lastIslandProgress: number | null = null;
+  private nextIslandGap = ISLAND_GAP_BASE;
 
   constructor(center: Vec2, initialAsteroids?: Asteroid[]) {
     if (initialAsteroids) {
@@ -34,16 +58,20 @@ export class AsteroidBelt {
     }
   }
 
-  update(dt: number, center: Vec2, spawnExclusionRadius = 1450, spawnEnabled = true): void {
+  update(dt: number, center: Vec2, spawnExclusionRadius = 1450, spawnEnabled = true, islands = false, travelDirection: Vec2 | null = null): void {
     for (const asteroid of this.asteroids) {
       asteroid.integrate(dt);
     }
     this.resolveInternalCollisions();
-    if (spawnEnabled) this.recycleDistantAsteroids(center, spawnExclusionRadius);
+    if (spawnEnabled) this.recycleDistantAsteroids(center, spawnExclusionRadius, islands, travelDirection);
   }
 
   forEach(visitor: (asteroid: Asteroid) => void): void {
     this.asteroids.forEach(visitor);
+  }
+
+  forEachIsland(visitor: (island: AsteroidIsland) => void): void {
+    this.islands.forEach(visitor);
   }
 
   has(asteroid: Asteroid): boolean { return this.asteroids.includes(asteroid); }
@@ -152,14 +180,90 @@ export class AsteroidBelt {
     }
   }
 
-  private recycleDistantAsteroids(center: Vec2, spawnExclusionRadius: number): void {
+  private recycleDistantAsteroids(center: Vec2, spawnExclusionRadius: number, islands = false, travelDirection: Vec2 | null = null): void {
     const spawnInnerRadius = Math.max(1050, spawnExclusionRadius + 180);
-    const recycleRadius = spawnInnerRadius + 800;
-    for (let i = 0; i < this.asteroids.length; i++) {
+    const ahead = spawnInnerRadius + ISLAND_LEAD;
+    const recycleRadius = islands ? ahead + ISLAND_MAX_RADIUS + ISLAND_RECYCLE_MARGIN : spawnInnerRadius + 800;
+    for (let i = this.asteroids.length - 1; i >= 0; i--) {
       if (length(sub(this.asteroids[i].position, center)) > recycleRadius) {
-        this.asteroids[i] = this.createAsteroid(center, spawnInnerRadius, spawnInnerRadius + 500);
+        if (islands) {
+          this.asteroids.splice(i, 1);
+        } else {
+          this.asteroids[i] = this.createAsteroid(center, spawnInnerRadius, spawnInnerRadius + 500);
+        }
       }
     }
+    if (islands) {
+      for (let i = this.islands.length - 1; i >= 0; i--) {
+        if (length(sub(this.islands[i].center, center)) > recycleRadius) this.islands.splice(i, 1);
+      }
+    }
+    if (islands && travelDirection) this.spawnIslands(center, travelDirection, ahead);
+  }
+
+  private spawnIslands(center: Vec2, travelDirection: Vec2, ahead: number): void {
+    const progress = center.x * travelDirection.x + center.y * travelDirection.y;
+    if (this.lastIslandProgress === null) this.lastIslandProgress = progress - this.nextIslandGap;
+    const perp: Vec2 = { x: -travelDirection.y, y: travelDirection.x };
+    while (progress >= this.lastIslandProgress + this.nextIslandGap) {
+      this.lastIslandProgress += this.nextIslandGap;
+      this.nextIslandGap = ISLAND_GAP_BASE + random(0, ISLAND_GAP_JITTER);
+      const rockCount = Math.floor(random(ISLAND_MIN_ROCKS, ISLAND_MAX_ROCKS + 1));
+      const spread = ISLAND_BASE_SPREAD * Math.sqrt(rockCount / ISLAND_BASE_ROCKS);
+      const aspect = random(ISLAND_ASPECT_MIN, ISLAND_ASPECT_MAX);
+      const rotation = random(0, Math.PI * 2);
+      const a = spread * aspect;
+      const b = spread / aspect;
+      const routeCenter = add(center, scale(travelDirection, ahead));
+      let islandCenter = routeCenter;
+      if (random(0, 1) < ISLAND_PERIPHERAL_FRACTION) {
+        const lateral = random(0.4, 1) * (ISLAND_LATERAL + spread) * (random(0, 1) < 0.5 ? 1 : -1);
+        islandCenter = add(routeCenter, scale(perp, lateral));
+      }
+      const outline = this.buildOutline(islandCenter, a, b, rotation);
+      this.islands.push({ center: { ...islandCenter }, radius: Math.max(a, b) + ISLAND_RING_MARGIN, outline });
+      const cos = Math.cos(rotation);
+      const sin = Math.sin(rotation);
+      for (let i = 0; i < rockCount; i++) {
+        const angle = random(0, Math.PI * 2);
+        const t = Math.sqrt(random(0, 1));
+        const local: Vec2 = { x: a * t * Math.cos(angle), y: b * t * Math.sin(angle) };
+        const position = add(islandCenter, {
+          x: local.x * cos - local.y * sin,
+          y: local.x * sin + local.y * cos,
+        });
+        const radius = AsteroidBelt.pickRadius();
+        const vertexCount = Math.floor(random(8, 13));
+        this.asteroids.push(new Asteroid(
+          this.nextId++,
+          position,
+          { x: random(-16, 16), y: random(-16, 16) },
+          radius,
+          random(0, Math.PI * 2),
+          random(-0.22, 0.22),
+          Array.from({ length: vertexCount }, () => random(0.78, 1.12)),
+          random(0, 1),
+        ));
+      }
+    }
+  }
+
+  private buildOutline(center: Vec2, a: number, b: number, rotation: number): Vec2[] {
+    const points: Vec2[] = [];
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const ra = a + ISLAND_RING_MARGIN;
+    const rb = b + ISLAND_RING_MARGIN;
+    for (let i = 0; i < ISLAND_OUTLINE_SEGMENTS; i++) {
+      const angle = (i / ISLAND_OUTLINE_SEGMENTS) * Math.PI * 2;
+      const jitter = random(0.82, 1.16);
+      const local: Vec2 = { x: ra * jitter * Math.cos(angle), y: rb * jitter * Math.sin(angle) };
+      points.push({
+        x: center.x + local.x * cos - local.y * sin,
+        y: center.y + local.x * sin + local.y * cos,
+      });
+    }
+    return points;
   }
 
   private resolveInternalCollisions(): void {

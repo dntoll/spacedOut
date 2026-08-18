@@ -8,6 +8,7 @@ const RAMP_DOWN = 6;
 const MAX_AMMO = 100;
 const EMERGENCY_RELOAD_INTERVAL = 2;
 const EMERGENCY_RELOAD_AMOUNT = 1;
+const MAX_WEAPON_LEVEL = 2;
 
 export interface ShipInitialLevels {
   fuel?: number;
@@ -21,13 +22,14 @@ export class Ship extends PhysicsBody {
   private fuelLevel: number;
   private hpLevel: number;
   private ammoLevel: number;
+  private weaponLevelValue = 0;
   private ammoReloadTimer = 0;
   private fuelReloadTimer = 0;
   private invulnerableTime = 0;
   private alive = true;
   private dampening = 1.5;
   private thrustAccel = 170;
-  private maxSpeed = 650;
+  private maxSpeed = 1000;
   private turningRate = 0;
   private directionalVec: Vec2 | null = null;
   private directionalLevel = 0;
@@ -54,6 +56,7 @@ export class Ship extends PhysicsBody {
   get fuel(): number { return this.fuelLevel; }
   get hp(): number { return this.hpLevel; }
   get ammo(): number { return this.ammoLevel; }
+  get weaponLevel(): number { return this.weaponLevelValue; }
   get isInvulnerable(): boolean { return this.invulnerableTime > 0; }
   get isAlive(): boolean { return this.alive; }
   get turnRate(): number { return this.turningRate; }
@@ -85,6 +88,7 @@ export class Ship extends PhysicsBody {
   stopThrust(): void { this.throttle = 0; }
   collectFuel(amount: number): void { this.fuelLevel = clamp(this.fuelLevel + amount, 0, 100); }
   collectAmmo(amount: number): void { this.ammoLevel = clamp(this.ammoLevel + amount, 0, MAX_AMMO); }
+  upgradeWeapon(): void { this.weaponLevelValue = Math.min(MAX_WEAPON_LEVEL, this.weaponLevelValue + 1); }
   consumeAmmo(amount: number): boolean {
     if (this.ammoLevel < amount) return false;
     this.ammoLevel -= amount;

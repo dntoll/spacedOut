@@ -11,6 +11,8 @@ export interface WorldBounds {
 
 const DRONE_THREAT_ZOOM_OUT = 0.25;
 const DRONE_THREAT_FLOOR = 0.30;
+const DESOLATE_ZOOM_OUT = 0.35;
+const DESOLATE_FLOOR = 0.25;
 
 export class Camera {
   private position: Vec2 = { x: 0, y: 0 };
@@ -22,11 +24,13 @@ export class Camera {
 
   setBaseZoom(zoom: number): void { this.baseZoom = clamp(zoom, 0.5, 2); }
 
-  update(target: Vec2, speed: number, dt: number, droneThreat = false): void {
+  update(target: Vec2, speed: number, dt: number, droneThreat = false, desolate = false): void {
     this.position = { ...target };
-    const floor = droneThreat ? DRONE_THREAT_FLOOR : 0.42;
-    const threatOffset = droneThreat ? DRONE_THREAT_ZOOM_OUT : 0;
-    const targetZoom = clamp(this.baseZoom - speed / 700 - threatOffset, floor, this.baseZoom);
+    let floor = 0.42;
+    let offset = 0;
+    if (droneThreat) { floor = Math.min(floor, DRONE_THREAT_FLOOR); offset += DRONE_THREAT_ZOOM_OUT; }
+    if (desolate) { floor = Math.min(floor, DESOLATE_FLOOR); offset += DESOLATE_ZOOM_OUT; }
+    const targetZoom = clamp(this.baseZoom - speed / 700 - offset, floor, this.baseZoom);
     this.zoomLevel += (targetZoom - this.zoomLevel) * Math.min(1, dt * 2.5);
   }
 

@@ -1,12 +1,15 @@
 import * as Model from '../model';
-import { clamp } from '../math';
+import { clamp, normalize, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
 import type { Drawing, Size } from './Drawing';
 import { ExplorationMap } from './ExplorationMap';
 
+const DEFAULT_WORLD_SPAN = 8000;
+const TRAVEL_WORLD_SPAN = 16000;
+
 export class Minimap {
-  static readonly worldSpan = 8000;
+  static readonly worldSpan = DEFAULT_WORLD_SPAN;
 
   draw(
     drawing: Drawing,
@@ -14,6 +17,7 @@ export class Minimap {
     model: Model.Game,
     camera: Camera,
   ): void {
+    const span = model.mission.isTraversal ? TRAVEL_WORLD_SPAN : DEFAULT_WORLD_SPAN;
     const compact = drawing.size.width <= 520;
     const mapSize = compact ? 128 : 180;
     const margin = compact ? 22 : clamp(drawing.size.width * 0.04, 20, 48);
@@ -28,13 +32,13 @@ export class Minimap {
     );
     drawing.rectangle(position, size, 'rgba(2,8,17,.84)');
     drawing.withClipRectangle(position, size, () => {
-      this.drawExplored(drawing, exploration, center, position, size);
-      this.drawMassiveAsteroids(drawing, exploration, model.massiveAsteroidField, center, position, size);
-      this.drawAsteroids(drawing, exploration, model.asteroidBelt, center, position, size);
-      this.drawSupplies(drawing, exploration, model.supplyField, center, position, size);
-      this.drawDrones(drawing, exploration, model.droneField, center, position, size);
+      this.drawExplored(drawing, exploration, center, position, size, span);
+      this.drawMassiveAsteroids(drawing, exploration, model.massiveAsteroidField, center, position, size, span);
+      this.drawAsteroids(drawing, exploration, model.asteroidBelt, center, position, size, span);
+      this.drawSupplies(drawing, exploration, model.supplyField, center, position, size, span);
+      this.drawDrones(drawing, exploration, model.droneField, center, position, size, span);
       this.drawShip(drawing, model.ship.angle, position, size);
-      this.drawSignal(drawing, model, position, size);
+      this.drawSignal(drawing, model, position, size, center);
     });
   }
 
@@ -44,10 +48,11 @@ export class Minimap {
     center: Vec2,
     position: Vec2,
     size: Size,
+    span: number,
   ): void {
-    const cellPixels = ExplorationMap.cellSize / Minimap.worldSpan * size.width;
-    exploration.forEachVisibleCell(center, Minimap.worldSpan, (cell) => {
-      const point = this.toMap(cell, center, position, size);
+    const cellPixels = ExplorationMap.cellSize / span * size.width;
+    exploration.forEachVisibleCell(center, span, (cell) => {
+      const point = this.toMap(cell, center, position, size, span);
       drawing.rectangle(point, { width: cellPixels + 0.35, height: cellPixels + 0.35 }, 'rgba(68,139,158,.22)');
     });
   }
@@ -59,12 +64,13 @@ export class Minimap {
     center: Vec2,
     position: Vec2,
     size: Size,
+    span: number,
   ): void {
     field.forEachKnown((asteroid) => {
       if (!exploration.isExplored(asteroid.position, asteroid.radius)) return;
-      if (!this.intersectsMap(asteroid.position, asteroid.radius, center)) return;
-      const point = this.toMap(asteroid.position, center, position, size);
-      const radius = clamp(asteroid.radius / Minimap.worldSpan * size.width, 3, size.width * 0.18);
+      if (!this.intersectsMap(asteroid.position, asteroid.radius, center, span)) return;
+      const point = this.toMap(asteroid.position, center, position, size, span);
+      const radius = clamp(asteroid.radius / span * size.width, 3, size.width * 0.18);
       const scale = radius / asteroid.radius;
       const outline = asteroid.vertices.map((variation, index) => {
         const angle = index / asteroid.vertices.length * Math.PI * 2;
@@ -86,12 +92,13 @@ export class Minimap {
     center: Vec2,
     position: Vec2,
     size: Size,
+    span: number,
   ): void {
     belt.forEach((asteroid) => {
       if (!exploration.isExplored(asteroid.position, asteroid.radius)) return;
-      if (!this.intersectsMap(asteroid.position, asteroid.radius, center)) return;
+      if (!this.intersectsMap(asteroid.position, asteroid.radius, center, span)) return;
       drawing.circle(
-        this.toMap(asteroid.position, center, position, size),
+        this.toMap(asteroid.position, center, position, size, span),
         1.6,
         'rgba(146,164,186,.72)',
       );
@@ -105,11 +112,12 @@ export class Minimap {
     center: Vec2,
     position: Vec2,
     size: Size,
+    span: number,
   ): void {
     field.forEachKnown((container) => {
-      if (!exploration.isExplored(container.position) || !this.intersectsMap(container.position, 0, center)) return;
+      if (!exploration.isExplored(container.position) || !this.intersectsMap(container.position, 0, center, span)) return;
       drawing.circle(
-        this.toMap(container.position, center, position, size),
+        this.toMap(container.position, center, position, size, span),
         2.2,
         container instanceof Model.HpContainer
           ? '#5dff9a'
@@ -127,11 +135,12 @@ export class Minimap {
     center: Vec2,
     position: Vec2,
     size: Size,
+    span: number,
   ): void {
     field.forEach((drone) => {
-      if (!exploration.isExplored(drone.position) || !this.intersectsMap(drone.position, 0, center)) return;
+      if (!exploration.isExplored(drone.position) || !this.intersectsMap(drone.position, 0, center, span)) return;
       drawing.circle(
-        this.toMap(drone.position, center, position, size),
+        this.toMap(drone.position, center, position, size, span),
         2.0,
         '#7dff5e',
       );
@@ -150,8 +159,14 @@ export class Minimap {
     });
   }
 
-  private drawSignal(drawing: Drawing, model: Model.Game, position: Vec2, size: Size): void {
-    const direction = model.mission.signalDirection;
+  private drawSignal(drawing: Drawing, model: Model.Game, position: Vec2, size: Size, worldCenter: Vec2): void {
+    const destination = model.mission.destinationPosition;
+    let direction: Vec2 | null = null;
+    if (destination) {
+      const dir = normalize(sub(destination, worldCenter));
+      if (dir.x !== 0 || dir.y !== 0) direction = dir;
+    }
+    if (!direction) direction = model.mission.signalDirection;
     if (!direction) return;
     const center = { x: position.x + size.width / 2, y: position.y + size.height / 2 };
     const edge = this.squareEdge(center, direction, position, size);
@@ -181,15 +196,15 @@ export class Minimap {
     return { x: center.x + direction.x * t, y: center.y + direction.y * t };
   }
 
-  private toMap(world: Vec2, center: Vec2, position: Vec2, size: Size): Vec2 {
+  private toMap(world: Vec2, center: Vec2, position: Vec2, size: Size, span: number): Vec2 {
     return {
-      x: position.x + size.width / 2 + (world.x - center.x) / Minimap.worldSpan * size.width,
-      y: position.y + size.height / 2 + (world.y - center.y) / Minimap.worldSpan * size.height,
+      x: position.x + size.width / 2 + (world.x - center.x) / span * size.width,
+      y: position.y + size.height / 2 + (world.y - center.y) / span * size.height,
     };
   }
 
-  private intersectsMap(world: Vec2, radius: number, center: Vec2): boolean {
-    const halfSpan = Minimap.worldSpan / 2;
+  private intersectsMap(world: Vec2, radius: number, center: Vec2, span: number): boolean {
+    const halfSpan = span / 2;
     return (
       world.x + radius >= center.x - halfSpan
       && world.x - radius <= center.x + halfSpan

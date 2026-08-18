@@ -76,6 +76,23 @@ describe('SignalIndicator', () => {
     expect(edge.y).toBe(0);
   });
 
+  it('REQ-64 aims the signal arrow at the destination once it is placed', () => {
+    const { drawing, dashedLine } = stubDrawing({ width: 800, height: 600 });
+    const mission = {
+      destinationPosition: { x: 100000, y: 0 },
+      signalDirection: { x: 0, y: -1 },
+    } as unknown as Model.Mission;
+    const model = stubModel({ mission });
+    const camera = new Camera();
+    camera.update({ x: 0, y: 0 }, 0, 1);
+
+    new SignalIndicator().draw(drawing, model, camera);
+
+    const [edge] = dashedLine.mock.calls[0];
+    expect(edge.x).toBe(800);
+    expect(edge.y).toBe(300);
+  });
+
   it('REQ-57 draws a green wave toward an off-screen hunting drone', () => {
     const { drawing, arc } = stubDrawing({ width: 800, height: 600 });
     const drone = new Drone(null, 0, [1, 1, 1], 2);

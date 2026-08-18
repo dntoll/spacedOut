@@ -7,7 +7,7 @@ export class Game {
   constructor(
     private model: Model.Game,
     private view: View.Game,
-    private readonly createModel: () => Model.Game = () => new Model.Game(),
+    private readonly createModel: (mission?: 1 | 2) => Model.Game = (mission) => new Model.Game(mission === 2 ? { startingMission: 2 } : {}),
   ) {
     this.attachObservers(this.model);
   }
@@ -17,7 +17,10 @@ export class Game {
   private frame(time: number): void {
     const dt = (time - this.lastTime) / 1000;
     this.lastTime = time;
-    if (this.model.isGameOver) {
+    const selection = this.view.consumeMissionSelection();
+    if (selection) {
+      this.restart(selection);
+    } else if (this.model.isGameOver) {
       if (this.view.consumeRestartRequest()) this.restart();
     } else if (this.model.mission.requestsRestart) {
       this.restart();
@@ -37,8 +40,8 @@ export class Game {
     requestAnimationFrame((next) => this.frame(next));
   }
 
-  private restart(): void {
-    this.model = this.createModel();
+  private restart(mission: 1 | 2 = 1): void {
+    this.model = this.createModel(mission);
     this.attachObservers(this.model);
     this.view.reset();
   }
@@ -52,5 +55,6 @@ export class Game {
     model.addAsteroidCollisionObserver(this.view);
     model.addCollectablePickupObserver(this.view);
     model.addDroneDestroyedObserver(this.view);
+    model.addPirateDestroyedObserver(this.view);
   }
 }

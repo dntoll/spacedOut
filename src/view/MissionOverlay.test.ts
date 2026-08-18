@@ -47,13 +47,14 @@ describe('MissionOverlay', () => {
     expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
   });
 
-  it('REQ-55 shows the mission 2 briefing', () => {
+  it('REQ-55 shows the mission 2 briefing with the wing-gun objective', () => {
     const nodes = stubNodes();
     const overlay = new MissionOverlay();
 
     overlay.show(MissionPhase.Mission2Intro);
 
     expect(nodes.get('#mission-title')?.textContent).toBe('Mission 2: Traverse empty space towards signal.');
+    expect(nodes.get('#mission-signal')?.textContent).toBe('Destroy pirates to recover both wing-gun upgrades.');
     expect(nodes.get('#mission-detail')?.textContent).toBe('Click to continue.');
     expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
   });
@@ -72,6 +73,26 @@ describe('MissionOverlay', () => {
     const overlay = new MissionOverlay();
 
     overlay.show(MissionPhase.Mission1Active);
+
+    expect(nodes.get('#mission')?.classList.add).toHaveBeenCalledWith('hidden');
+  });
+
+  it('REQ-64 shows well done with click to continue when mission 2 is complete', () => {
+    const nodes = stubNodes();
+    const overlay = new MissionOverlay();
+
+    overlay.show(MissionPhase.Mission2Done);
+
+    expect(nodes.get('#mission-title')?.textContent).toBe('Well done');
+    expect(nodes.get('#mission-detail')?.textContent).toBe('Click to continue.');
+    expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
+  });
+
+  it('hides the overlay during the mission 2 traversal', () => {
+    const nodes = stubNodes();
+    const overlay = new MissionOverlay();
+
+    overlay.show(MissionPhase.Mission2Active);
 
     expect(nodes.get('#mission')?.classList.add).toHaveBeenCalledWith('hidden');
   });

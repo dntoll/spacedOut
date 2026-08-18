@@ -16,7 +16,7 @@ export class SignalIndicator {
   draw(drawing: Drawing, model: Model.Game, camera: Camera): void {
     const size = drawing.size;
     const center = { x: size.width / 2, y: size.height / 2 };
-    const direction = model.mission.signalDirection;
+    const direction = this.aimDirection(model, camera);
     if (direction) {
       const edge = this.edgePoint(center, direction, size);
       const inner = { x: edge.x - direction.x * SEGMENT_LENGTH, y: edge.y - direction.y * SEGMENT_LENGTH };
@@ -71,5 +71,14 @@ export class SignalIndicator {
     else if (direction.y < 0) candidates.push(-center.y / direction.y);
     const t = Math.min(...candidates.filter((value) => value > 0));
     return { x: center.x + direction.x * t, y: center.y + direction.y * t };
+  }
+
+  private aimDirection(model: Model.Game, camera: Camera): Vec2 | null {
+    const destination = model.mission.destinationPosition;
+    if (destination) {
+      const dir = normalize(sub(destination, camera.worldPosition));
+      if (dir.x !== 0 || dir.y !== 0) return dir;
+    }
+    return model.mission.signalDirection;
   }
 }

@@ -43,6 +43,80 @@ describe('AsteroidBelt', () => {
     expect(positions[0]).toBeGreaterThan(3000);
   });
 
+  it('REQ-62 recycles distant asteroids and spawns dense islands ahead while traversing', () => {
+    const asteroids: Asteroid[] = [];
+    for (let i = 0; i < 60; i++) {
+      asteroids.push(new Asteroid(i, { x: 10000 + i * 100, y: 0 }, { x: 0, y: 0 }, 20, 0, 0, [1, 1, 1], 0.5));
+    }
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, asteroids);
+
+    belt.update(0, { x: 0, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+
+    const remaining: Asteroid[] = [];
+    belt.forEach((body) => remaining.push(body));
+    expect(remaining.length).toBeGreaterThanOrEqual(10);
+    expect(remaining.length).toBeLessThanOrEqual(100);
+    const ahead = remaining.filter((a) => a.position.x > 2000);
+    expect(ahead.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('REQ-62 retains the spawned island across frames until the ship reaches it', () => {
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+    const direction = { x: 1, y: 0 };
+
+    belt.update(0, { x: 0, y: 0 }, 1500, true, true, direction);
+    const afterFirst: Asteroid[] = [];
+    belt.forEach((a) => afterFirst.push(a));
+    expect(afterFirst.length).toBeGreaterThanOrEqual(10);
+
+    for (let step = 0; step < 10; step++) belt.update(0, { x: 0, y: 0 }, 1500, true, true, direction);
+    const afterLater: Asteroid[] = [];
+    belt.forEach((a) => afterLater.push(a));
+
+    expect(afterLater.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('REQ-62 exposes an irregular warning outline around each spawned island', () => {
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+    belt.update(0, { x: 0, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+
+    const islands: { center: { x: number; y: number }; radius: number; outline: { x: number; y: number }[] }[] = [];
+    belt.forEachIsland((island) => islands.push(island));
+
+    expect(islands.length).toBeGreaterThan(0);
+    expect(islands[0].radius).toBeGreaterThan(500);
+    expect(islands[0].outline.length).toBeGreaterThanOrEqual(12);
+    const center = islands[0].center;
+    const radii = islands[0].outline.map((p) => Math.hypot(p.x - center.x, p.y - center.y));
+    expect(Math.max(...radii) - Math.min(...radii)).toBeGreaterThan(120);
+  });
+
+  it('REQ-62 spawns some islands peripherally off the route so they can be skipped', () => {
+    const spy = vi.spyOn(Math, 'random').mockReturnValue(0);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+    belt.update(0, { x: 0, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+    spy.mockRestore();
+
+    const islands: { center: { x: number; y: number } }[] = [];
+    belt.forEachIsland((island) => islands.push(island));
+    expect(islands.length).toBeGreaterThan(0);
+    expect(Math.abs(islands[0].center.y)).toBeGreaterThan(500);
+  });
+
+  it('REQ-62 leaves wide randomized spacing between islands', () => {
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, []);
+    belt.update(0, { x: 0, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+    let islands: { center: { x: number; y: number } }[] = [];
+    belt.forEachIsland((island) => islands.push(island));
+    expect(islands.length).toBe(1);
+
+    // advancing well within the wide gap does not spawn another island
+    belt.update(0, { x: 10000, y: 0 }, 1500, true, true, { x: 1, y: 0 });
+    islands = [];
+    belt.forEachIsland((island) => islands.push(island));
+    expect(islands.length).toBe(1);
+  });
+
   it('REQ-12 transfers momentum and spin during ship-asteroid collisions', () => {
     const ship = new Ship();
     ship.previousPosition = { x: 70, y: 0 };

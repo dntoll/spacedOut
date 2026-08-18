@@ -34,7 +34,7 @@ function buildDocument(): Map<string, MockElement> {
     ['#settings-panel', makeElement()],
     ['#dampening-slider', makeElement('1.5')],
     ['#thrust-slider', makeElement('170')],
-    ['#maxspeed-slider', makeElement('650')],
+    ['#maxspeed-slider', makeElement('1000')],
     ['#dampening-value', makeElement()],
     ['#thrust-value', makeElement()],
     ['#maxspeed-value', makeElement()],
@@ -77,7 +77,7 @@ describe('SettingsMenu', () => {
 
     expect(tuning.dampening).toBeCloseTo(1.5, 5);
     expect(tuning.thrustAccel).toBe(170);
-    expect(tuning.maxSpeed).toBe(650);
+    expect(tuning.maxSpeed).toBe(1000);
   });
 
   it('REQ-27 reflects slider changes in the tuning', () => {
@@ -132,7 +132,7 @@ describe('SettingsMenu', () => {
     const saved = new StorageAdapter(store).read<{ dampening: number; thrustAccel: number; maxSpeed: number }>('control-tuning');
     expect(saved?.dampening).toBe(4);
     expect(saved?.thrustAccel).toBe(170);
-    expect(saved?.maxSpeed).toBe(650);
+    expect(saved?.maxSpeed).toBe(1000);
   });
 
   it('REQ-30 exposes the default music level from the slider', () => {

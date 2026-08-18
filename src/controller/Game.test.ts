@@ -24,6 +24,7 @@ const stubModel = (isGameOver: boolean): Model.Game =>
     addAsteroidCollisionObserver: vi.fn(),
     addCollectablePickupObserver: vi.fn(),
     addDroneDestroyedObserver: vi.fn(),
+    addPirateDestroyedObserver: vi.fn(),
   }) as unknown as Model.Game;
 
 const stubView = (restart: boolean, firing = false): View.Game =>
@@ -36,6 +37,7 @@ const stubView = (restart: boolean, firing = false): View.Game =>
     getSpawnExclusionRadius: vi.fn(() => 1000),
     consumeRestartRequest: vi.fn(() => restart),
     consumeMissionContinueClick: vi.fn(() => false),
+    consumeMissionSelection: vi.fn(() => null),
     render: vi.fn(),
     reset: vi.fn(),
     onCollision: vi.fn(),
@@ -68,6 +70,7 @@ describe('Controller Game', () => {
     expect(freshModel.addAsteroidCollisionObserver).toHaveBeenCalledWith(view);
     expect(freshModel.addCollectablePickupObserver).toHaveBeenCalledWith(view);
     expect(freshModel.addDroneDestroyedObserver).toHaveBeenCalledWith(view);
+    expect(freshModel.addPirateDestroyedObserver).toHaveBeenCalledWith(view);
     expect(freshModel.update).toHaveBeenCalled();
     expect(view.render).toHaveBeenCalledWith(freshModel, expect.any(Number));
     expect(deadModel.update).not.toHaveBeenCalled();
@@ -118,6 +121,28 @@ describe('Controller Game', () => {
 
     expect(model.advanceMission).toHaveBeenCalledOnce();
     expect(model.setThrustTarget).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('REQ-66 restarts at the selected mission when the missions menu picks one', () => {
+    vi.stubGlobal('performance', { now: () => 1000 });
+    const rafCbs: ((t: number) => void)[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: (t: number) => void) => { rafCbs.push(cb); return rafCbs.length; });
+
+    const deadModel = stubModel(false);
+    const freshModel = stubModel(false);
+    const createModel = vi.fn((mission?: 1 | 2) => freshModel);
+    const view = stubView(false);
+    (view.consumeMissionSelection as ReturnType<typeof vi.fn>).mockReturnValueOnce(2);
+    const controller = new Game(deadModel, view, createModel);
+
+    controller.start();
+    rafCbs[0](1016);
+
+    expect(createModel).toHaveBeenCalledWith(2);
+    expect(view.reset).toHaveBeenCalledOnce();
+    expect(freshModel.addCollisionObserver).toHaveBeenCalledWith(view);
+    expect(deadModel.update).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });
 });

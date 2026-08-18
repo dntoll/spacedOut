@@ -12,6 +12,8 @@ import { LaserShot } from './LaserShot';
 import type { LaserShotObserver } from './LaserShotObserver';
 import type { MassiveAsteroid } from './MassiveAsteroid';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
+import type { Pirate } from './Pirate';
+import type { PirateField } from './PirateField';
 import type { Ship } from './Ship';
 
 const NOSE_OFFSET = 22;
@@ -20,6 +22,8 @@ const LASER_RADIUS = 2.5;
 const FIRE_COOLDOWN = 0.18;
 const SHOT_COST = 1;
 const CULL_MARGIN = 60;
+const LEFT_WING_LOCAL: Vec2 = { x: 6, y: -13 };
+const RIGHT_WING_LOCAL: Vec2 = { x: 6, y: 13 };
 
 export class LaserField {
   private readonly lasers: Laser[] = [];
@@ -43,11 +47,19 @@ export class LaserField {
     if (!ship.consumeAmmo(SHOT_COST)) return;
     this.cooldown = FIRE_COOLDOWN;
     const forward = { x: Math.cos(ship.angle), y: Math.sin(ship.angle) };
-    const muzzle = add(ship.position, scale(forward, NOSE_OFFSET));
     const velocity = add(scale(forward, LASER_SPEED), ship.velocity);
-    this.lasers.push(new Laser(muzzle, velocity, ship.angle, LASER_RADIUS));
-    const event = new LaserShot({ ...muzzle });
+    const muzzles: Vec2[] = [add(ship.position, scale(forward, NOSE_OFFSET))];
+    if (ship.weaponLevel >= 1) muzzles.push(this.muzzleAt(ship, LEFT_WING_LOCAL));
+    if (ship.weaponLevel >= 2) muzzles.push(this.muzzleAt(ship, RIGHT_WING_LOCAL));
+    for (const muzzle of muzzles) this.lasers.push(new Laser(muzzle, velocity, ship.angle, LASER_RADIUS));
+    const event = new LaserShot({ ...muzzles[0] });
     for (const observer of this.laserShotObservers) observer.onLaserShot(event);
+  }
+
+  private muzzleAt(ship: Ship, local: Vec2): Vec2 {
+    const c = Math.cos(ship.angle);
+    const s = Math.sin(ship.angle);
+    return add(ship.position, { x: local.x * c - local.y * s, y: local.x * s + local.y * c });
   }
 
   update(
@@ -57,6 +69,7 @@ export class LaserField {
     massiveAsteroidField: MassiveAsteroidField,
     cullRadius = Number.POSITIVE_INFINITY,
     droneField?: DroneField,
+    pirateField?: PirateField,
   ): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
     const maxRange = cullRadius + CULL_MARGIN;
@@ -89,7 +102,30 @@ export class LaserField {
           continue;
         }
       }
+
+      if (pirateField) {
+        const pirate = this.pirateHit(laser, pirateField);
+        if (pirate) {
+          this.emitSpark(laser.position, normalize(sub(laser.position, pirate.position)));
+          pirateField.applyLaserHit(pirate, laser.position);
+          this.lasers.splice(i, 1);
+          continue;
+        }
+      }
     }
+  }
+
+  private pirateHit(laser: Laser, pirateField: PirateField): Pirate | null {
+    let hit: Pirate | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    pirateField.forEachPirate((pirate) => {
+      const distance = length(sub(pirate.position, laser.position));
+      if (distance <= pirate.radius + laser.radius && distance < bestDistance) {
+        bestDistance = distance;
+        hit = pirate;
+      }
+    });
+    return hit;
   }
 
   private droneHit(laser: Laser, droneField: DroneField): Drone | null {

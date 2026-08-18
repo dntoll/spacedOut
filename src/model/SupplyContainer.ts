@@ -10,8 +10,9 @@ export abstract class SupplyContainer extends PhysicsBody {
   constructor(
     position: Vec2,
     public readonly amount: number,
+    radius = 13,
   ) {
-    super(position, { x: 0, y: 0 }, 13, 6, 0, 0);
+    super(position, { x: 0, y: 0 }, radius, 6, 0, 0);
   }
 
   abstract get type(): SupplyType;

@@ -44,4 +44,34 @@ describe('Ship view', () => {
     const sideNozzle = circles.find((c) => c.position.y > 10);
     expect(sideNozzle).toBeDefined();
   });
+
+  it('REQ-69 draws a left wing gun at level 1 and both wing guns at level 2', () => {
+    const polygons: Array<Array<{ x: number; y: number }>> = [];
+    const drawing = {
+      withTransform: (_position: unknown, _angle: number, draw: () => void) => draw(),
+      withShadow: (_color: string, _blur: number, draw: () => void) => draw(),
+      polygon: (points: Array<{ x: number; y: number }>) => polygons.push(points),
+      circle: vi.fn(),
+    } as unknown as Drawing;
+
+    const level0 = new ModelShip();
+    new Ship().draw(drawing, level0);
+    const baseCount = polygons.length;
+    expect(baseCount).toBe(2);
+
+    const level1 = new ModelShip();
+    level1.upgradeWeapon();
+    polygons.length = 0;
+    new Ship().draw(drawing, level1);
+    expect(polygons.length).toBe(baseCount + 1);
+
+    const level2 = new ModelShip();
+    level2.upgradeWeapon();
+    level2.upgradeWeapon();
+    polygons.length = 0;
+    new Ship().draw(drawing, level2);
+    expect(polygons.length).toBe(baseCount + 2);
+    const wingGuns = polygons.filter((points) => points.length === 4);
+    expect(wingGuns).toHaveLength(2);
+  });
 });

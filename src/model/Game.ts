@@ -15,7 +15,10 @@ import type { LaserImpactObserver } from './LaserImpactObserver';
 import { LaserField } from './LaserField';
 import type { LaserShotObserver } from './LaserShotObserver';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
-import { Mission } from './Mission';
+import { Mission, SpawnMode } from './Mission';
+import { PirateField } from './PirateField';
+import { PirateDestroyed } from './PirateDestroyed';
+import type { PirateDestroyedObserver } from './PirateDestroyedObserver';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
 import { SupplyChooser, SupplyType } from './SupplyChooser';
@@ -23,25 +26,39 @@ import { SupplyContainer } from './SupplyContainer';
 import { SupplyField } from './SupplyField';
 import type { PolygonObstacle } from './SweptCircleCollision';
 import { VisitedMap } from './VisitedMap';
+import { WeaponPod } from './WeaponPod';
 
 const DROP_PROBABILITY = 0.35;
 const DROP_AMOUNT = 24;
+const PIRATE_WEAPON_DROP_PROBABILITY = 0.2;
 
-export class Game implements AsteroidDestroyedObserver {
+export interface GameOptions {
+  startingMission?: 1 | 2;
+}
+
+export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver {
   readonly ship = new Ship({ fuel: 50, hp: 50, ammo: 50 });
   readonly asteroidBelt = new AsteroidBelt(this.ship.position);
   readonly supplyField = new SupplyField(this.ship.position);
   readonly massiveAsteroidField = new MassiveAsteroidField(this.ship.position, this.ship.radius);
   readonly laserField = new LaserField();
   readonly droneField = new DroneField();
+  readonly pirateField = new PirateField();
   readonly mission = new Mission();
   readonly visitedMap = new VisitedMap();
   private readonly shipCollisions = new ShipCollisionSystem();
   private spawnExclusionRadius = 1500;
   elapsed = 0;
 
-  constructor() {
+  constructor(options?: GameOptions) {
     this.asteroidBelt.addAsteroidDestroyedObserver(this);
+    this.pirateField.addPirateDestroyedObserver(this);
+    if (options?.startingMission === 2) {
+      this.ship.collectFuel(100);
+      this.ship.repair(100);
+      this.ship.collectAmmo(100);
+      this.mission.jumpToMission2Briefing();
+    }
   }
 
   get speed(): number { return this.ship.speed; }
@@ -68,23 +85,29 @@ export class Game implements AsteroidDestroyedObserver {
     this.massiveAsteroidField.addCollisionObserver(observer);
     this.shipCollisions.addCollisionObserver(observer);
     this.laserField.addCollisionObserver(observer);
+    this.pirateField.addCollisionObserver(observer);
   }
   removeCollisionObserver(observer: CollisionObserver): void {
     this.asteroidBelt.removeCollisionObserver(observer);
     this.massiveAsteroidField.removeCollisionObserver(observer);
     this.shipCollisions.removeCollisionObserver(observer);
     this.laserField.removeCollisionObserver(observer);
+    this.pirateField.removeCollisionObserver(observer);
   }
   addDamageObserver(observer: DamageObserver): void {
     this.shipCollisions.addDamageObserver(observer);
     this.droneField.addDamageObserver(observer);
+    this.pirateField.addDamageObserver(observer);
   }
   removeDamageObserver(observer: DamageObserver): void {
     this.shipCollisions.removeDamageObserver(observer);
     this.droneField.removeDamageObserver(observer);
+    this.pirateField.removeDamageObserver(observer);
   }
   addDroneDestroyedObserver(observer: DroneDestroyedObserver): void { this.droneField.addDroneDestroyedObserver(observer); }
   removeDroneDestroyedObserver(observer: DroneDestroyedObserver): void { this.droneField.removeDroneDestroyedObserver(observer); }
+  addPirateDestroyedObserver(observer: PirateDestroyedObserver): void { this.pirateField.addPirateDestroyedObserver(observer); }
+  removePirateDestroyedObserver(observer: PirateDestroyedObserver): void { this.pirateField.removePirateDestroyedObserver(observer); }
   addAsteroidDestroyedObserver(observer: AsteroidDestroyedObserver): void {
     this.asteroidBelt.addAsteroidDestroyedObserver(observer);
   }
@@ -93,8 +116,14 @@ export class Game implements AsteroidDestroyedObserver {
   }
   addLaserShotObserver(observer: LaserShotObserver): void { this.laserField.addLaserShotObserver(observer); }
   removeLaserShotObserver(observer: LaserShotObserver): void { this.laserField.removeLaserShotObserver(observer); }
-  addLaserImpactObserver(observer: LaserImpactObserver): void { this.laserField.addLaserImpactObserver(observer); }
-  removeLaserImpactObserver(observer: LaserImpactObserver): void { this.laserField.removeLaserImpactObserver(observer); }
+  addLaserImpactObserver(observer: LaserImpactObserver): void {
+    this.laserField.addLaserImpactObserver(observer);
+    this.pirateField.addLaserImpactObserver(observer);
+  }
+  removeLaserImpactObserver(observer: LaserImpactObserver): void {
+    this.laserField.removeLaserImpactObserver(observer);
+    this.pirateField.removeLaserImpactObserver(observer);
+  }
   addAsteroidCollisionObserver(observer: AsteroidCollisionObserver): void {
     this.asteroidBelt.addAsteroidCollisionObserver(observer);
     this.massiveAsteroidField.addAsteroidCollisionObserver(observer);
@@ -109,6 +138,15 @@ export class Game implements AsteroidDestroyedObserver {
   onDestroyed(event: AsteroidDestroyed): void {
     if (Math.random() >= DROP_PROBABILITY) return;
     this.supplyField.drop(this.createDrop(event.position));
+  }
+
+  onPirateDestroyed(event: PirateDestroyed): void {
+    if (Math.random() < PIRATE_WEAPON_DROP_PROBABILITY) {
+      this.supplyField.drop(new WeaponPod({ ...event.position }));
+    }
+    if (Math.random() < DROP_PROBABILITY) {
+      this.supplyField.drop(this.createDrop(event.position));
+    }
   }
 
   private createDrop(position: Vec2): SupplyContainer {
@@ -135,13 +173,21 @@ export class Game implements AsteroidDestroyedObserver {
     this.ship.integrate(dt);
     this.visitedMap.visit(this.ship.position);
     const spawnBoundary = this.spawnExclusionRadius + this.ship.speed * 1.2;
-    const spawnEnabled = !this.mission.suppressSpawning;
-    this.asteroidBelt.update(dt, this.ship.position, spawnBoundary, spawnEnabled);
-    this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary, this.spawnExclusionRadius, spawnEnabled);
-    this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary, spawnEnabled);
+    const mode = this.mission.spawnMode;
+    const asteroidsEnabled = mode === SpawnMode.Normal || mode === SpawnMode.Mission2Travel;
+    const islands = mode === SpawnMode.Mission2Travel;
+    const suppliesEnabled = mode === SpawnMode.Normal;
+    const massiveEnabled = mode === SpawnMode.Normal;
+    const dronesEnabled = mode === SpawnMode.Normal;
+    const piratesEnabled = mode === SpawnMode.Mission2Travel
+      && this.mission.distanceRemaining <= this.mission.initialTravelDistance * 0.75;
+    this.asteroidBelt.update(dt, this.ship.position, spawnBoundary, asteroidsEnabled, islands, this.mission.signalDirection);
+    this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary, this.spawnExclusionRadius, suppliesEnabled);
+    this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary, massiveEnabled);
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
-    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, spawnEnabled);
-    this.laserField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, this.spawnExclusionRadius, this.droneField);
+    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, dronesEnabled);
+    this.pirateField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, piratesEnabled, this.mission.isTraversal ? this.mission.signalDirection : null);
+    this.laserField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, this.spawnExclusionRadius, this.droneField, this.pirateField);
 
     const obstacles: PolygonObstacle[] = [];
     this.asteroidBelt.forEach((asteroid) => obstacles.push(asteroid));

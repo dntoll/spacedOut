@@ -2,6 +2,7 @@ export enum SupplyType {
   Fuel,
   Hp,
   Ammo,
+  Weapon,
 }
 
 export interface SupplyMeters {

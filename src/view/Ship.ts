@@ -21,7 +21,22 @@ export class Ship {
         );
       });
       drawing.polygon([{ x: 10, y: 0 }, { x: -6, y: 5 }, { x: -4, y: -5 }], '#182c45');
+      this.drawWingGuns(drawing, ship);
     });
+  }
+
+  private drawWingGuns(drawing: Drawing, ship: Model.Ship): void {
+    if (ship.weaponLevel >= 1) this.drawWingGun(drawing, -13);
+    if (ship.weaponLevel >= 2) this.drawWingGun(drawing, 13);
+  }
+
+  private drawWingGun(drawing: Drawing, y: number): void {
+    drawing.polygon(
+      [{ x: 2, y }, { x: 14, y }, { x: 14, y: y > 0 ? 10 : -10 }, { x: 2, y: y > 0 ? 10 : -10 }],
+      '#d9f7ff',
+      '#72dff5',
+      1.2,
+    );
   }
 
   private drawNozzles(drawing: Drawing, ship: Model.Ship): void {
