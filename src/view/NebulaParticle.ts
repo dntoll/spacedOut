@@ -1,4 +1,4 @@
-import { add, length, normalize, scale, sub } from '../math';
+import { add, length, scale, sub } from '../math';
 import type { Vec2 } from '../types';
 
 const PUSH_RANGE = 420;
@@ -19,14 +19,16 @@ export class NebulaParticle {
     public readonly alpha: number,
   ) {}
 
-  update(dt: number, shipPosition: Vec2): void {
+  update(dt: number, pushers: Vec2[]): void {
     let accel: Vec2 = { x: 0, y: 0 };
-    const toShip = sub(this.position, shipPosition);
-    const dist = length(toShip);
-    if (dist < PUSH_RANGE && dist > 0.0001) {
-      const pushDir = scale(toShip, 1 / dist);
-      const strength = (1 - dist / PUSH_RANGE) * PUSH_FORCE;
-      accel = add(accel, scale(pushDir, strength));
+    for (const pusher of pushers) {
+      const toPusher = sub(this.position, pusher);
+      const dist = length(toPusher);
+      if (dist < PUSH_RANGE && dist > 0.0001) {
+        const pushDir = scale(toPusher, 1 / dist);
+        const strength = (1 - dist / PUSH_RANGE) * PUSH_FORCE;
+        accel = add(accel, scale(pushDir, strength));
+      }
     }
     accel = add(accel, scale(sub(this.home, this.position), SPRING));
     this.velocity = add(this.velocity, scale(accel, dt));

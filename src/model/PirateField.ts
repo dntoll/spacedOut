@@ -8,6 +8,8 @@ import { Laser } from './Laser';
 import type { LaserImpactObserver } from './LaserImpactObserver';
 import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
+import { CollisionResolver } from './CollisionResolver';
+import { DamageCalculator } from './DamageCalculator';
 import { Pirate, PIRATE_LASER_DAMAGE } from './Pirate';
 import { PirateDestroyed } from './PirateDestroyed';
 import type { PirateDestroyedObserver } from './PirateDestroyedObserver';
@@ -83,9 +85,26 @@ export class PirateField {
   ): void {
     this.awakenInRange(ship);
     this.rideAndHunt(dt, ship);
+    this.resolveAsteroidCollisions(asteroidBelt);
     this.updateLasers(dt, ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
     this.recycleDistant(ship, spawnExclusionRadius);
     if (spawnEnabled) this.spawnSquads(ship, spawnExclusionRadius, travelDirection);
+  }
+
+  private resolveAsteroidCollisions(asteroidBelt: AsteroidBelt): void {
+    for (let i = this.pirates.length - 1; i >= 0; i--) {
+      const pirate = this.pirates[i];
+      asteroidBelt.forEach((asteroid) => {
+        const collision = CollisionResolver.resolve(pirate, asteroid);
+        if (!collision) return;
+        for (const observer of this.collisionObservers) observer.onCollision(collision);
+        if (collision.impactSpeed > DamageCalculator.violentThreshold && pirate.takeImpact()) {
+          this.pirates.splice(i, 1);
+          const event = new PirateDestroyed({ ...pirate.position });
+          for (const observer of this.destroyedObservers) observer.onPirateDestroyed(event);
+        }
+      });
+    }
   }
 
   private awakenInRange(ship: Ship): void {
@@ -152,8 +171,30 @@ export class PirateField {
       if (massive) {
         this.emitSpark(laser.position, normalize(sub(laser.position, massive.position)));
         this.lasers.splice(i, 1);
+        continue;
+      }
+      const pirateHit = this.pirateHit(laser);
+      if (pirateHit) {
+        this.emitSpark(laser.position, normalize(sub(laser.position, pirateHit.position)));
+        this.applyLaserHit(pirateHit, laser.position);
+        this.lasers.splice(i, 1);
+        continue;
       }
     }
+  }
+
+  private pirateHit(laser: Laser): Pirate | null {
+    let hit: Pirate | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    for (const pirate of this.pirates) {
+      if (pirate === laser.owner) continue;
+      const distance = length(sub(pirate.position, laser.position));
+      if (distance <= pirate.radius + laser.radius && distance < bestDistance) {
+        bestDistance = distance;
+        hit = pirate;
+      }
+    }
+    return hit;
   }
 
   private nearestRegularHit(laser: Laser, asteroidBelt: AsteroidBelt): { asteroid: Asteroid } | null {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
+import { Collision } from './Collision';
 import { Damage } from './Damage';
 import { Drone } from './Drone';
 import { DroneDestroyed } from './DroneDestroyed';
@@ -356,6 +357,58 @@ describe('DroneField', () => {
     expect(referencesTarget).toBe(1);
     expect(attachedToTarget).toBe(0);
     expect(attachedToFree).toBe(1);
+  });
+
+  it('REQ-12 hunting drones bounce off regular asteroids and emit a collision', () => {
+    const ship = new Ship();
+    ship.position = { x: 5000, y: 0 };
+    const drone = new Drone(null, 0, [1, 1, 1], 2);
+    drone.position = { x: 40, y: 0 };
+    drone.velocity = { x: -40, y: 0 };
+    const asteroid = new Asteroid(1, { x: 0, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const field = new DroneField([drone]);
+    const collisions: Collision[] = [];
+    field.addCollisionObserver({ onCollision: (c) => collisions.push(c) });
+
+    field.update(0, ship, belt, emptyMassive(), 1500, false);
+
+    expect(collisions.length).toBeGreaterThan(0);
+    expect(drone.velocity.x).toBeGreaterThan(-40);
+  });
+
+  it('REQ-12 hunting drones crash-destroy on high-speed impact with a regular asteroid', () => {
+    const ship = new Ship();
+    ship.position = { x: 5000, y: 0 };
+    const drone = new Drone(null, 0, [1, 1, 1], 1);
+    drone.position = { x: 40, y: 0 };
+    drone.velocity = { x: -1000, y: 0 };
+    const asteroid = new Asteroid(1, { x: 0, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const field = new DroneField([drone]);
+    const events: DroneDestroyed[] = [];
+    field.addDroneDestroyedObserver({ onDroneDestroyed: (e) => events.push(e) });
+
+    field.update(0, ship, belt, emptyMassive(), 1500, false);
+
+    expect(field.has(drone)).toBe(false);
+    expect(events).toHaveLength(1);
+  });
+
+  it('REQ-12 attached drones are unaffected by asteroid collisions', () => {
+    const ship = new Ship();
+    ship.position = { x: 5000, y: 0 };
+    const asteroid = new Asteroid(1, { x: 0, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const drone = new Drone(asteroid, 0, [1, 1, 1], 2);
+    const field = new DroneField([drone]);
+    const collisions: Collision[] = [];
+    field.addCollisionObserver({ onCollision: (c) => collisions.push(c) });
+
+    field.update(0, ship, belt, emptyMassive(), 1500, false);
+
+    expect(collisions.length).toBe(0);
+    expect(field.has(drone)).toBe(true);
   });
 });
 

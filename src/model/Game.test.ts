@@ -5,6 +5,7 @@ import { CollectablePickup } from './CollectablePickup';
 import { FuelContainer } from './FuelContainer';
 import { Game } from './Game';
 import { LaserShot } from './LaserShot';
+import { MassiveAsteroid } from './MassiveAsteroid';
 import { MissionPhase } from './Mission';
 import { PirateDestroyed } from './PirateDestroyed';
 import type { SupplyContainer } from './SupplyContainer';
@@ -89,6 +90,16 @@ describe('Game', () => {
     expect(game.mission.phase).toBe(MissionPhase.Mission2Intro);
     expect(game.mission.isPaused).toBe(true);
     expect(game.mission.signalDirection).not.toBeNull();
+  });
+
+  it('REQ-62 suppresses ambient massive asteroids when jumping to mission 2 via the menu', () => {
+    const game = new Game({ startingMission: 2 });
+    const active: MassiveAsteroid[] = [];
+    game.massiveAsteroidField.forEachActive((asteroid) => active.push(asteroid));
+    const known: MassiveAsteroid[] = [];
+    game.massiveAsteroidField.forEachKnown((asteroid) => known.push(asteroid));
+    expect(active).toHaveLength(0);
+    expect(known).toHaveLength(0);
   });
 
   it('REQ-68 drops a weapon pod from a destroyed pirate at the 20% threshold', () => {

@@ -1,6 +1,9 @@
 import { length, random, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { AsteroidBelt } from './AsteroidBelt';
+import { Collision } from './Collision';
+import type { CollisionObserver } from './CollisionObserver';
+import { CollisionResolver } from './CollisionResolver';
 import { Damage } from './Damage';
 import type { DamageObserver } from './DamageObserver';
 import { Drone } from './Drone';
@@ -16,11 +19,13 @@ const DETACH_RANGE_RADII = 12;
 const DRONE_IMPACT_DAMAGE = 20;
 const MASSIVE_CAPACITY_MAX = 6;
 const HUNT_GIVE_UP_RADIUS = 1200;
+const DRONE_CRASH_THRESHOLD = 250;
 
 export class DroneField {
   private readonly drones: Drone[] = [];
   private readonly damageObservers = new Set<DamageObserver>();
   private readonly destroyedObservers = new Set<DroneDestroyedObserver>();
+  private readonly collisionObservers = new Set<CollisionObserver>();
   private readonly massiveCapacity = new Map<MassiveAsteroid, number>();
 
   constructor(initialDrones?: Drone[]) {
@@ -43,6 +48,8 @@ export class DroneField {
   removeDamageObserver(observer: DamageObserver): void { this.damageObservers.delete(observer); }
   addDroneDestroyedObserver(observer: DroneDestroyedObserver): void { this.destroyedObservers.add(observer); }
   removeDroneDestroyedObserver(observer: DroneDestroyedObserver): void { this.destroyedObservers.delete(observer); }
+  addCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.add(observer); }
+  removeCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.delete(observer); }
 
   applyLaserHit(drone: Drone, position: Vec2): void {
     const index = this.drones.indexOf(drone);
@@ -68,9 +75,27 @@ export class DroneField {
     this.releaseLostHosts(asteroidBelt, massiveAsteroidField);
     this.detachInRange(ship);
     this.rideAndHunt(dt, ship, asteroidBelt, massiveAsteroidField);
+    this.resolveAsteroidCollisions(asteroidBelt);
     this.resolveShipImpacts(ship);
     this.recycleDistant(ship, asteroidBelt, massiveAsteroidField);
     if (spawnEnabled) this.spawnToTarget(ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
+  }
+
+  private resolveAsteroidCollisions(asteroidBelt: AsteroidBelt): void {
+    for (let i = this.drones.length - 1; i >= 0; i--) {
+      const drone = this.drones[i];
+      if (drone.host || drone.reHomeTarget) continue;
+      asteroidBelt.forEach((asteroid) => {
+        const collision = CollisionResolver.resolve(drone, asteroid);
+        if (!collision) return;
+        for (const observer of this.collisionObservers) observer.onCollision(collision);
+        if (collision.impactSpeed > DRONE_CRASH_THRESHOLD && drone.takeImpact()) {
+          this.drones.splice(i, 1);
+          const event = new DroneDestroyed({ ...drone.position });
+          for (const observer of this.destroyedObservers) observer.onDroneDestroyed(event);
+        }
+      });
+    }
   }
 
   private releaseLostHosts(asteroidBelt: AsteroidBelt, massiveAsteroidField: MassiveAsteroidField): void {

@@ -8,15 +8,21 @@ import { NebulaParticle, type NebulaColor } from './NebulaParticle';
 const CLOUD_GAP_BASE = 15000;
 const CLOUD_GAP_JITTER = 15000;
 const CLOUD_SIZE = 200;
+const WISP_CLOUD_SIZE = 280;
 const CLOUD_SPREAD = 1732;
 const CLOUD_ASPECT_MIN = 1.4;
 const CLOUD_ASPECT_MAX = 2.6;
+const WISP_ASPECT_MIN = 2.5;
+const WISP_ASPECT_MAX = 3.5;
+const BLOB_KERNEL_MIN = 2;
+const BLOB_KERNEL_MAX = 3;
+const BLOB_KERNEL_RADIUS = 520;
 const PERIPHERAL_FRACTION = 0.5;
 const ISLAND_CLEARANCE = 600;
 const PARTICLE_MIN = 50;
 const PARTICLE_MAX = 120;
 const PARTICLE_ALPHA = 0.5;
-const CULL_MARGIN = 400 + CLOUD_SPREAD * CLOUD_ASPECT_MAX + 800;
+const CULL_MARGIN = 400 + CLOUD_SPREAD * WISP_ASPECT_MAX + 800;
 
 const PALETTE: NebulaColor[] = [
   { r: 180, g: 90, b: 220 },
@@ -41,7 +47,10 @@ export class NebulaField {
       return;
     }
     this.spawn(model, camera, viewport);
-    for (const particle of this.particles) particle.update(dt, model.ship.position);
+    const pushers: Vec2[] = [model.ship.position];
+    model.pirateField.forEachPirate((pirate) => pushers.push(pirate.position));
+    model.droneField.forEach((drone) => pushers.push(drone.position));
+    for (const particle of this.particles) particle.update(dt, pushers);
     this.cull(model.ship.position, camera, viewport);
   }
 
@@ -81,25 +90,62 @@ export class NebulaField {
         cloudCenter = add(routeCenter, scale(perp, lateral));
       }
       if (this.nearIsland(model, cloudCenter)) continue;
-      const aspect = random(CLOUD_ASPECT_MIN, CLOUD_ASPECT_MAX);
-      const rotation = random(0, Math.PI * 2);
-      const a = CLOUD_SPREAD * aspect;
-      const b = CLOUD_SPREAD / aspect;
-      const cos = Math.cos(rotation);
-      const sin = Math.sin(rotation);
       const color = PALETTE[Math.floor(random(0, PALETTE.length))];
-      for (let i = 0; i < CLOUD_SIZE; i++) {
-        const angle = random(0, Math.PI * 2);
-        const t = Math.sqrt(random(0, 1));
-        const local: Vec2 = { x: a * t * Math.cos(angle), y: b * t * Math.sin(angle) };
-        const home = add(cloudCenter, {
-          x: local.x * cos - local.y * sin,
-          y: local.x * sin + local.y * cos,
-        });
-        const size = random(PARTICLE_MIN, PARTICLE_MAX);
-        const tint = this.tint(color);
-        this.particles.push(new NebulaParticle({ ...home }, home, size, tint, PARTICLE_ALPHA));
+      const rotation = random(0, Math.PI * 2);
+      const shapeRoll = random(0, 1);
+      if (shapeRoll < 1 / 3) {
+        this.spawnEllipse(cloudCenter, color, rotation, CLOUD_SIZE);
+      } else if (shapeRoll < 2 / 3) {
+        this.spawnBlob(cloudCenter, color, rotation, CLOUD_SIZE);
+      } else {
+        this.spawnWisp(cloudCenter, color, rotation);
       }
+    }
+  }
+
+  private spawnEllipse(center: Vec2, color: NebulaColor, rotation: number, count: number): void {
+    const aspect = random(CLOUD_ASPECT_MIN, CLOUD_ASPECT_MAX);
+    const a = CLOUD_SPREAD * aspect;
+    const b = CLOUD_SPREAD / aspect;
+    this.scatterEllipse(center, color, rotation, count, a, b);
+  }
+
+  private spawnWisp(center: Vec2, color: NebulaColor, rotation: number): void {
+    const aspect = random(WISP_ASPECT_MIN, WISP_ASPECT_MAX);
+    const a = CLOUD_SPREAD * aspect;
+    const b = CLOUD_SPREAD / aspect;
+    this.scatterEllipse(center, color, rotation, WISP_CLOUD_SIZE, a, b);
+  }
+
+  private spawnBlob(center: Vec2, color: NebulaColor, rotation: number, count: number): void {
+    const kernelCount = Math.floor(random(BLOB_KERNEL_MIN, BLOB_KERNEL_MAX + 1));
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    const kernels: Vec2[] = [];
+    for (let k = 0; k < kernelCount; k++) {
+      const local: Vec2 = { x: random(-CLOUD_SPREAD * 0.4, CLOUD_SPREAD * 0.4), y: random(-CLOUD_SPREAD * 0.4, CLOUD_SPREAD * 0.4) };
+      kernels.push(add(center, { x: local.x * cos - local.y * sin, y: local.x * sin + local.y * cos }));
+    }
+    const perKernel = Math.ceil(count / kernelCount);
+    for (const kernel of kernels) {
+      this.scatterEllipse(kernel, color, rotation, perKernel, BLOB_KERNEL_RADIUS, BLOB_KERNEL_RADIUS);
+    }
+  }
+
+  private scatterEllipse(center: Vec2, color: NebulaColor, rotation: number, count: number, a: number, b: number): void {
+    const cos = Math.cos(rotation);
+    const sin = Math.sin(rotation);
+    for (let i = 0; i < count; i++) {
+      const angle = random(0, Math.PI * 2);
+      const t = Math.sqrt(random(0, 1));
+      const local: Vec2 = { x: a * t * Math.cos(angle), y: b * t * Math.sin(angle) };
+      const home = add(center, {
+        x: local.x * cos - local.y * sin,
+        y: local.x * sin + local.y * cos,
+      });
+      const size = random(PARTICLE_MIN, PARTICLE_MAX);
+      const tint = this.tint(color);
+      this.particles.push(new NebulaParticle({ ...home }, home, size, tint, PARTICLE_ALPHA));
     }
   }
 

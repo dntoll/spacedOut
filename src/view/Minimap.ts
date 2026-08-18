@@ -37,6 +37,7 @@ export class Minimap {
       this.drawAsteroids(drawing, exploration, model.asteroidBelt, center, position, size, span);
       this.drawSupplies(drawing, exploration, model.supplyField, center, position, size, span);
       this.drawDrones(drawing, exploration, model.droneField, center, position, size, span);
+      this.drawPirates(drawing, exploration, model.pirateField, center, position, size, span);
       this.drawShip(drawing, model.ship.angle, position, size);
       this.drawSignal(drawing, model, position, size, center);
     });
@@ -143,6 +144,25 @@ export class Minimap {
         this.toMap(drone.position, center, position, size, span),
         2.0,
         '#7dff5e',
+      );
+    });
+  }
+
+  private drawPirates(
+    drawing: Drawing,
+    exploration: ExplorationMap,
+    field: Model.PirateField,
+    center: Vec2,
+    position: Vec2,
+    size: Size,
+    span: number,
+  ): void {
+    field.forEachPirate((pirate) => {
+      if (!exploration.isExplored(pirate.position) || !this.intersectsMap(pirate.position, 0, center, span)) return;
+      drawing.circle(
+        this.toMap(pirate.position, center, position, size, span),
+        2.6,
+        '#ff6a4a',
       );
     });
   }

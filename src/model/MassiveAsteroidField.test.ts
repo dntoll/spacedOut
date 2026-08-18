@@ -82,6 +82,42 @@ describe('MassiveAsteroidField', () => {
     expect(positions(true)).toEqual(origin);
   });
 
+  it('REQ-62 clears ambient massive asteroids when the destination is placed for mission 2', () => {
+    const ship = new Ship();
+    const field = new MassiveAsteroidField(ship.position, ship.radius, undefined, 789);
+    const knownBefore: MassiveAsteroid[] = [];
+    field.forEachKnown((asteroid) => knownBefore.push(asteroid));
+    expect(knownBefore.length).toBeGreaterThan(0);
+
+    field.placeDestination({ x: 80000, y: 0 }, ship.radius * 100);
+
+    const knownAfter: MassiveAsteroid[] = [];
+    field.forEachKnown((asteroid) => knownAfter.push(asteroid));
+    const activeAfter: MassiveAsteroid[] = [];
+    field.forEachActive((asteroid) => activeAfter.push(asteroid));
+    expect(knownAfter).toHaveLength(1);
+    expect(activeAfter).toHaveLength(1);
+    expect(knownAfter[0]).toBe(activeAfter[0]);
+    expect(field.destination).toBe(knownAfter[0]);
+  });
+
+  it('REQ-62 suppressAmbient clears ambient asteroids without placing a destination', () => {
+    const ship = new Ship();
+    const field = new MassiveAsteroidField(ship.position, ship.radius, undefined, 321);
+    const knownBefore: MassiveAsteroid[] = [];
+    field.forEachKnown((asteroid) => knownBefore.push(asteroid));
+    expect(knownBefore.length).toBeGreaterThan(0);
+
+    field.suppressAmbient();
+
+    const knownAfter: MassiveAsteroid[] = [];
+    field.forEachKnown((asteroid) => knownAfter.push(asteroid));
+    const activeAfter: MassiveAsteroid[] = [];
+    field.forEachActive((asteroid) => activeAfter.push(asteroid));
+    expect(knownAfter).toHaveLength(0);
+    expect(activeAfter).toHaveLength(0);
+  });
+
   it('REQ-20 remains fixed while ship, asteroid, and container bounce from it', () => {
     const massive = new MassiveAsteroid(
       1, { x: 0, y: 0 }, 100, 0,

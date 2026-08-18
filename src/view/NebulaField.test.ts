@@ -22,6 +22,8 @@ const traversalModel = (shipPosition: Vec2 = { x: 0, y: 0 }): Model.Game =>
     mission: { isTraversal: true, signalDirection: { x: 1, y: 0 } },
     ship: { position: shipPosition },
     asteroidBelt: { forEachIsland: () => {} },
+    pirateField: { forEachPirate: () => {} },
+    droneField: { forEach: () => {} },
   }) as unknown as Model.Game;
 
 describe('NebulaField', () => {
@@ -56,7 +58,7 @@ describe('NebulaField', () => {
     const particle = new NebulaParticle({ x: 0, y: 0 }, home, 80, { r: 180, g: 90, b: 220 }, 0.5);
     const shipPosition = { x: 60, y: 0 };
 
-    particle.update(0.05, shipPosition);
+    particle.update(0.05, [shipPosition]);
     const beforeX = 0;
     expect(particle.position.x).toBeLessThan(beforeX);
   });
@@ -65,14 +67,29 @@ describe('NebulaField', () => {
     const home = { x: 0, y: 0 };
     const particle = new NebulaParticle({ x: 0, y: 0 }, home, 80, { r: 180, g: 90, b: 220 }, 0.5);
 
-    particle.update(0.05, { x: 60, y: 0 });
+    particle.update(0.05, [{ x: 60, y: 0 }]);
     const pushedX = particle.position.x;
-    for (let i = 0; i < 200; i++) particle.update(0.05, { x: 5000, y: 0 });
+    for (let i = 0; i < 200; i++) particle.update(0.05, [{ x: 5000, y: 0 }]);
 
     expect(Math.abs(particle.position.x)).toBeLessThan(Math.abs(pushedX));
   });
 
+  it('REQ-67 pirates and drones part the cloud just like the ship', () => {
+    const home = { x: 0, y: 0 };
+    const particle = new NebulaParticle({ x: 0, y: 0 }, home, 80, { r: 180, g: 90, b: 220 }, 0.5);
+
+    particle.update(0.05, [{ x: 60, y: 0 }]);
+
+    expect(particle.position.x).toBeLessThan(0);
+  });
+
   it('REQ-67 clouds are large (triple area), spreading far across space', () => {
+    const spy = vi.spyOn(Math, 'random')
+      .mockImplementationOnce(() => 1.0)
+      .mockImplementationOnce(() => 0.0)
+      .mockImplementationOnce(() => 0.0)
+      .mockImplementationOnce(() => 0.0)
+      .mockImplementationOnce(() => 0.5);
     const { drawing, circles } = stubDrawing();
     const field = new NebulaField();
     const camera = new Camera();
@@ -80,6 +97,7 @@ describe('NebulaField', () => {
 
     field.update(0.016, traversalModel(), camera, { width: 800, height: 600 });
     field.draw(drawing);
+    spy.mockRestore();
 
     const xs = circles.mock.calls.map((c) => (c[0] as Vec2).x);
     const ys = circles.mock.calls.map((c) => (c[0] as Vec2).y);
@@ -111,6 +129,8 @@ describe('NebulaField', () => {
         forEachIsland: (visitor: (island: { center: Vec2; radius: number; outline: Vec2[] }) => void) =>
           visitor({ center: { x: 0, y: 0 }, radius: 100000, outline: [] }),
       },
+      pirateField: { forEachPirate: () => {} },
+      droneField: { forEach: () => {} },
     } as unknown as Model.Game;
 
     field.update(0.016, model, camera, { width: 800, height: 600 });

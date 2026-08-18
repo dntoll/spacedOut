@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
+import { Collision } from './Collision';
 import { Damage } from './Damage';
 import { DroneField } from './DroneField';
 import { MassiveAsteroid } from './MassiveAsteroid';
@@ -153,5 +154,55 @@ describe('PirateField', () => {
     let stillDormant = 0;
     field.forEachPirate((p) => { if (p.peripheral && !p.awake) stillDormant++; });
     expect(stillDormant).toBeGreaterThan(0);
+  });
+
+  it('REQ-12 pirates bounce off regular asteroids and emit a collision', () => {
+    const ship = new Ship();
+    const pirate = new Pirate({ x: 60, y: 0 }, VERTICES, 3);
+    pirate.velocity = { x: -40, y: 0 };
+    const asteroid = new Asteroid(1, { x: 0, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const field = new PirateField([pirate]);
+    const collisions: Collision[] = [];
+    field.addCollisionObserver({ onCollision: (c) => collisions.push(c) });
+
+    field.update(0, ship, belt, emptyMassive(), 1500, false);
+
+    expect(collisions.length).toBeGreaterThan(0);
+    expect(pirate.velocity.x).toBeGreaterThan(-40);
+  });
+
+  it('REQ-12 pirates crash-destroy on high-speed impact with a regular asteroid', () => {
+    const ship = new Ship();
+    const pirate = new Pirate({ x: 60, y: 0 }, VERTICES, 1);
+    pirate.velocity = { x: -1000, y: 0 };
+    const asteroid = new Asteroid(1, { x: 0, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const field = new PirateField([pirate]);
+    const events: PirateDestroyed[] = [];
+    field.addPirateDestroyedObserver({ onPirateDestroyed: (e) => events.push(e) });
+
+    field.update(0, ship, belt, emptyMassive(), 1500, false);
+
+    expect(field.has(pirate)).toBe(false);
+    expect(events).toHaveLength(1);
+  });
+
+  it('REQ-63 pirate lasers hit and destroy other pirates (friendly fire) but not the owner', () => {
+    const ship = new Ship();
+    ship.position = { x: -1000, y: 0 };
+    const shooter = new Pirate({ x: 0, y: 0 }, VERTICES, 3);
+    shooter.awaken();
+    const victim = new Pirate({ x: -100, y: 0 }, VERTICES, 1);
+    victim.awaken();
+    const field = new PirateField([shooter, victim]);
+    const events: PirateDestroyed[] = [];
+    field.addPirateDestroyedObserver({ onPirateDestroyed: (e) => events.push(e) });
+
+    for (let step = 0; step < 80; step++) field.update(0.05, ship, emptyBelt(), emptyMassive(), 1500, false);
+
+    expect(field.has(victim)).toBe(false);
+    expect(field.has(shooter)).toBe(true);
+    expect(events.length).toBeGreaterThan(0);
   });
 });

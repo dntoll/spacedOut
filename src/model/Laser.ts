@@ -1,5 +1,6 @@
 import { add, scale } from '../math';
 import type { Vec2 } from '../types';
+import type { PhysicsBody } from './PhysicsBody';
 
 export class Laser {
   constructor(
@@ -7,6 +8,7 @@ export class Laser {
     public velocity: Vec2,
     public angle: number,
     public readonly radius: number,
+    public readonly owner?: PhysicsBody,
   ) {}
 
   update(dt: number): void {

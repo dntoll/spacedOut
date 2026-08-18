@@ -78,7 +78,18 @@ export class MassiveAsteroidField {
       random(0, 1),
     );
     this.destinationAsteroid = asteroid;
-    if (!this.activeAsteroids.includes(asteroid)) this.activeAsteroids.push(asteroid);
+    if (this.fixedAsteroids) {
+      if (!this.activeAsteroids.includes(asteroid)) this.activeAsteroids.push(asteroid);
+      return;
+    }
+    this.regions.clear();
+    this.activeAsteroids = [asteroid];
+  }
+
+  suppressAmbient(): void {
+    if (this.fixedAsteroids) return;
+    this.regions.clear();
+    this.activeAsteroids = [];
   }
 
   get destination(): MassiveAsteroid | null { return this.destinationAsteroid; }

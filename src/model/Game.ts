@@ -58,6 +58,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver 
       this.ship.repair(100);
       this.ship.collectAmmo(100);
       this.mission.jumpToMission2Briefing();
+      this.massiveAsteroidField.suppressAmbient();
     }
   }
 
@@ -86,6 +87,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver 
     this.shipCollisions.addCollisionObserver(observer);
     this.laserField.addCollisionObserver(observer);
     this.pirateField.addCollisionObserver(observer);
+    this.droneField.addCollisionObserver(observer);
   }
   removeCollisionObserver(observer: CollisionObserver): void {
     this.asteroidBelt.removeCollisionObserver(observer);
@@ -93,6 +95,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver 
     this.shipCollisions.removeCollisionObserver(observer);
     this.laserField.removeCollisionObserver(observer);
     this.pirateField.removeCollisionObserver(observer);
+    this.droneField.removeCollisionObserver(observer);
   }
   addDamageObserver(observer: DamageObserver): void {
     this.shipCollisions.addDamageObserver(observer);

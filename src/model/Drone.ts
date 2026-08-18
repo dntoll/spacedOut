@@ -85,6 +85,12 @@ export class Drone extends PhysicsBody {
     return this.killed;
   }
 
+  takeImpact(): boolean {
+    this.hp -= 1;
+    if (this.hp <= 0) this.killed = true;
+    return this.killed;
+  }
+
   rideHost(massiveField: MassiveAsteroidField | null): void {
     if (!this.host) return;
     const dir: Vec2 = { x: Math.cos(this.gripAngle), y: Math.sin(this.gripAngle) };

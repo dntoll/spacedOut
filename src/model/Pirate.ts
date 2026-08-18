@@ -60,6 +60,12 @@ export class Pirate extends PhysicsBody {
     return this.killed;
   }
 
+  takeImpact(): boolean {
+    this.hp -= 1;
+    if (this.hp <= 0) this.killed = true;
+    return this.killed;
+  }
+
   hunt(dt: number, ship: Ship): void {
     const toShip = sub(ship.position, this.position);
     const dist = length(toShip);
@@ -101,7 +107,7 @@ export class Pirate extends PhysicsBody {
     const forward = { x: Math.cos(this.angle), y: Math.sin(this.angle) };
     const muzzle = add(this.position, scale(forward, NOSE_OFFSET));
     const velocity = add(scale(forward, LASER_SPEED), this.velocity);
-    return new Laser(muzzle, velocity, this.angle, LASER_RADIUS);
+    return new Laser(muzzle, velocity, this.angle, LASER_RADIUS, this);
   }
 
   static createBodyVertices(): number[] {

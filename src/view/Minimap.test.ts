@@ -26,8 +26,9 @@ describe('Minimap', () => {
       massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, [massive]),
       asteroidBelt: { forEach: (fn: (a: Model.Asteroid) => void) => fn(asteroid) },
       droneField: { forEach: (fn: (d: Model.Drone) => void) => fn(drone) },
+      pirateField: { forEachPirate: () => {} },
       mission: { signalDirection: null },
-    } as Model.Game;
+    } as unknown as Model.Game;
     const exploration = new ExplorationMap();
     exploration.observe({ left: -250, top: -250, right: 250, bottom: 250 });
     const circle = vi.fn();
@@ -85,6 +86,7 @@ describe('Minimap', () => {
       massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, []),
       asteroidBelt: { forEach: () => undefined },
       droneField: { forEach: (fn: (d: Model.Drone) => void) => fn(drone) },
+      pirateField: { forEachPirate: () => {} },
       mission: { signalDirection: { x: 1, y: 0 } },
       elapsed: 0.5,
     } as unknown as Model.Game;
@@ -129,6 +131,7 @@ describe('Minimap', () => {
       massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, []),
       asteroidBelt: { forEach: (fn: (a: Model.Asteroid) => void) => fn(asteroid) },
       droneField: { forEach: () => undefined },
+      pirateField: { forEachPirate: () => {} },
       mission: { signalDirection: null, isTraversal },
       elapsed: 0,
     } as unknown as Model.Game);
@@ -154,5 +157,41 @@ describe('Minimap', () => {
     (drawing.circle as ReturnType<typeof vi.fn>).mockClear();
     new Minimap().draw(drawing, exploration, buildModel(true), camera);
     expect(drawing.circle).toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
+  });
+
+  it('REQ-23 shows discovered pirate ships on the minimap', () => {
+    const ship = new Model.Ship();
+    const pirate = new Model.Pirate({ x: 200, y: 0 }, [1, 1, 1], 3);
+    const model = {
+      ship,
+      supplyField: new Model.SupplyField({ x: 100000, y: 0 }, undefined, 1),
+      massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, []),
+      asteroidBelt: { forEach: () => undefined },
+      droneField: { forEach: () => undefined },
+      pirateField: { forEachPirate: (fn: (p: Model.Pirate) => void) => fn(pirate) },
+      mission: { signalDirection: null },
+      elapsed: 0,
+    } as unknown as Model.Game;
+    const exploration = new ExplorationMap();
+    const camera = new Camera();
+    camera.update(ship.position, 0, 1);
+    const drawing = {
+      size: { width: 1000, height: 700 },
+      rectangle: vi.fn(),
+      circle: vi.fn(),
+      polygon: vi.fn(),
+      dashedLine: vi.fn(),
+      arc: vi.fn(),
+      withClipRectangle: vi.fn((_position: unknown, _size: unknown, draw: () => void) => draw()),
+      withTransform: vi.fn((_position: unknown, _angle: unknown, draw: () => void) => draw()),
+    } as unknown as Drawing;
+
+    new Minimap().draw(drawing, exploration, model, camera);
+    expect(drawing.circle).not.toHaveBeenCalledWith(expect.any(Object), 2.6, '#ff6a4a');
+
+    exploration.observe({ left: -250, top: -250, right: 250, bottom: 250 });
+    (drawing.circle as ReturnType<typeof vi.fn>).mockClear();
+    new Minimap().draw(drawing, exploration, model, camera);
+    expect(drawing.circle).toHaveBeenCalledWith(expect.any(Object), 2.6, '#ff6a4a');
   });
 });
