@@ -10,7 +10,7 @@ type StubNode = {
 
 const stubNodes = (): Map<string, StubNode> => {
   const nodes = new Map<string, StubNode>();
-  for (const selector of ['#mission', '#mission-title', '#mission-detail']) {
+  for (const selector of ['#mission', '#mission-title', '#mission-signal', '#mission-detail']) {
     nodes.set(selector, {
       textContent: '',
       classList: { add: vi.fn(), remove: vi.fn(), contains: vi.fn() },
@@ -35,13 +35,14 @@ describe('MissionOverlay', () => {
     expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
   });
 
-  it('REQ-53 shows well done when mission 1 is complete', () => {
+  it('REQ-53 shows well done with the long distance signal when mission 1 is complete', () => {
     const nodes = stubNodes();
     const overlay = new MissionOverlay();
 
     overlay.show(MissionPhase.Mission1Done);
 
     expect(nodes.get('#mission-title')?.textContent).toBe('well done');
+    expect(nodes.get('#mission-signal')?.textContent).toBe('We have picked up a long distance signal.');
     expect(nodes.get('#mission-detail')?.textContent).toBe('Click to continue.');
     expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
   });
@@ -52,9 +53,18 @@ describe('MissionOverlay', () => {
 
     overlay.show(MissionPhase.Mission2Intro);
 
-    expect(nodes.get('#mission-title')?.textContent).toBe('Mission: traverse empty space');
+    expect(nodes.get('#mission-title')?.textContent).toBe('Mission 2: Traverse empty space towards signal.');
     expect(nodes.get('#mission-detail')?.textContent).toBe('Click to continue.');
     expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
+  });
+
+  it('clears the signal text on non-done phases', () => {
+    const nodes = stubNodes();
+    const overlay = new MissionOverlay();
+
+    overlay.show(MissionPhase.Mission1Intro);
+
+    expect(nodes.get('#mission-signal')?.textContent).toBe('');
   });
 
   it('hides the overlay during active and transition phases', () => {

@@ -1,3 +1,4 @@
+import { length, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { AsteroidBelt } from './AsteroidBelt';
 import type { AsteroidCollisionObserver } from './AsteroidCollisionObserver';
@@ -65,6 +66,13 @@ export class MassiveAsteroidField {
   forEachActive(visitor: (asteroid: MassiveAsteroid) => void): void { this.activeAsteroids.forEach(visitor); }
 
   has(asteroid: MassiveAsteroid): boolean { return this.activeAsteroids.includes(asteroid); }
+
+  anyWithin(position: Vec2, radius: number): boolean {
+    for (const asteroid of this.activeAsteroids) {
+      if (length(sub(asteroid.position, position)) <= radius + asteroid.radius) return true;
+    }
+    return false;
+  }
   forEachKnown(visitor: (asteroid: MassiveAsteroid) => void): void {
     if (this.fixedAsteroids) {
       this.fixedAsteroids.forEach(visitor);

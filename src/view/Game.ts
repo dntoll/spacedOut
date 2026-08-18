@@ -15,6 +15,7 @@ import { ParticleField } from './ParticleField';
 import { PlayerInput } from './PlayerInput';
 import { SettingsMenu } from './SettingsMenu';
 import { Ship } from './Ship';
+import { SignalIndicator } from './SignalIndicator';
 import { SoundGate } from './SoundGate';
 import { SoundSystem } from './SoundSystem';
 import { SpaceBackground } from './SpaceBackground';
@@ -38,6 +39,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly explorationMap = new ExplorationMap();
   private readonly minimap = new Minimap();
   private readonly missionOverlay = new MissionOverlay();
+  private readonly signalIndicator = new SignalIndicator();
   private readonly music = MusicSystem.create();
   private readonly sounds = SoundSystem.create();
   private readonly soundGate = new SoundGate(this.camera, this.sounds, () => this.drawing.size);
@@ -125,7 +127,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
 
   render(model: Model.Game, dt: number): void {
     this.camera.setBaseZoom(this.settings.getDefaultZoomLevel());
-    this.camera.update(model.ship.position, model.speed, dt);
+    this.camera.update(model.ship.position, model.speed, dt, model.droneField.anyHunting());
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
     this.particleField.update(dt, model, this.camera, this.drawing.size);
     this.music.update(this.getMusicLevel(), dt, model.droneField.anyHunting());
@@ -142,12 +144,13 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
       this.particleField.draw(this.drawing);
       this.supplyField.draw(this.drawing, model.supplyField);
       this.asteroidBelt.draw(this.drawing, model.asteroidBelt, model.ship.position, this.camera);
-      this.droneField.draw(this.drawing, model.droneField, model.ship.position, this.camera);
+      this.droneField.draw(this.drawing, model.droneField, model.ship, this.camera);
       this.laserField.draw(this.drawing, model.laserField);
       if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship);
     });
     this.background.drawVignette(this.drawing);
     this.minimap.draw(this.drawing, this.explorationMap, model, this.camera);
+    this.signalIndicator.draw(this.drawing, model, this.camera);
     this.hud.updateSpeed(model.speed);
     this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);
     if (model.isGameOver) {

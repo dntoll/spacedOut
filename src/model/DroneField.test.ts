@@ -249,5 +249,113 @@ describe('DroneField', () => {
 
     expect(field.anyHunting()).toBe(true);
   });
+
+  it('REQ-58 keeps hunting while within the give-up distance', () => {
+    const ship = new Ship();
+    const asteroid = new Asteroid(1, { x: 2400, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const hunter = new Drone(null, 0, [1, 1, 1], 2);
+    hunter.position = { x: 1000, y: 0 };
+    const field = new DroneField([hunter]);
+
+    field.update(0, ship, belt, emptyMassive(), 0, false);
+
+    expect(hunter.isHunting).toBe(true);
+    expect(hunter.reHomeTarget).toBeNull();
+    expect(field.has(hunter)).toBe(true);
+  });
+
+  it('REQ-58 starts re-homing toward the nearest asteroid when outrun beyond the give-up distance', () => {
+    const ship = new Ship();
+    const near = new Asteroid(1, { x: 2400, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const far = new Asteroid(1, { x: -3000, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [near, far]);
+    const hunter = new Drone(null, 0, [1, 1, 1], 2);
+    hunter.position = { x: 1250, y: 0 };
+    const field = new DroneField([hunter]);
+
+    field.update(0, ship, belt, emptyMassive(), 0, false);
+
+    expect(field.has(hunter)).toBe(true);
+    expect(hunter.isHunting).toBe(false);
+    expect(hunter.reHomeTarget).toBe(near);
+  });
+
+  it('REQ-58 a re-homing drone attaches to its target on arrival', () => {
+    const ship = new Ship();
+    const asteroid = new Asteroid(1, { x: 1300, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const hunter = new Drone(null, 0, [1, 1, 1], 2);
+    hunter.position = { x: 1250, y: 0 };
+    const field = new DroneField([hunter]);
+
+    field.update(0, ship, belt, emptyMassive(), 0, false);
+    expect(hunter.reHomeTarget).toBe(asteroid);
+
+    field.update(0.02, ship, belt, emptyMassive(), 0, false);
+
+    expect(hunter.host).toBe(asteroid);
+    expect(hunter.reHomeTarget).toBeNull();
+    expect(hunter.isHunting).toBe(false);
+  });
+
+  it('REQ-58 anyHunting is false while a drone is re-homing', () => {
+    const ship = new Ship();
+    const asteroid = new Asteroid(1, { x: 2400, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [asteroid]);
+    const hunter = new Drone(null, 0, [1, 1, 1], 2);
+    hunter.position = { x: 1250, y: 0 };
+    const field = new DroneField([hunter]);
+
+    field.update(0, ship, belt, emptyMassive(), 0, false);
+
+    expect(field.anyHunting()).toBe(false);
+  });
+
+  it('REQ-58 re-homing drones do not count toward the spawn population cap', () => {
+    const ship = new Ship();
+    const target = new Asteroid(1, { x: 2000, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const free = new Asteroid(1, { x: -2000, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [target, free]);
+    const rehomers: Drone[] = [];
+    for (let i = 0; i < 24; i++) {
+      const drone = new Drone(null, 0, [1, 1, 1], 2);
+      drone.position = { x: 1500, y: 0 };
+      drone.startReHoming(target);
+      rehomers.push(drone);
+    }
+    const field = new DroneField(rehomers);
+
+    field.update(0, ship, belt, emptyMassive(), 0, true);
+
+    let onFree = 0;
+    field.forEach((drone) => { if (drone.host === free) onFree++; });
+    expect(onFree).toBe(1);
+  });
+
+  it('REQ-58 a re-homing drone reserves its target asteroid against double-assignment', () => {
+    const ship = new Ship();
+    const target = new Asteroid(1, { x: 2000, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const free = new Asteroid(1, { x: -2000, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
+    const belt = new AsteroidBelt({ x: 0, y: 0 }, [target, free]);
+    const rehoming = new Drone(null, 0, [1, 1, 1], 2);
+    rehoming.position = { x: 1500, y: 0 };
+    rehoming.startReHoming(target);
+    const field = new DroneField([rehoming]);
+
+    field.update(0, ship, belt, emptyMassive(), 0, true);
+
+    let referencesTarget = 0;
+    let attachedToTarget = 0;
+    let attachedToFree = 0;
+    field.forEach((drone) => {
+      if (drone.reHomeTarget === target || drone.host === target) referencesTarget++;
+      if (drone.host === target) attachedToTarget++;
+      if (drone.host === free) attachedToFree++;
+    });
+    expect(referencesTarget).toBe(1);
+    expect(attachedToTarget).toBe(0);
+    expect(attachedToFree).toBe(1);
+  });
 });
 

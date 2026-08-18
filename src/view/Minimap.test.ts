@@ -26,17 +26,22 @@ describe('Minimap', () => {
       massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, [massive]),
       asteroidBelt: { forEach: (fn: (a: Model.Asteroid) => void) => fn(asteroid) },
       droneField: { forEach: (fn: (d: Model.Drone) => void) => fn(drone) },
+      mission: { signalDirection: null },
     } as Model.Game;
     const exploration = new ExplorationMap();
     exploration.observe({ left: -250, top: -250, right: 250, bottom: 250 });
     const circle = vi.fn();
     const polygon = vi.fn();
+    const dashedLine = vi.fn();
+    const arc = vi.fn();
     const withTransform = vi.fn((_position, _angle, draw: () => void) => draw());
     const drawing = {
       size: { width: 1000, height: 700 },
       rectangle: vi.fn(),
       circle,
       polygon,
+      dashedLine,
+      arc,
       withClipRectangle: vi.fn((_position, _size, draw: () => void) => draw()),
       withTransform,
     } as unknown as Drawing;
@@ -68,5 +73,49 @@ describe('Minimap', () => {
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#ffc35c');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#c98bff');
     expect(withTransform).toHaveBeenCalledWith({ x: 870, y: 162 }, ship.angle, expect.any(Function));
+  });
+
+  it('REQ-56 draws a dotted red signal line and a red growing-arc wave on the minimap', () => {
+    const ship = new Model.Ship();
+    const drone = new Model.Drone(null, 0, [1, 1, 1], 2);
+    drone.position = { x: 100000, y: 0 };
+    const model = {
+      ship,
+      supplyField: new Model.SupplyField({ x: 100000, y: 0 }, undefined, 1),
+      massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, []),
+      asteroidBelt: { forEach: () => undefined },
+      droneField: { forEach: (fn: (d: Model.Drone) => void) => fn(drone) },
+      mission: { signalDirection: { x: 1, y: 0 } },
+      elapsed: 0.5,
+    } as unknown as Model.Game;
+    const exploration = new ExplorationMap();
+    const dashedLine = vi.fn();
+    const arc = vi.fn();
+    const drawing = {
+      size: { width: 1000, height: 700 },
+      rectangle: vi.fn(),
+      circle: vi.fn(),
+      polygon: vi.fn(),
+      dashedLine,
+      arc,
+      withClipRectangle: vi.fn((_position, _size, draw: () => void) => draw()),
+      withTransform: vi.fn((_position, _angle, draw: () => void) => draw()),
+    } as unknown as Drawing;
+    const camera = new Camera();
+    camera.update(ship.position, 0, 1);
+
+    new Minimap().draw(drawing, exploration, model, camera);
+
+    expect(dashedLine).toHaveBeenCalledTimes(1);
+    const [from, to, color] = dashedLine.mock.calls[0];
+    expect(color).toBe('#ff3b3b');
+    expect(to.x).toBeGreaterThan(from.x);
+    expect(to.y).toBeCloseTo(from.y, 6);
+
+    expect(arc).toHaveBeenCalled();
+    for (const call of arc.mock.calls) {
+      const arcColor = call[4];
+      expect(arcColor).toMatch(/^rgba\(255,59,59,/);
+    }
   });
 });

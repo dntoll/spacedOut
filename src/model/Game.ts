@@ -148,6 +148,6 @@ export class Game implements AsteroidDestroyedObserver {
     this.massiveAsteroidField.forEachActive((asteroid) => obstacles.push(asteroid));
     this.shipCollisions.resolve(this.ship, obstacles, dt);
 
-    this.mission.update(dt, this.ship, this.droneField, this.visitedMap);
+    this.mission.update(dt, this.ship, this.droneField, this.asteroidBelt, this.massiveAsteroidField, this.visitedMap, this.spawnExclusionRadius);
   }
 }

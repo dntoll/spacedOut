@@ -59,4 +59,29 @@ describe('Camera', () => {
     expect(fast.getVisibleWorldRadius({ width: 1000, height: 600 }))
       .toBeGreaterThan(slow.getVisibleWorldRadius({ width: 1000, height: 600 }));
   });
+
+  it('REQ-56 zooms farther out while any drone is hunting', () => {
+    const calm = new Camera();
+    const threatened = new Camera();
+    calm.update({ x: 0, y: 0 }, 0, 1, false);
+    threatened.update({ x: 0, y: 0 }, 0, 1, true);
+
+    expect(threatened.zoom).toBeLessThan(calm.zoom);
+
+    const fastCalm = new Camera();
+    const fastThreatened = new Camera();
+    fastCalm.update({ x: 0, y: 0 }, 600, 1, false);
+    fastThreatened.update({ x: 0, y: 0 }, 600, 1, true);
+    expect(fastThreatened.zoom).toBeLessThan(fastCalm.zoom);
+  });
+
+  it('REQ-56 eases back in when the drone threat clears', () => {
+    const camera = new Camera();
+    camera.update({ x: 0, y: 0 }, 0, 1, true);
+    const threatenedZoom = camera.zoom;
+
+    camera.update({ x: 0, y: 0 }, 0, 1, false);
+
+    expect(camera.zoom).toBeGreaterThan(threatenedZoom);
+  });
 });

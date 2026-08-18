@@ -34,6 +34,7 @@ export class Minimap {
       this.drawSupplies(drawing, exploration, model.supplyField, center, position, size);
       this.drawDrones(drawing, exploration, model.droneField, center, position, size);
       this.drawShip(drawing, model.ship.angle, position, size);
+      this.drawSignal(drawing, model, position, size);
     });
   }
 
@@ -147,6 +148,37 @@ export class Minimap {
         1,
       );
     });
+  }
+
+  private drawSignal(drawing: Drawing, model: Model.Game, position: Vec2, size: Size): void {
+    const direction = model.mission.signalDirection;
+    if (!direction) return;
+    const center = { x: position.x + size.width / 2, y: position.y + size.height / 2 };
+    const edge = this.squareEdge(center, direction, position, size);
+    drawing.dashedLine(center, edge, '#ff3b3b', 1.5);
+    const inwardAngle = Math.atan2(-direction.y, -direction.x);
+    const halfSpread = Math.PI / 2;
+    const maxRadius = size.width / 2;
+    const period = 1.4;
+    const arcCount = 3;
+    for (let index = 0; index < arcCount; index++) {
+      const phase = ((model.elapsed / period) + index / arcCount) % 1;
+      const radius = phase * maxRadius;
+      if (radius < 1) continue;
+      const alpha = (1 - phase) * 0.8;
+      drawing.arc(edge, radius, inwardAngle - halfSpread, inwardAngle + halfSpread, `rgba(255,59,59,${alpha.toFixed(3)})`, 1);
+    }
+  }
+
+  private squareEdge(center: Vec2, direction: Vec2, position: Vec2, size: Size): Vec2 {
+    const half = { width: size.width / 2, height: size.height / 2 };
+    const candidates: number[] = [];
+    if (direction.x > 0) candidates.push(half.width / direction.x);
+    else if (direction.x < 0) candidates.push(-half.width / direction.x);
+    if (direction.y > 0) candidates.push(half.height / direction.y);
+    else if (direction.y < 0) candidates.push(-half.height / direction.y);
+    const t = Math.min(...candidates.filter((value) => value > 0));
+    return { x: center.x + direction.x * t, y: center.y + direction.y * t };
   }
 
   private toMap(world: Vec2, center: Vec2, position: Vec2, size: Size): Vec2 {

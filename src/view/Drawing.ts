@@ -128,6 +128,29 @@ export class Drawing {
     this.context.stroke();
   }
 
+  dashedLine(from: Vec2, to: Vec2, color: string, width: number, dash: number[] = [7, 6]): void {
+    this.withState(() => {
+      this.context.beginPath();
+      this.context.moveTo(from.x, from.y);
+      this.context.lineTo(to.x, to.y);
+      this.context.strokeStyle = color;
+      this.context.lineWidth = width;
+      this.context.lineCap = 'butt';
+      this.context.setLineDash(dash);
+      this.context.stroke();
+    });
+  }
+
+  arc(position: Vec2, radius: number, startAngle: number, endAngle: number, color: string, width: number): void {
+    this.withState(() => {
+      this.context.beginPath();
+      this.context.arc(position.x, position.y, radius, startAngle, endAngle);
+      this.context.strokeStyle = color;
+      this.context.lineWidth = width;
+      this.context.stroke();
+    });
+  }
+
   onResize(listener: () => void): void { window.addEventListener('resize', listener); }
   onBlur(listener: () => void): void { window.addEventListener('blur', listener); }
   onKeyDown(listener: (key: string) => void): void {

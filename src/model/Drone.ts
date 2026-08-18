@@ -13,10 +13,14 @@ const CLOSE_RANGE = 260;
 const CLOSE_ACCEL_BOOST = 1.9;
 const CLOSE_DAMP_RATE = 5.5;
 const BASE_DAMP_RATE = 1;
+const REHOME_ACCEL = 200;
+const REHOME_MAX_SPEED = 320;
+const REHOME_ATTACH_DISTANCE = 4;
 
 export class Drone extends PhysicsBody {
   public hp: number;
   public killed = false;
+  public reHomeTarget: PhysicsBody | null = null;
 
   constructor(
     public host: PhysicsBody | null,
@@ -36,9 +40,44 @@ export class Drone extends PhysicsBody {
     this.hp = hp;
   }
 
-  get isHunting(): boolean { return this.host === null; }
+  get isHunting(): boolean { return this.host === null && this.reHomeTarget === null; }
+  get isReHoming(): boolean { return this.reHomeTarget !== null; }
 
   detach(): void { this.host = null; }
+
+  startReHoming(target: PhysicsBody): void {
+    this.host = null;
+    this.reHomeTarget = target;
+  }
+
+  private attachTo(target: PhysicsBody): void {
+    this.host = target;
+    this.reHomeTarget = null;
+    this.gripAngle = Math.atan2(
+      this.position.y - target.position.y,
+      this.position.x - target.position.x,
+    );
+  }
+
+  reHome(dt: number, target: PhysicsBody, massiveField: MassiveAsteroidField | null): void {
+    const toTarget = sub(target.position, this.position);
+    const dist = length(toTarget);
+    if (dist <= target.radius + this.radius + REHOME_ATTACH_DISTANCE) {
+      this.attachTo(target);
+      this.rideHost(massiveField);
+      return;
+    }
+    const dir = dist > 0.0001 ? scale(toTarget, 1 / dist) : { x: 1, y: 0 };
+    this.faceTarget(target.position);
+    this.velocity = add(this.velocity, scale(dir, REHOME_ACCEL * dt));
+    const along = Math.max(0, dot(this.velocity, dir));
+    const across = sub(this.velocity, scale(dir, along));
+    const dampFactor = Math.exp(-BASE_DAMP_RATE * dt);
+    this.velocity = add(scale(dir, along), scale(across, dampFactor));
+    const speed = length(this.velocity);
+    if (speed > REHOME_MAX_SPEED) this.velocity = scale(this.velocity, REHOME_MAX_SPEED / speed);
+    this.integrate(dt);
+  }
 
   takeLaserHit(): boolean {
     this.hp -= 1;

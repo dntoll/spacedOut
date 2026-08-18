@@ -15,6 +15,7 @@ const TARGET_POPULATION = 24;
 const DETACH_RANGE_RADII = 12;
 const DRONE_IMPACT_DAMAGE = 20;
 const MASSIVE_CAPACITY_MAX = 6;
+const HUNT_GIVE_UP_RADIUS = 1200;
 
 export class DroneField {
   private readonly drones: Drone[] = [];
@@ -31,9 +32,12 @@ export class DroneField {
   has(drone: Drone): boolean { return this.drones.includes(drone); }
 
   anyHunting(): boolean {
-    for (const drone of this.drones) { if (!drone.host) return true; }
+    for (const drone of this.drones) { if (drone.isHunting) return true; }
     return false;
   }
+
+  detachRange(ship: Ship): number { return ship.radius * DETACH_RANGE_RADII; }
+  giveUpRadius(): number { return HUNT_GIVE_UP_RADIUS; }
 
   addDamageObserver(observer: DamageObserver): void { this.damageObservers.add(observer); }
   removeDamageObserver(observer: DamageObserver): void { this.damageObservers.delete(observer); }
@@ -63,19 +67,28 @@ export class DroneField {
   ): void {
     this.releaseLostHosts(asteroidBelt, massiveAsteroidField);
     this.detachInRange(ship);
-    this.rideAndHunt(dt, ship, massiveAsteroidField);
+    this.rideAndHunt(dt, ship, asteroidBelt, massiveAsteroidField);
     this.resolveShipImpacts(ship);
-    this.recycleDistant(ship.position, spawnExclusionRadius);
+    this.recycleDistant(ship, asteroidBelt, massiveAsteroidField);
     if (spawnEnabled) this.spawnToTarget(ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
   }
 
   private releaseLostHosts(asteroidBelt: AsteroidBelt, massiveAsteroidField: MassiveAsteroidField): void {
     for (const drone of this.drones) {
-      if (!drone.host) continue;
-      const alive = drone.host instanceof MassiveAsteroid
-        ? massiveAsteroidField.has(drone.host)
-        : asteroidBelt.has(drone.host as never);
-      if (!alive) drone.detach();
+      if (drone.host) {
+        const alive = drone.host instanceof MassiveAsteroid
+          ? massiveAsteroidField.has(drone.host)
+          : asteroidBelt.has(drone.host as never);
+        if (!alive) drone.detach();
+        continue;
+      }
+      if (drone.reHomeTarget) {
+        const target = drone.reHomeTarget;
+        const alive = target instanceof MassiveAsteroid
+          ? massiveAsteroidField.has(target)
+          : asteroidBelt.has(target as never);
+        if (!alive) drone.reHomeTarget = null;
+      }
     }
   }
 
@@ -100,10 +113,15 @@ export class DroneField {
     }
   }
 
-  private rideAndHunt(dt: number, ship: Ship, massiveAsteroidField: MassiveAsteroidField): void {
+  private rideAndHunt(dt: number, ship: Ship, asteroidBelt: AsteroidBelt, massiveAsteroidField: MassiveAsteroidField): void {
     for (const drone of this.drones) {
-      if (drone.host) drone.rideHost(drone.host instanceof MassiveAsteroid ? massiveAsteroidField : null);
-      else drone.hunt(dt, ship);
+      if (drone.reHomeTarget) {
+        drone.reHome(dt, drone.reHomeTarget, drone.reHomeTarget instanceof MassiveAsteroid ? massiveAsteroidField : null);
+      } else if (drone.host) {
+        drone.rideHost(drone.host instanceof MassiveAsteroid ? massiveAsteroidField : null);
+      } else {
+        drone.hunt(dt, ship);
+      }
     }
   }
 
@@ -125,14 +143,40 @@ export class DroneField {
     }
   }
 
-  private recycleDistant(center: Vec2, spawnExclusionRadius: number): void {
-    const spawnInner = Math.max(1050, spawnExclusionRadius + 180);
-    const recycleRadius = spawnInner + 800;
+  private recycleDistant(ship: Ship, asteroidBelt: AsteroidBelt, massiveAsteroidField: MassiveAsteroidField): void {
+    const giveUpSq = HUNT_GIVE_UP_RADIUS * HUNT_GIVE_UP_RADIUS;
     for (let i = this.drones.length - 1; i >= 0; i--) {
       const drone = this.drones[i];
-      if (drone.host) continue;
-      if (length(sub(drone.position, center)) > recycleRadius) this.drones.splice(i, 1);
+      if (drone.host || drone.reHomeTarget) continue;
+      const dx = drone.position.x - ship.position.x;
+      const dy = drone.position.y - ship.position.y;
+      if (dx * dx + dy * dy <= giveUpSq) continue;
+      const target = this.pickNearestHost(drone.position, asteroidBelt, massiveAsteroidField);
+      if (target) drone.startReHoming(target);
+      else this.drones.splice(i, 1);
     }
+  }
+
+  private pickNearestHost(
+    center: Vec2,
+    asteroidBelt: AsteroidBelt,
+    massiveAsteroidField: MassiveAsteroidField,
+  ): PhysicsBody | null {
+    let nearest: PhysicsBody | null = null;
+    let nearestDistSq = Infinity;
+    asteroidBelt.forEach((asteroid) => {
+      const dx = asteroid.position.x - center.x;
+      const dy = asteroid.position.y - center.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < nearestDistSq) { nearestDistSq = distSq; nearest = asteroid; }
+    });
+    massiveAsteroidField.forEachActive((asteroid) => {
+      const dx = asteroid.position.x - center.x;
+      const dy = asteroid.position.y - center.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq < nearestDistSq) { nearestDistSq = distSq; nearest = asteroid; }
+    });
+    return nearest;
   }
 
   private spawnToTarget(
@@ -143,18 +187,25 @@ export class DroneField {
   ): void {
     const spawnInner = Math.max(1050, spawnExclusionRadius + 180);
     const hostCounts = new Map<PhysicsBody, number>();
+    let activeCount = 0;
     for (const drone of this.drones) {
+      if (drone.reHomeTarget) {
+        hostCounts.set(drone.reHomeTarget, (hostCounts.get(drone.reHomeTarget) ?? 0) + 1);
+        continue;
+      }
+      activeCount++;
       if (drone.host) hostCounts.set(drone.host, (hostCounts.get(drone.host) ?? 0) + 1);
     }
     this.pruneStaleCapacities(massiveAsteroidField);
 
-    while (this.drones.length < TARGET_POPULATION) {
+    while (activeCount < TARGET_POPULATION) {
       const host = this.pickHost(ship.position, asteroidBelt, massiveAsteroidField, spawnInner, hostCounts);
       if (!host) break;
       const drone = new Drone(host, random(0, Math.PI * 2), Drone.createBodyVertices(), Math.floor(random(1, 4)));
       drone.rideHost(host instanceof MassiveAsteroid ? massiveAsteroidField : null);
       this.drones.push(drone);
       hostCounts.set(host, (hostCounts.get(host) ?? 0) + 1);
+      activeCount++;
     }
   }
 

@@ -48,6 +48,13 @@ export class AsteroidBelt {
 
   has(asteroid: Asteroid): boolean { return this.asteroids.includes(asteroid); }
 
+  anyWithin(position: Vec2, radius: number): boolean {
+    for (const asteroid of this.asteroids) {
+      if (length(sub(asteroid.position, position)) <= radius + asteroid.radius) return true;
+    }
+    return false;
+  }
+
   collideWith(body: PhysicsBody): void {
     for (const asteroid of this.asteroids) this.collide(body, asteroid);
   }

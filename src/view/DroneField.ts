@@ -1,20 +1,30 @@
 import { length, sub } from '../math';
 import type * as Model from '../model';
-import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
 import type { Drawing, RadialPaint } from './Drawing';
 
 const ARM_COLOR = '#9dff7a';
 const BODY_STROKE = 'rgba(150,255,120,.55)';
+const DETECTION_RING_COLOR = 'rgba(150,255,120,.28)';
+const ESCAPE_RING_COLOR = 'rgba(150,255,120,.22)';
 
 export class DroneField {
-  draw(drawing: Drawing, field: Model.DroneField, shipPosition: Vec2, camera: Camera): void {
+  draw(drawing: Drawing, field: Model.DroneField, ship: Model.Ship, camera: Camera): void {
     const { width, height } = drawing.size;
     const visibleRange = Math.hypot(width, height) / camera.zoom * 0.7 + 100;
+    const shipPosition = ship.position;
+    const detectionRange = field.detachRange(ship);
+    const hunting = field.anyHunting();
     field.forEach((drone) => {
       if (length(sub(drone.position, shipPosition)) > visibleRange) return;
+      if (!drone.isHunting) {
+        drawing.arc(drone.position, detectionRange, 0, Math.PI * 2, DETECTION_RING_COLOR, 1 / camera.zoom);
+      }
       this.drawDrone(drawing, drone, camera.zoom);
     });
+    if (hunting) {
+      drawing.arc(shipPosition, field.giveUpRadius(), 0, Math.PI * 2, ESCAPE_RING_COLOR, 1.5 / camera.zoom);
+    }
   }
 
   private drawDrone(drawing: Drawing, drone: Model.Drone, zoom: number): void {
