@@ -134,7 +134,9 @@ describe('Drawing', () => {
     drawing.compositeShadowLayer('multiply');
 
     expect(mainContext.globalCompositeOperation).toBe('multiply');
-    expect(mainContext.drawImage).toHaveBeenCalledWith(offscreenCanvas, 0, 0);
+    expect(offscreenCanvas.width).toBe(400);
+    expect(offscreenCanvas.height).toBe(300);
+    expect(mainContext.drawImage).toHaveBeenCalledWith(offscreenCanvas, 0, 0, 800, 600);
     expect(mainContext.save).toHaveBeenCalled();
     expect(mainContext.restore).toHaveBeenCalled();
   });

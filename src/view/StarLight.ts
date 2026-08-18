@@ -20,6 +20,7 @@ export interface ShadowCaster {
 }
 
 export interface ShadowCasters {
+  readonly casters?: readonly ShadowCaster[];
   forEachCaster(visitor: (caster: ShadowCaster) => void): void;
 }
 
@@ -55,7 +56,7 @@ export class StarLight {
     const dx = this.lightDir.x;
     const dy = this.lightDir.y;
     let maxFactor = 0;
-    casters.forEachCaster((occluder) => {
+    const visit = (occluder: ShadowCaster): void => {
       const rx = position.x - occluder.position.x;
       const ry = position.y - occluder.position.y;
       const along = rx * dx + ry * dy;
@@ -80,7 +81,12 @@ export class StarLight {
       }
       const factor = alongFade * edgeFade;
       if (factor > maxFactor) maxFactor = factor;
-    });
+    };
+    if (casters.casters) {
+      for (const caster of casters.casters) visit(caster);
+    } else {
+      casters.forEachCaster(visit);
+    }
     return clamp(maxFactor, 0, 1);
   }
 

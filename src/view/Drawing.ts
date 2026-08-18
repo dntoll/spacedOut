@@ -17,6 +17,11 @@ export interface LinearPaint {
 }
 export type Paint = string | RadialPaint | LinearPaint;
 
+// Shadow volumes are deliberately rendered below the main canvas resolution.
+// They contain only broad, soft-edged darkness, so full device resolution adds
+// fill-rate and compositing cost without adding useful visible detail.
+const SHADOW_LAYER_SCALE = 0.5;
+
 export class Drawing {
   private readonly canvas: HTMLCanvasElement;
   private readonly context: CanvasRenderingContext2D;
@@ -47,8 +52,7 @@ export class Drawing {
     this.canvas.style.width = `${this.viewport.width}px`;
     this.canvas.style.height = `${this.viewport.height}px`;
     if (this.offscreen) {
-      this.offscreen.width = this.viewport.width * this.pixelRatio;
-      this.offscreen.height = this.viewport.height * this.pixelRatio;
+      this.resizeShadowLayer();
     }
   }
 
@@ -64,10 +68,10 @@ export class Drawing {
       const ctx = this.offscreen.getContext('2d');
       if (!ctx) throw new Error('Offscreen 2D is unavailable');
       this.offscreenCtx = ctx;
-      this.offscreen.width = this.viewport.width * this.pixelRatio;
-      this.offscreen.height = this.viewport.height * this.pixelRatio;
+      this.resizeShadowLayer();
     }
-    this.offscreenCtx!.setTransform(this.pixelRatio, 0, 0, this.pixelRatio, 0, 0);
+    const shadowPixelRatio = this.pixelRatio * SHADOW_LAYER_SCALE;
+    this.offscreenCtx!.setTransform(shadowPixelRatio, 0, 0, shadowPixelRatio, 0, 0);
     this.offscreenCtx!.clearRect(0, 0, this.viewport.width, this.viewport.height);
     this.activeCtx = this.offscreenCtx!;
   }
@@ -79,7 +83,7 @@ export class Drawing {
     this.context.save();
     this.context.setTransform(1, 0, 0, 1, 0, 0);
     this.context.globalCompositeOperation = blend;
-    this.context.drawImage(this.offscreen, 0, 0);
+    this.context.drawImage(this.offscreen, 0, 0, this.canvas.width, this.canvas.height);
     this.context.restore();
   }
 
@@ -228,6 +232,12 @@ export class Drawing {
     this.activeCtx.save();
     draw();
     this.activeCtx.restore();
+  }
+
+  private resizeShadowLayer(): void {
+    if (!this.offscreen) return;
+    this.offscreen.width = Math.max(1, Math.round(this.viewport.width * this.pixelRatio * SHADOW_LAYER_SCALE));
+    this.offscreen.height = Math.max(1, Math.round(this.viewport.height * this.pixelRatio * SHADOW_LAYER_SCALE));
   }
 
   private resolvePaint(paint: Paint): string | CanvasGradient {

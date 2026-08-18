@@ -10,19 +10,28 @@ interface OutlinedBody {
 }
 
 export class CompositeShadowCasters implements OutlinedShadowCasters {
+  readonly casters: readonly ShadowCaster[];
+  private readonly bodies: readonly OutlinedBody[];
+
   constructor(
-    private readonly massive: Model.MassiveAsteroidField | null,
-    private readonly belt: Model.AsteroidBelt | null,
-  ) {}
+    massive: Model.MassiveAsteroidField | null,
+    belt: Model.AsteroidBelt | null,
+  ) {
+    const bodies: OutlinedBody[] = [];
+    const casters: ShadowCaster[] = [];
+    massive?.forEachActive((asteroid) => bodies.push(asteroid));
+    belt?.forEach((asteroid) => bodies.push(asteroid));
+    for (const body of bodies) casters.push({ position: body.position, radius: body.radius });
+    this.bodies = bodies;
+    this.casters = casters;
+  }
 
   forEachCaster(visitor: (caster: ShadowCaster) => void): void {
-    this.massive?.forEachActive((asteroid) => visitor({ position: asteroid.position, radius: asteroid.radius }));
-    this.belt?.forEach((asteroid) => visitor({ position: asteroid.position, radius: asteroid.radius }));
+    this.casters.forEach(visitor);
   }
 
   forEachOutlinedCaster(visitor: (caster: ShadowCaster) => void): void {
-    this.massive?.forEachActive((asteroid) => visitor(this.caster(asteroid)));
-    this.belt?.forEach((asteroid) => visitor(this.caster(asteroid)));
+    for (const body of this.bodies) visitor(this.caster(body));
   }
 
   private caster(body: OutlinedBody): ShadowCaster {

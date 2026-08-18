@@ -1,4 +1,4 @@
-import { add, dot, length, normalize, random, scale, sub } from '../math';
+import { add, dot, length, random, scale, sub } from '../math';
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
@@ -7,6 +7,11 @@ import { Particle } from './Particle';
 import type { ShadowCasters, StarLight } from './StarLight';
 
 interface Circle { position: Vec2; radius: number }
+interface MassiveCollider extends Circle {
+  polygon: Vec2[];
+  cos: number;
+  sin: number;
+}
 
 const TARGET_POPULATION = 240;
 const MAX_POPULATION = 600;
@@ -206,8 +211,14 @@ export class ParticleField {
     model.asteroidBelt.forEach((asteroid) => {
       circles.push({ position: asteroid.position, radius: asteroid.radius });
     });
-    const massives: Model.MassiveAsteroid[] = [];
-    model.massiveAsteroidField.forEachActive((asteroid) => massives.push(asteroid));
+    const massives: MassiveCollider[] = [];
+    model.massiveAsteroidField.forEachActive((asteroid) => massives.push({
+      position: asteroid.position,
+      radius: asteroid.radius,
+      polygon: this.localPolygon(asteroid),
+      cos: Math.cos(asteroid.angle),
+      sin: Math.sin(asteroid.angle),
+    }));
 
     for (const particle of this.particles) {
       for (const circle of circles) this.bounceCircle(particle, circle);
@@ -216,31 +227,55 @@ export class ParticleField {
   }
 
   private bounceCircle(particle: Particle, circle: Circle): void {
-    const offset = sub(particle.position, circle.position);
-    const dist = length(offset);
     const minDist = circle.radius + DUST_RADIUS;
-    if (dist >= minDist || dist < 0.0001) return;
-    const normal = scale(offset, 1 / dist);
+    const dx = particle.position.x - circle.position.x;
+    if (Math.abs(dx) >= minDist) return;
+    const dy = particle.position.y - circle.position.y;
+    if (Math.abs(dy) >= minDist) return;
+    const distSq = dx * dx + dy * dy;
+    if (distSq >= minDist * minDist || distSq < 0.00000001) return;
+    const dist = Math.sqrt(distSq);
+    const normal = { x: dx / dist, y: dy / dist };
     particle.position = add(circle.position, scale(normal, minDist));
     const vn = dot(particle.velocity, normal);
     if (vn < 0) particle.velocity = sub(particle.velocity, scale(normal, (1 + BOUNCE_DAMPING) * vn));
   }
 
-  private bounceMassive(particle: Particle, asteroid: Model.MassiveAsteroid): void {
-    const offset = sub(particle.position, asteroid.position);
-    if (length(offset) >= asteroid.radius + DUST_RADIUS) return;
-    const local = this.toLocal(particle.position, asteroid);
-    const polygon = this.localPolygon(asteroid);
-    if (!this.pointInPolygon(local, polygon)) return;
-    const nearest = this.nearestEdge(local, polygon);
+  private bounceMassive(particle: Particle, collider: MassiveCollider): void {
+    const maxDist = collider.radius + DUST_RADIUS;
+    const dx = particle.position.x - collider.position.x;
+    if (Math.abs(dx) >= maxDist) return;
+    const dy = particle.position.y - collider.position.y;
+    if (Math.abs(dy) >= maxDist || dx * dx + dy * dy >= maxDist * maxDist) return;
+    const local = {
+      x: dx * collider.cos + dy * collider.sin,
+      y: -dx * collider.sin + dy * collider.cos,
+    };
+    if (!this.pointInPolygon(local, collider.polygon)) return;
+    const nearest = this.nearestEdge(local, collider.polygon);
     if (!nearest) return;
-    const outward = normalize(sub(nearest.point, local));
-    if (length(outward) < 0.0001) return;
+    const outwardX = nearest.point.x - local.x;
+    const outwardY = nearest.point.y - local.y;
+    const outwardLength = Math.hypot(outwardX, outwardY);
+    if (outwardLength < 0.0001) return;
+    const outward = { x: outwardX / outwardLength, y: outwardY / outwardLength };
     const pushedLocal = add(nearest.point, scale(outward, DUST_RADIUS));
-    particle.position = this.toWorld(pushedLocal, asteroid);
-    const localVel = this.rotate(particle.velocity, -asteroid.angle);
+    particle.position = {
+      x: collider.position.x + pushedLocal.x * collider.cos - pushedLocal.y * collider.sin,
+      y: collider.position.y + pushedLocal.x * collider.sin + pushedLocal.y * collider.cos,
+    };
+    const localVel = {
+      x: particle.velocity.x * collider.cos + particle.velocity.y * collider.sin,
+      y: -particle.velocity.x * collider.sin + particle.velocity.y * collider.cos,
+    };
     const vn = dot(localVel, outward);
-    if (vn < 0) particle.velocity = this.rotate(sub(localVel, scale(outward, (1 + BOUNCE_DAMPING) * vn)), asteroid.angle);
+    if (vn < 0) {
+      const bounced = sub(localVel, scale(outward, (1 + BOUNCE_DAMPING) * vn));
+      particle.velocity = {
+        x: bounced.x * collider.cos - bounced.y * collider.sin,
+        y: bounced.x * collider.sin + bounced.y * collider.cos,
+      };
+    }
   }
 
   private spawn(dt: number, camera: Camera, viewport: Size): void {
@@ -268,8 +303,13 @@ export class ParticleField {
 
   private cull(camera: Camera, viewport: Size): void {
     const maxDist = camera.getVisibleWorldRadius(viewport) + CULL_MARGIN;
+    const maxDistSq = maxDist * maxDist;
     const center = camera.worldPosition;
-    this.particles = this.particles.filter((p) => length(sub(p.position, center)) <= maxDist);
+    this.particles = this.particles.filter((particle) => {
+      const dx = particle.position.x - center.x;
+      const dy = particle.position.y - center.y;
+      return dx * dx + dy * dy <= maxDistSq;
+    });
   }
 
   private localPolygon(asteroid: Model.MassiveAsteroid): Vec2[] {
@@ -280,24 +320,28 @@ export class ParticleField {
   }
 
   private nearestEdge(point: Vec2, polygon: Vec2[]): { point: Vec2 } | undefined {
-    let best = Infinity;
+    let bestSq = Infinity;
     let closest = { x: 0, y: 0 };
     for (let i = 0; i < polygon.length; i++) {
       const a = polygon[i];
       const b = polygon[(i + 1) % polygon.length];
-      const cp = this.closestPointOnSegment(point, a, b);
-      const d = length(sub(point, cp));
-      if (d < best) { best = d; closest = cp; }
+      const edgeX = b.x - a.x;
+      const edgeY = b.y - a.y;
+      const denom = edgeX * edgeX + edgeY * edgeY;
+      const amount = denom < 0.000001
+        ? 0
+        : Math.max(0, Math.min(1, ((point.x - a.x) * edgeX + (point.y - a.y) * edgeY) / denom));
+      const candidateX = a.x + edgeX * amount;
+      const candidateY = a.y + edgeY * amount;
+      const dx = point.x - candidateX;
+      const dy = point.y - candidateY;
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq < bestSq) {
+        bestSq = distanceSq;
+        closest = { x: candidateX, y: candidateY };
+      }
     }
-    return best === Infinity ? undefined : { point: closest };
-  }
-
-  private closestPointOnSegment(point: Vec2, a: Vec2, b: Vec2): Vec2 {
-    const edge = sub(b, a);
-    const denom = dot(edge, edge);
-    if (denom < 0.000001) return { ...a };
-    const amount = Math.max(0, Math.min(1, dot(sub(point, a), edge) / denom));
-    return add(a, scale(edge, amount));
+    return bestSq === Infinity ? undefined : { point: closest };
   }
 
   private pointInPolygon(point: Vec2, polygon: Vec2[]): boolean {
@@ -308,14 +352,6 @@ export class ParticleField {
       if (intersect) inside = !inside;
     }
     return inside;
-  }
-
-  private toLocal(point: Vec2, asteroid: Model.MassiveAsteroid): Vec2 {
-    return this.rotate(sub(point, asteroid.position), -asteroid.angle);
-  }
-
-  private toWorld(point: Vec2, asteroid: Model.MassiveAsteroid): Vec2 {
-    return add(this.rotate(point, asteroid.angle), asteroid.position);
   }
 
   private rotate(point: Vec2, angle: number): Vec2 {

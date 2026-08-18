@@ -70,6 +70,20 @@ describe('StarLight', () => {
     expect(star.shadowFactor({ x: 0, y: 0 }, 20, null)).toBe(0);
   });
 
+  it('REQ-71 reuses a prepared caster snapshot for repeated shadow checks', () => {
+    const star = new StarLight(LIGHT, 2400);
+    let fallbackScans = 0;
+    const casters: ShadowCasters = {
+      casters: [{ position: { x: 0, y: 0 }, radius: 500 }],
+      forEachCaster: () => { fallbackScans++; },
+    };
+    const behind = { x: LIGHT.x * 100, y: LIGHT.y * 100 };
+
+    expect(star.shadowFactor(behind, 20, casters)).toBeGreaterThan(0.9);
+    expect(star.particleAlpha(behind, 0.6, casters)).toBeLessThan(0.6);
+    expect(fallbackScans).toBe(0);
+  });
+
   it('REQ-71 darkens a smaller object that is directly behind an occluder within range', () => {
     const star = new StarLight(LIGHT, 2400);
     const casters = singleCaster({ x: 0, y: 0 }, 500);

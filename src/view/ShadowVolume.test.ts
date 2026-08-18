@@ -42,7 +42,7 @@ describe('ShadowVolume', () => {
     const umbra = polygons[1];
     expect(perpSpread([penumbra])).toBeGreaterThan(perpSpread([umbra]));
     expect(umbra.fill.stops[0].color).toMatch(/rgba\(0,0,0,/);
-    expect(umbra.fill.stops[1].color).toBe('rgba(0,0,0,0)');
+    expect(umbra.fill.stops[umbra.fill.stops.length - 1].color).toBe('rgba(0,0,0,0)');
   });
 
   it('REQ-71 culls casters whose shadow cone is outside the visible range', () => {
@@ -56,6 +56,67 @@ describe('ShadowVolume', () => {
     new ShadowVolume().render(stubDrawing(polygons), casters, star, new Camera());
 
     expect(polygons).toHaveLength(0);
+  });
+
+  it('REQ-71 lets an off-screen caster project its shadow into the viewport', () => {
+    const fillCalls: PolyCall[][] = [];
+    const outline = [
+      { x: -1100, y: -100 }, { x: -900, y: -100 },
+      { x: -900, y: 100 }, { x: -1100, y: 100 },
+    ];
+    const casters: OutlinedShadowCasters = {
+      forEachCaster: () => {},
+      forEachOutlinedCaster: (fn) => fn({ position: { x: -1000, y: 0 }, radius: 100, outline }),
+    };
+
+    new ShadowVolume().render(stubDrawing([], fillCalls), casters, new StarLight({ x: 1, y: 0 }, 2400), new Camera());
+
+    expect(fillCalls.length).toBeGreaterThan(0);
+  });
+
+  it('REQ-71 softens the distant tail of long shadows before their final endpoint', () => {
+    const polygons: PolyCall[] = [];
+    const casters: OutlinedShadowCasters = {
+      forEachCaster: () => {},
+      forEachOutlinedCaster: (fn) => fn({ position: { x: 0, y: 0 }, radius: 100 }),
+    };
+
+    new ShadowVolume().render(stubDrawing(polygons), casters, new StarLight(LIGHT, 2400), new Camera());
+
+    expect(polygons[0].fill.stops).toHaveLength(4);
+    expect(polygons[0].fill.stops[2].offset).toBe(0.75);
+    expect(polygons[0].fill.stops[2].color).toMatch(/rgba\(0,0,0,0\.0/);
+  });
+
+  it('REQ-71 keeps a huge outlined caster penumbra attached instead of translating it down-light', () => {
+    const fillCalls: PolyCall[][] = [];
+    const outline = [
+      { x: -1000, y: -1000 }, { x: 1000, y: -1000 },
+      { x: 1000, y: 1000 }, { x: -1000, y: 1000 },
+    ];
+    const casters: OutlinedShadowCasters = {
+      forEachCaster: () => {},
+      forEachOutlinedCaster: (fn) => fn({ position: { x: 0, y: 0 }, radius: 1000, outline }),
+    };
+    const star = new StarLight({ x: 1, y: 0 }, 2400);
+
+    new ShadowVolume().render(stubDrawing([], fillCalls), casters, star, new Camera());
+
+    const penumbraXs = fillCalls[1].flatMap((path) => path.points.map((point) => point.x));
+    expect(Math.min(...penumbraXs)).toBe(1000);
+    expect(Math.max(...penumbraXs)).toBe(1000 + star.shadowLengthFor(1000));
+  });
+
+  it('REQ-71 caps huge circular-caster penumbra softness in screen space', () => {
+    const polygons: PolyCall[] = [];
+    const casters: OutlinedShadowCasters = {
+      forEachCaster: () => {},
+      forEachOutlinedCaster: (fn) => fn({ position: { x: 0, y: 0 }, radius: 1000 }),
+    };
+
+    new ShadowVolume().render(stubDrawing(polygons), casters, new StarLight(LIGHT, 2400), new Camera());
+
+    expect(perpSpread([polygons[0]]) - perpSpread([polygons[1]])).toBeLessThanOrEqual(24);
   });
 
   it('REQ-71 extrudes shadow quads from the polygon back-facing edges so the volume matches the irregular outline', () => {
