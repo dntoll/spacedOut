@@ -37,6 +37,8 @@ export { Pirate, PIRATE_RADIUS } from './Pirate';
 export { PirateField } from './PirateField';
 export { PirateDestroyed } from './PirateDestroyed';
 export type { PirateDestroyedObserver } from './PirateDestroyedObserver';
+export type { PirateLaserShotObserver } from './PirateLaserShotObserver';
+export type { PirateCollisionObserver } from './PirateCollisionObserver';
 export { RandomSequence } from './RandomSequence';
 export { Ship, type ShipInitialLevels } from './Ship';
 export { ShipCollisionSystem } from './ShipCollisionSystem';

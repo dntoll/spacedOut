@@ -13,11 +13,15 @@ class FakeSounds {
   asteroidCollision = 0;
   shipCollision = 0;
   collectable = 0;
+  pirateLaserShot = 0;
+  pirateCollision = 0;
   onLaserShot(): void { this.laserShot++; }
   onLaserImpact(): void { this.laserImpact++; }
   onAsteroidCollision(): void { this.asteroidCollision++; }
   onShipCollision(): void { this.shipCollision++; }
   onCollectable(): void { this.collectable++; }
+  onPirateLaserShot(): void { this.pirateLaserShot++; }
+  onPirateCollision(): void { this.pirateCollision++; }
 }
 
 function buildGate(): { gate: SoundGate; sounds: FakeSounds } {
@@ -110,5 +114,37 @@ describe('SoundGate', () => {
     gate.onCollectable(new CollectablePickup(OFFSCREEN));
 
     expect(sounds.collectable).toBe(0);
+  });
+
+  it('REQ-45 plays the pirate laser-shot sound for on-screen firings', () => {
+    const { gate, sounds } = buildGate();
+
+    gate.onPirateLaserShot(new LaserShot(ONSCREEN));
+
+    expect(sounds.pirateLaserShot).toBe(1);
+  });
+
+  it('REQ-45 stays silent for pirate laser shots fired off-screen', () => {
+    const { gate, sounds } = buildGate();
+
+    gate.onPirateLaserShot(new LaserShot(OFFSCREEN));
+
+    expect(sounds.pirateLaserShot).toBe(0);
+  });
+
+  it('REQ-45 plays the pirate collision sound for on-screen collisions', () => {
+    const { gate, sounds } = buildGate();
+
+    gate.onPirateCollision(new Collision(ONSCREEN, { x: 1, y: 0 }, 200));
+
+    expect(sounds.pirateCollision).toBe(1);
+  });
+
+  it('REQ-45 stays silent for pirate collisions off-screen', () => {
+    const { gate, sounds } = buildGate();
+
+    gate.onPirateCollision(new Collision(OFFSCREEN, { x: 1, y: 0 }, 200));
+
+    expect(sounds.pirateCollision).toBe(0);
   });
 });

@@ -9,6 +9,8 @@ import { Laser } from './Laser';
 import type { LaserImpactObserver } from './LaserImpactObserver';
 import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
+import type { PirateCollisionObserver } from './PirateCollisionObserver';
+import type { PirateLaserShotObserver } from './PirateLaserShotObserver';
 import { CollisionResolver } from './CollisionResolver';
 import { DamageCalculator } from './DamageCalculator';
 import { Pirate, PIRATE_LASER_DAMAGE, PIRATE_RADIUS } from './Pirate';
@@ -18,6 +20,7 @@ import type { MassiveAsteroid } from './MassiveAsteroid';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
 import type { PhysicsBody } from './PhysicsBody';
 import type { Ship } from './Ship';
+import { LaserShot } from './LaserShot';
 
 const TARGET_COMBAT_SQUADS = 1;
 const TARGET_PERIPHERAL_SQUADS = 1;
@@ -40,6 +43,8 @@ export class PirateField {
   private readonly destroyedObservers = new Set<PirateDestroyedObserver>();
   private readonly collisionObservers = new Set<CollisionObserver>();
   private readonly laserImpactObservers = new Set<LaserImpactObserver>();
+  private readonly pirateLaserShotObservers = new Set<PirateLaserShotObserver>();
+  private readonly pirateCollisionObservers = new Set<PirateCollisionObserver>();
 
   constructor(initialPirates?: Pirate[]) {
     if (initialPirates) this.pirates.push(...initialPirates);
@@ -72,6 +77,10 @@ export class PirateField {
   removeCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.delete(observer); }
   addLaserImpactObserver(observer: LaserImpactObserver): void { this.laserImpactObservers.add(observer); }
   removeLaserImpactObserver(observer: LaserImpactObserver): void { this.laserImpactObservers.delete(observer); }
+  addPirateLaserShotObserver(observer: PirateLaserShotObserver): void { this.pirateLaserShotObservers.add(observer); }
+  removePirateLaserShotObserver(observer: PirateLaserShotObserver): void { this.pirateLaserShotObservers.delete(observer); }
+  addPirateCollisionObserver(observer: PirateCollisionObserver): void { this.pirateCollisionObservers.add(observer); }
+  removePirateCollisionObserver(observer: PirateCollisionObserver): void { this.pirateCollisionObservers.delete(observer); }
 
   applyLaserHit(pirate: Pirate, position: Vec2): void {
     const index = this.pirates.indexOf(pirate);
@@ -109,6 +118,7 @@ export class PirateField {
         const collision = CollisionResolver.resolve(pirate, asteroid);
         if (!collision) return;
         for (const observer of this.collisionObservers) observer.onCollision(collision);
+        for (const observer of this.pirateCollisionObservers) observer.onPirateCollision(collision);
         if (collision.impactSpeed > DamageCalculator.violentThreshold && pirate.takeImpact()) {
           this.pirates.splice(i, 1);
           const event = new PirateDestroyed({ ...pirate.position });
@@ -173,7 +183,11 @@ export class PirateField {
       if (pirate.awake) {
         pirate.hunt(dt, ship);
         const laser = pirate.tryFire(dt, ship);
-        if (laser) this.lasers.push(laser);
+        if (laser) {
+          this.lasers.push(laser);
+          const event = new LaserShot({ ...laser.position });
+          for (const observer of this.pirateLaserShotObservers) observer.onPirateLaserShot(event);
+        }
       } else {
         pirate.drift(dt);
       }

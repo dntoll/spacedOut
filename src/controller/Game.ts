@@ -57,5 +57,7 @@ export class Game {
     model.addCollectablePickupObserver(this.view);
     model.addDroneDestroyedObserver(this.view);
     model.addPirateDestroyedObserver(this.view);
+    model.addPirateLaserShotObserver(this.view);
+    model.addPirateCollisionObserver(this.view);
   }
 }

@@ -22,6 +22,8 @@ import { Mission, MissionPhase, SpawnMode } from './Mission';
 import { PirateField } from './PirateField';
 import { PirateDestroyed } from './PirateDestroyed';
 import type { PirateDestroyedObserver } from './PirateDestroyedObserver';
+import type { PirateLaserShotObserver } from './PirateLaserShotObserver';
+import type { PirateCollisionObserver } from './PirateCollisionObserver';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
 import { StationMaze } from './StationMaze';
@@ -145,6 +147,10 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
   }
   addLaserShotObserver(observer: LaserShotObserver): void { this.laserField.addLaserShotObserver(observer); }
   removeLaserShotObserver(observer: LaserShotObserver): void { this.laserField.removeLaserShotObserver(observer); }
+  addPirateLaserShotObserver(observer: PirateLaserShotObserver): void { this.pirateField.addPirateLaserShotObserver(observer); }
+  removePirateLaserShotObserver(observer: PirateLaserShotObserver): void { this.pirateField.removePirateLaserShotObserver(observer); }
+  addPirateCollisionObserver(observer: PirateCollisionObserver): void { this.pirateField.addPirateCollisionObserver(observer); }
+  removePirateCollisionObserver(observer: PirateCollisionObserver): void { this.pirateField.removePirateCollisionObserver(observer); }
   addLaserImpactObserver(observer: LaserImpactObserver): void {
     this.laserField.addLaserImpactObserver(observer);
     this.pirateField.addLaserImpactObserver(observer);

@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { Asteroid } from '../model/Asteroid';
 import { Collision } from '../model/Collision';
 import { MassiveAsteroid } from '../model/MassiveAsteroid';
+import { Pirate } from '../model/Pirate';
 import { Ship } from '../model/Ship';
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
@@ -27,6 +28,7 @@ function stubModel(ship: Ship, asteroids: Asteroid[] = [], massives: MassiveAste
     asteroidBelt: { forEach: (fn: (a: Asteroid) => void) => asteroids.forEach(fn) },
     massiveAsteroidField: { forEachActive: (fn: (a: MassiveAsteroid) => void) => massives.forEach(fn) },
     droneField: { forEach: () => {} },
+    pirateField: { forEachPirate: () => {} },
   } as unknown as Model.Game;
 }
 
@@ -214,6 +216,31 @@ describe('ParticleField', () => {
     const exhaust = circles.filter((c) => Math.hypot(c.x, c.y) < radius);
     expect(exhaust.length).toBeGreaterThan(0);
     expect(exhaust.every((c) => c.x < ship.position.x)).toBe(true);
+    vi.restoreAllMocks();
+  });
+
+  it('REQ-63 hunting pirates emit fuel-amber exhaust behind them like drones', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const pirate = new Pirate({ x: 0, y: 0 }, [1, 1, 1, 1], 3);
+    pirate.awaken();
+    const camera = new Camera();
+    const field = new ParticleField();
+    const { drawing, circles } = countingDrawing();
+    const model = {
+      ship: new Ship(),
+      asteroidBelt: { forEach: () => {} },
+      massiveAsteroidField: { forEachActive: () => {} },
+      droneField: { forEach: () => {} },
+      pirateField: { forEachPirate: (fn: (p: Pirate) => void) => fn(pirate) },
+    } as unknown as Model.Game;
+
+    field.update(0.5, model, camera, VIEWPORT);
+    field.draw(drawing);
+
+    const radius = camera.getVisibleWorldRadius(VIEWPORT);
+    const exhaust = circles.filter((c) => Math.hypot(c.x, c.y) < radius);
+    expect(exhaust.length).toBeGreaterThan(0);
+    expect(exhaust.every((c) => c.x < pirate.position.x)).toBe(true);
     vi.restoreAllMocks();
   });
 

@@ -33,7 +33,7 @@ import { StationDarkness } from './StationDarkness';
 import { StorageAdapter } from './StorageAdapter';
 import { SupplyField } from './SupplyField';
 
-export class Game implements Model.CollisionObserver, Model.DamageObserver, Model.AsteroidDestroyedObserver, Model.LaserShotObserver, Model.LaserImpactObserver, Model.AsteroidCollisionObserver, Model.CollectablePickupObserver, Model.DroneDestroyedObserver, Model.PirateDestroyedObserver {
+export class Game implements Model.CollisionObserver, Model.DamageObserver, Model.AsteroidDestroyedObserver, Model.LaserShotObserver, Model.LaserImpactObserver, Model.AsteroidCollisionObserver, Model.CollectablePickupObserver, Model.DroneDestroyedObserver, Model.PirateDestroyedObserver, Model.PirateLaserShotObserver, Model.PirateCollisionObserver {
   private readonly drawing: Drawing;
   private readonly camera = new Camera();
   private readonly hud = new Hud();
@@ -124,6 +124,14 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.particleField.emitExplosion(event.position, { r: 255, g: 106, b: 74 });
   }
 
+  onPirateLaserShot(event: Model.LaserShot): void {
+    this.soundGate.onPirateLaserShot(event);
+  }
+
+  onPirateCollision(collision: Model.Collision): void {
+    this.soundGate.onPirateCollision(collision);
+  }
+
   consumeRestartRequest(): boolean {
     if (this.restartRequested) {
       this.restartRequested = false;
@@ -166,10 +174,21 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     return found;
   }
 
+  private anyHuntingPirateOnScreen(model: Model.Game): boolean {
+    const bounds = this.camera.getVisibleWorldBounds(this.drawing.size);
+    let found = false;
+    model.pirateField.forEachPirate((pirate) => {
+      if (found || !pirate.isHunting) return;
+      if (pirate.position.x >= bounds.left && pirate.position.x <= bounds.right
+        && pirate.position.y >= bounds.top && pirate.position.y <= bounds.bottom) found = true;
+    });
+    return found;
+  }
+
   render(model: Model.Game, dt: number): void {
     this.camera.setBaseZoom(this.settings.getDefaultZoomLevel());
     this.camera.setViewport(this.drawing.size);
-    this.camera.update(model.ship.position, model.ship.velocity, dt, model.droneField.anyHunting(), model.mission.isTraversal);
+    this.camera.update(model.ship.position, model.ship.velocity, dt, model.droneField.anyHunting() || model.pirateField.anyHunting(), model.mission.isTraversal);
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
     this.particleField.update(dt, model, this.camera, this.drawing.size);
     this.nebulaField.update(dt, model, this.camera, this.drawing.size);
@@ -185,6 +204,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.sounds.setSettings(this.settings.getSfxSettings());
     this.sounds.setThrusting(model.ship.isAlive && model.thrusting);
     this.sounds.setDroneThrusting(this.anyHuntingDroneOnScreen(model));
+    this.sounds.setPirateThrusting(this.anyHuntingPirateOnScreen(model));
     this.sounds.update();
 
     this.background.draw(this.drawing, this.camera.worldPosition);

@@ -34,6 +34,14 @@ export class SoundGate {
     if (this.onScreen(event.position)) this.sounds.onCollectable();
   }
 
+  onPirateLaserShot(event: LaserShot): void {
+    if (this.onScreen(event.position)) this.sounds.onPirateLaserShot();
+  }
+
+  onPirateCollision(collision: Collision): void {
+    if (this.onScreen(collision.position)) this.sounds.onPirateCollision();
+  }
+
   private onScreen(position: Vec2): boolean {
     const bounds = this.camera.getVisibleWorldBounds(this.viewport());
     return position.x >= bounds.left

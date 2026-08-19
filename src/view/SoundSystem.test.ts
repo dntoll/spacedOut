@@ -33,6 +33,8 @@ interface Harness {
   thrust: ThrustSound;
   droneAudio: FakeThrustAudio;
   droneThrust: ThrustSound;
+  pirateAudio: FakeThrustAudio;
+  pirateThrust: ThrustSound;
 }
 
 function harness(clips: Partial<Record<SfxChannel, SoundClip[]>>, rng: () => number = () => 0): Harness {
@@ -40,8 +42,10 @@ function harness(clips: Partial<Record<SfxChannel, SoundClip[]>>, rng: () => num
   const thrust = new ThrustSound(audio, { startFraction: 0.1, endFraction: 0.1 });
   const droneAudio = new FakeThrustAudio();
   const droneThrust = new ThrustSound(droneAudio, { startFraction: 0.1, endFraction: 0.1 });
-  const system = new SoundSystem(clips, thrust, { rng, droneThrust });
-  return { system, audio, thrust, droneAudio, droneThrust };
+  const pirateAudio = new FakeThrustAudio();
+  const pirateThrust = new ThrustSound(pirateAudio, { startFraction: 0.1, endFraction: 0.1 });
+  const system = new SoundSystem(clips, thrust, { rng, droneThrust, pirateThrust });
+  return { system, audio, thrust, droneAudio, droneThrust, pirateAudio, pirateThrust };
 }
 
 const fullSettings = (overrides: Partial<typeof DEFAULT_SFX_SETTINGS> = {}) => ({ ...DEFAULT_SFX_SETTINGS, ...overrides });
@@ -230,5 +234,63 @@ describe('SoundSystem', () => {
 
     system.setDroneThrusting(false);
     expect(droneThrust.currentPhase).toBe('ending');
+  });
+
+  it('REQ-45 plays the pirate thrust sound at a lower volume than the ship thrust', () => {
+    const { system, pirateAudio, pirateThrust } = harness({});
+    system.unlock();
+    system.setSettings(fullSettings({ master: 1, thrust: 1 }));
+
+    system.setPirateThrusting(true);
+
+    expect(pirateThrust.currentPhase).toBe('starting');
+    expect(pirateAudio.playing).toBe(true);
+    expect(pirateAudio.volume).toBeLessThan(1);
+    expect(pirateAudio.volume).toBeGreaterThan(0);
+  });
+
+  it('REQ-45 starts and stops the pirate thrust sound independently of the ship and drone thrust', () => {
+    const { system, audio, droneAudio, pirateAudio, pirateThrust } = harness({});
+    system.unlock();
+
+    system.setPirateThrusting(true);
+    expect(pirateAudio.playing).toBe(true);
+    expect(audio.playing).toBe(false);
+    expect(droneAudio.playing).toBe(false);
+
+    system.setPirateThrusting(false);
+    expect(pirateThrust.currentPhase).toBe('ending');
+  });
+
+  it('REQ-45 plays the pirate laser-shot sound at a lower volume than the ship laser shot', () => {
+    const clip = new FakeSoundClip();
+    const { system } = harness({ [SfxChannel.LaserShot]: [clip] });
+    system.unlock();
+    system.setSettings(fullSettings({ master: 1, laserShot: 1 }));
+
+    system.onLaserShot();
+    const shipVolume = clip.volume;
+
+    system.onPirateLaserShot();
+
+    expect(clip.plays).toBe(2);
+    expect(clip.volume).toBeLessThan(shipVolume);
+    expect(clip.volume).toBeGreaterThan(0);
+  });
+
+  it('REQ-45 plays the pirate collision sound at a lower volume than the ship asteroid collision', () => {
+    const clip = new FakeSoundClip();
+    const { system } = harness({ [SfxChannel.AsteroidCollision]: [clip] });
+    system.unlock();
+    system.setSettings(fullSettings({ master: 1, asteroidCollision: 1 }));
+
+    system.onAsteroidCollision();
+    const shipVolume = clip.volume;
+
+    system.onPirateCollision();
+
+    expect(clip.plays).toBe(2);
+    expect(clip.volume).toBeLessThan(shipVolume);
+    expect(clip.volume).toBeGreaterThan(0);
   });
 });

@@ -34,10 +34,11 @@ export class ParticleField {
   private particles: Particle[] = [];
   private emissionCarry = 0;
   private droneEmissionCarry = 0;
+  private pirateEmissionCarry = 0;
   private visibility = 1;
 
   setVisibility(v: number): void { this.visibility = Math.max(0, v); }
-  reset(): void { this.particles = []; this.emissionCarry = 0; this.droneEmissionCarry = 0; }
+  reset(): void { this.particles = []; this.emissionCarry = 0; this.droneEmissionCarry = 0; this.pirateEmissionCarry = 0; }
 
   adopt(position: Vec2, velocity: Vec2): void {
     if (this.particles.length >= MAX_POPULATION) return;
@@ -112,6 +113,7 @@ export class ParticleField {
   update(dt: number, model: Model.Game, camera: Camera, viewport: Size): void {
     if (model.ship.isThrusting && model.ship.isAlive) this.emitExhaust(dt, model.ship);
     this.emitDroneExhaust(dt, model);
+    this.emitPirateExhaust(dt, model);
     for (const particle of this.particles) particle.update(dt);
     this.bounce(model);
     this.cull(camera, viewport);
@@ -176,6 +178,37 @@ export class ParticleField {
       add(drone.position, offset),
       add(
         scale(drone.velocity, 0.08),
+        add(scale(back, random(120, 200)), scale(side, jitter * 14)),
+      ),
+      random(1.2, 3),
+      burn,
+      burn,
+      FUEL_COLOR,
+      HOT_ALPHA,
+    );
+  }
+
+  private emitPirateExhaust(dt: number, model: Model.Game): void {
+    model.pirateField.forEachPirate((pirate) => {
+      if (!pirate.isHunting) return;
+      this.pirateEmissionCarry += dt * 22;
+      while (this.pirateEmissionCarry >= 1) {
+        this.pirateEmissionCarry--;
+        this.particles.push(this.createPirateExhaustParticle(pirate));
+      }
+    });
+  }
+
+  private createPirateExhaustParticle(pirate: Model.Pirate): Particle {
+    const back = { x: -Math.cos(pirate.angle), y: -Math.sin(pirate.angle) };
+    const side = { x: -back.y, y: back.x };
+    const jitter = random(-1, 1);
+    const burn = random(0.3, 0.55);
+    const offset = add(scale(back, pirate.radius * 0.5), scale(side, jitter * 2));
+    return new Particle(
+      add(pirate.position, offset),
+      add(
+        scale(pirate.velocity, 0.08),
         add(scale(back, random(120, 200)), scale(side, jitter * 14)),
       ),
       random(1.2, 3),

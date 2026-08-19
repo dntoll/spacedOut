@@ -46,22 +46,28 @@ const ONE_SHOT_CHANNELS: readonly SfxChannel[] = [
 ];
 
 const DRONE_THRUST_VOLUME_SCALE = 0.35;
+const PIRATE_THRUST_VOLUME_SCALE = 0.35;
+const PIRATE_LASER_VOLUME_SCALE = 0.5;
+const PIRATE_COLLISION_VOLUME_SCALE = 0.5;
 
 export interface SoundSystemOptions {
   window?: Window;
   rng?: () => number;
   droneThrust?: ThrustSound;
+  pirateThrust?: ThrustSound;
 }
 
 export class SoundSystem {
   private readonly clips: Record<SfxChannel, SoundClip[]>;
   private readonly thrust: ThrustSound;
   private readonly droneThrust: ThrustSound;
+  private readonly pirateThrust: ThrustSound;
   private readonly rng: () => number;
   private volumes: SfxSettings = { ...DEFAULT_SFX_SETTINGS };
   private unlocked = false;
   private thrustActive = false;
   private droneThrustActive = false;
+  private pirateThrustActive = false;
 
   constructor(
     clips: Partial<Record<SfxChannel, SoundClip[]>>,
@@ -75,6 +81,7 @@ export class SoundSystem {
     }
     this.thrust = thrust;
     this.droneThrust = options?.droneThrust ?? thrust;
+    this.pirateThrust = options?.pirateThrust ?? thrust;
     this.rng = options?.rng ?? Math.random;
     if (options?.window) this.attachUnlock(options.window);
   }
@@ -98,7 +105,9 @@ export class SoundSystem {
     const thrust = new ThrustSound(thrustAudio, DEFAULT_THRUST_SPLITS);
     const droneAudio = thrustUrl ? new HtmlThrustAudio(thrustUrl) : new NullThrustAudio();
     const droneThrust = new ThrustSound(droneAudio, DEFAULT_THRUST_SPLITS);
-    return new SoundSystem(clips, thrust, { window, droneThrust });
+    const pirateAudio = thrustUrl ? new HtmlThrustAudio(thrustUrl) : new NullThrustAudio();
+    const pirateThrust = new ThrustSound(pirateAudio, DEFAULT_THRUST_SPLITS);
+    return new SoundSystem(clips, thrust, { window, droneThrust, pirateThrust });
   }
 
   unlock(): void { this.unlocked = true; }
@@ -107,6 +116,7 @@ export class SoundSystem {
     this.volumes = clampSettings(settings);
     this.applyThrustVolume();
     this.applyDroneThrustVolume();
+    this.applyPirateThrustVolume();
   }
 
   setThrusting(active: boolean): void {
@@ -139,13 +149,30 @@ export class SoundSystem {
     }
   }
 
-  update(): void { this.thrust.update(); this.droneThrust.update(); }
+  setPirateThrusting(active: boolean): void {
+    if (!this.unlocked) {
+      if (this.pirateThrustActive) { this.pirateThrust.reset(); this.pirateThrustActive = false; }
+      return;
+    }
+    if (active && !this.pirateThrustActive) {
+      this.applyPirateThrustVolume();
+      this.pirateThrust.start();
+      this.pirateThrustActive = true;
+    } else if (!active && this.pirateThrustActive) {
+      this.pirateThrust.stop();
+      this.pirateThrustActive = false;
+    }
+  }
+
+  update(): void { this.thrust.update(); this.droneThrust.update(); this.pirateThrust.update(); }
 
   reset(): void {
     this.thrust.reset();
     this.thrustActive = false;
     this.droneThrust.reset();
     this.droneThrustActive = false;
+    this.pirateThrust.reset();
+    this.pirateThrustActive = false;
   }
 
   onLaserShot(): void { this.playOneshot(SfxChannel.LaserShot); }
@@ -153,13 +180,15 @@ export class SoundSystem {
   onAsteroidCollision(): void { this.playOneshot(SfxChannel.AsteroidCollision); }
   onShipCollision(): void { this.playOneshot(SfxChannel.ShipCollision); }
   onCollectable(): void { this.playOneshot(SfxChannel.Collectable); }
+  onPirateLaserShot(): void { this.playOneshot(SfxChannel.LaserShot, PIRATE_LASER_VOLUME_SCALE); }
+  onPirateCollision(): void { this.playOneshot(SfxChannel.AsteroidCollision, PIRATE_COLLISION_VOLUME_SCALE); }
 
-  private playOneshot(channel: SfxChannel): void {
+  private playOneshot(channel: SfxChannel, entityScale = 1): void {
     if (!this.unlocked) return;
     const pool = this.clips[channel];
     if (pool.length === 0) return;
     const clip = pool[Math.floor(this.rng() * pool.length)];
-    clip.setVolume(this.volumes.master * this.typeVolume(channel));
+    clip.setVolume(this.volumes.master * this.typeVolume(channel) * entityScale);
     clip.play();
   }
 
@@ -181,6 +210,10 @@ export class SoundSystem {
 
   private applyDroneThrustVolume(): void {
     this.droneThrust.setVolume(this.volumes.master * this.volumes.thrust * DRONE_THRUST_VOLUME_SCALE);
+  }
+
+  private applyPirateThrustVolume(): void {
+    this.pirateThrust.setVolume(this.volumes.master * this.volumes.thrust * PIRATE_THRUST_VOLUME_SCALE);
   }
 
   private attachUnlock(win: Window): void {

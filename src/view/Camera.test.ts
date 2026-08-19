@@ -60,7 +60,7 @@ describe('Camera', () => {
       .toBeGreaterThan(slow.getVisibleWorldRadius({ width: 1000, height: 600 }));
   });
 
-  it('REQ-56 zooms farther out while any drone is hunting', () => {
+  it('REQ-56 zooms farther out while any drone or pirate is hunting', () => {
     const calm = new Camera();
     const threatened = new Camera();
     calm.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1, false);
@@ -75,7 +75,7 @@ describe('Camera', () => {
     expect(fastThreatened.zoom).toBeLessThan(fastCalm.zoom);
   });
 
-  it('REQ-56 eases back in when the drone threat clears', () => {
+  it('REQ-56 eases back in when the threat clears', () => {
     const camera = new Camera();
     camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1, true);
     const threatenedZoom = camera.zoom;
@@ -111,7 +111,7 @@ describe('Camera', () => {
     expect(fast.zoom).toBeCloseTo(0.35);
   });
 
-  it('REQ-60 composes the desolation zoom with the hunting-drone pullback', () => {
+  it('REQ-60 composes the desolation zoom with the enemy-threat pullback', () => {
     const camera = new Camera();
     camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1, false, false);
     const base = camera.zoom;

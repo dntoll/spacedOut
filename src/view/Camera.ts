@@ -4,8 +4,8 @@ import type { Drawing } from './Drawing';
 
 export type WorldBounds = Bounds;
 
-const DRONE_THREAT_ZOOM_OUT = 0.25;
-const DRONE_THREAT_FLOOR = 0.30;
+const THREAT_ZOOM_OUT = 0.25;
+const THREAT_FLOOR = 0.30;
 const DESOLATE_ZOOM_OUT = 0.15;
 const DESOLATE_FLOOR = 0.35;
 const LOOKAHEAD_GAIN = 0.3;
@@ -26,12 +26,12 @@ export class Camera {
   setBaseZoom(zoom: number): void { this.baseZoom = clamp(zoom, 0.5, 2); }
   setViewport(viewport: { width: number; height: number }): void { this.viewport = { ...viewport }; }
 
-  update(target: Vec2, velocity: Vec2, dt: number, droneThreat = false, desolate = false): void {
+  update(target: Vec2, velocity: Vec2, dt: number, threat = false, desolate = false): void {
     this.focus = { ...target };
     const speed = length(velocity);
     let floor = 0.42;
     let zoomOffset = 0;
-    if (droneThreat) { floor = Math.min(floor, DRONE_THREAT_FLOOR); zoomOffset += DRONE_THREAT_ZOOM_OUT; }
+    if (threat) { floor = Math.min(floor, THREAT_FLOOR); zoomOffset += THREAT_ZOOM_OUT; }
     if (desolate) { floor = Math.min(floor, DESOLATE_FLOOR); zoomOffset += DESOLATE_ZOOM_OUT; }
     const targetZoom = clamp(this.baseZoom - speed / 700 - zoomOffset, floor, this.baseZoom);
     this.zoomLevel += (targetZoom - this.zoomLevel) * Math.min(1, dt * 2.5);

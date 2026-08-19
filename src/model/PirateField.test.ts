@@ -375,4 +375,24 @@ describe('PirateField', () => {
 
     expect(field.has(sample)).toBe(false);
   });
+
+  it('REQ-56 anyHunting is false while every pirate is dormant', () => {
+    const pirate = new Pirate({ x: 1000, y: 0 }, VERTICES, 3);
+    const field = new PirateField([pirate]);
+
+    expect(pirate.awake).toBe(false);
+    expect(field.anyHunting()).toBe(false);
+  });
+
+  it('REQ-56 anyHunting is true once a pirate awakens and hunts', () => {
+    const ship = new Ship();
+    const pirate = new Pirate({ x: 1000, y: 0 }, VERTICES, 3);
+    pirate.angle = Math.PI;
+    const field = new PirateField([pirate]);
+
+    field.update(0.02, ship, emptyBelt(), emptyMassive(), 1500, false);
+
+    expect(pirate.awake).toBe(true);
+    expect(field.anyHunting()).toBe(true);
+  });
 });

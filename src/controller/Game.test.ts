@@ -26,6 +26,8 @@ const stubModel = (isGameOver: boolean): Model.Game =>
     addCollectablePickupObserver: vi.fn(),
     addDroneDestroyedObserver: vi.fn(),
     addPirateDestroyedObserver: vi.fn(),
+    addPirateLaserShotObserver: vi.fn(),
+    addPirateCollisionObserver: vi.fn(),
   }) as unknown as Model.Game;
 
 const stubView = (restart: boolean, firing = false): View.Game =>
@@ -89,6 +91,8 @@ describe('Controller Game', () => {
     expect(model.addLaserImpactObserver).toHaveBeenCalledWith(view);
     expect(model.addAsteroidCollisionObserver).toHaveBeenCalledWith(view);
     expect(model.addCollectablePickupObserver).toHaveBeenCalledWith(view);
+    expect(model.addPirateLaserShotObserver).toHaveBeenCalledWith(view);
+    expect(model.addPirateCollisionObserver).toHaveBeenCalledWith(view);
   });
 
   it('REQ-39 fires lasers while the player is firing', () => {
