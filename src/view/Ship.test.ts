@@ -75,4 +75,35 @@ describe('Ship view', () => {
     const wingGuns = polygons.filter((points) => points.length === 4);
     expect(wingGuns).toHaveLength(2);
   });
+
+  it('REQ-77 draws a circle around the ship while it is invulnerable', () => {
+    const circles: Array<{ position: { x: number; y: number }; radius: number }> = [];
+    const drawing = {
+      withTransform: (_position: unknown, _angle: number, draw: () => void) => draw(),
+      withShadow: (_color: string, _blur: number, draw: () => void) => draw(),
+      polygon: vi.fn(),
+      circle: (position: { x: number; y: number }, radius: number, _paint: RadialPaint) =>
+        circles.push({ position: { ...position }, radius }),
+    } as unknown as Drawing;
+
+    const safe = new ModelShip();
+    expect(safe.isInvulnerable).toBe(false);
+    new Ship().draw(drawing, safe, new StarLight(), null);
+    expect(circles).toHaveLength(0);
+
+    const hit = new ModelShip();
+    hit.takeDamage(10);
+    expect(hit.isInvulnerable).toBe(true);
+    circles.length = 0;
+    new Ship().draw(drawing, hit, new StarLight(), null);
+    expect(circles).toHaveLength(1);
+    expect(circles[0].position).toEqual({ x: 0, y: 0 });
+    expect(circles[0].radius).toBeGreaterThan(22);
+
+    hit.updateInvulnerability(0.6);
+    expect(hit.isInvulnerable).toBe(false);
+    circles.length = 0;
+    new Ship().draw(drawing, hit, new StarLight(), null);
+    expect(circles).toHaveLength(0);
+  });
 });

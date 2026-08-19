@@ -1,5 +1,6 @@
 import type * as Model from '../model';
 import type { ControlTuning, Vec2 } from '../types';
+import { MissionPhase } from '../model';
 import { AsteroidBelt } from './AsteroidBelt';
 import { Camera } from './Camera';
 import { CompositeShadowCasters } from './CompositeShadowCasters';
@@ -60,6 +61,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly soundGate = new SoundGate(this.camera, this.sounds, () => this.drawing.size);
   private readonly gameOverNode = document.querySelector<HTMLElement>('#game-over');
   private restartRequested = false;
+  private previousMissionPhase: Model.MissionPhase | null = null;
 
   constructor(canvasSelector: string) {
     this.drawing = new Drawing(canvasSelector);
@@ -134,6 +136,17 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.particleField.reset();
     this.nebulaField.reset();
     this.sounds.reset();
+    this.previousMissionPhase = null;
+    this.music.resetMission();
+  }
+
+  private missionNumberFor(phase: Model.MissionPhase): 1 | 2 | 3 | null {
+    switch (phase) {
+      case MissionPhase.Mission1Active: return 1;
+      case MissionPhase.Mission2Active: return 2;
+      case MissionPhase.Mission3Active: return 3;
+      default: return null;
+    }
   }
 
   private anyHuntingDroneOnScreen(model: Model.Game): boolean {
@@ -154,6 +167,12 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
     this.particleField.update(dt, model, this.camera, this.drawing.size);
     this.nebulaField.update(dt, model, this.camera, this.drawing.size);
+    const phase = model.mission.phase;
+    if (phase !== this.previousMissionPhase) {
+      const mission = this.missionNumberFor(phase);
+      if (mission !== null) this.music.startMission(mission);
+      this.previousMissionPhase = phase;
+    }
     this.music.update(this.getMusicLevel(), dt, model.droneField.anyHunting() || model.pirateField.anyHunting());
     const particleVisibility = this.settings.getParticleVisibility();
     this.particleField.setVisibility(particleVisibility);

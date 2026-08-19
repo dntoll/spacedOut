@@ -43,12 +43,25 @@ describe('MusicSystem', () => {
     expect(system.activeCategory).toBeNull();
   });
 
+  it('REQ-29 plays no calm music before any mission has started', () => {
+    const calm = tracks('calm', 'calm');
+    const system = new MusicSystem(calm, { fadeSeconds: 1 });
+    system.unlock();
+
+    hold(system, 1, false, 1);
+
+    expect(system.activeCategory).toBeNull();
+    expect(calm[0].playing).toBe(false);
+    expect(calm[1].playing).toBe(false);
+  });
+
   it('REQ-29 plays calm as the default when the player is just piloting and idle', () => {
     const calm = tracks('calm', 'calm');
     const medium = tracks('medium', 'medium');
     const action = tracks('action', 'action');
     const system = new MusicSystem([...calm, ...medium, ...action], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
 
     hold(system, 1, false, 1);
 
@@ -63,6 +76,7 @@ describe('MusicSystem', () => {
     const medium = tracks('medium');
     const system = new MusicSystem([...calm, ...medium], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
 
     fire(system, 2);
@@ -76,6 +90,7 @@ describe('MusicSystem', () => {
     const medium = tracks('medium');
     const system = new MusicSystem([...calm, ...medium], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
 
     fire(system, 3);
@@ -92,6 +107,7 @@ describe('MusicSystem', () => {
     const medium = tracks('medium');
     const system = new MusicSystem([...calm, ...medium], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
 
     fire(system, 1);
@@ -109,6 +125,7 @@ describe('MusicSystem', () => {
     const medium = tracks('medium');
     const system = new MusicSystem([...calm, ...medium], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
 
     fire(system, 3);
@@ -124,6 +141,7 @@ describe('MusicSystem', () => {
     const action = tracks('action');
     const system = new MusicSystem([...calm, ...action], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
 
     system.update(1, DT, true);
@@ -137,6 +155,7 @@ describe('MusicSystem', () => {
     const action = tracks('action');
     const system = new MusicSystem([...calm, ...action], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
     hold(system, 1, true, 0.5); // enter action
     expect(system.activeCategory).toBe('action');
@@ -153,6 +172,7 @@ describe('MusicSystem', () => {
     const action = tracks('action');
     const system = new MusicSystem([...calm, ...medium, ...action], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
 
     fire(system, 3);
@@ -168,6 +188,7 @@ describe('MusicSystem', () => {
     const medium = tracks('medium');
     const system = new MusicSystem([...calm, ...medium], { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 6); // calm active, dwell satisfied, volume full
     expect(calm[0].volume).toBeCloseTo(1, 5);
 
@@ -186,18 +207,22 @@ describe('MusicSystem', () => {
   });
 
   it('REQ-29 rotates to the next track when the current song ends', () => {
-    const calm = tracks('calm', 'calm');
-    const system = new MusicSystem(calm, { fadeSeconds: 1 });
+    const calm = tracks('calm');
+    const medium = tracks('medium', 'medium');
+    const system = new MusicSystem([...calm, ...medium], { fadeSeconds: 1 });
     system.unlock();
     hold(system, 1, false, 1);
-    expect(calm[0].playing).toBe(true);
 
-    calm[0].ended = true;
+    fire(system, 3);
+    hold(system, 1, false, 6); // -> medium, medium[0] playing
+    expect(medium[0].playing).toBe(true);
+
+    medium[0].ended = true;
     system.update(1, 0.1, false);
 
-    expect(calm[0].currentTime).toBe(0);
-    expect(calm[0].playing).toBe(false);
-    expect(calm[1].playing).toBe(true);
+    expect(medium[0].currentTime).toBe(0);
+    expect(medium[0].playing).toBe(false);
+    expect(medium[1].playing).toBe(true);
   });
 
   it('REQ-29 resumes a paused track from its remembered position', () => {
@@ -205,6 +230,7 @@ describe('MusicSystem', () => {
     const medium = tracks('medium');
     const system = new MusicSystem([...calm, ...medium], { fadeSeconds: 0.5 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
     calm[0].currentTime = 30;
 
@@ -223,11 +249,103 @@ describe('MusicSystem', () => {
     const calm = tracks('calm');
     const system = new MusicSystem(calm, { fadeSeconds: 1 });
     system.unlock();
+    system.startMission(1);
     hold(system, 1, false, 1);
     expect(calm[0].volume).toBeCloseTo(1, 5);
 
     hold(system, 0, false, 2);
     expect(calm[0].volume).toBeCloseTo(0, 5);
     expect(calm[0].playing).toBe(false);
+  });
+
+  it('REQ-29 starts the mission theme from the beginning when a mission starts', () => {
+    const calm = tracks('calm', 'calm');
+    const system = new MusicSystem(calm, { fadeSeconds: 1 });
+    system.unlock();
+    system.startMission(1);
+    hold(system, 1, false, 1);
+    expect(calm[0].playing).toBe(true);
+    calm[0].currentTime = 42;
+
+    system.startMission(2); // mission 2 -> its theme (song 2) from the beginning
+    expect(calm[1].currentTime).toBe(0);
+    hold(system, 1, false, 1);
+    expect(calm[1].playing).toBe(true);
+  });
+
+  it('REQ-29 mission 1 keeps only song 1 unlocked and loops it', () => {
+    const calm = tracks('calm', 'calm', 'calm'); // song 1, 2, 3
+    const system = new MusicSystem(calm, { fadeSeconds: 1 });
+    system.unlock();
+    system.startMission(1);
+    hold(system, 1, false, 1);
+    expect(calm[0].playing).toBe(true);
+    expect(calm[1].playing).toBe(false);
+    expect(calm[2].playing).toBe(false);
+
+    calm[0].ended = true;
+    system.update(1, 0.1, false);
+
+    expect(calm[0].playing).toBe(true); // only song 1 unlocked -> loops back
+    expect(calm[1].playing).toBe(false);
+    expect(calm[2].playing).toBe(false);
+  });
+
+  it('REQ-29 mission 2 starts with song 2 then rotates through songs 1 and 2', () => {
+    const calm = tracks('calm', 'calm', 'calm');
+    const system = new MusicSystem(calm, { fadeSeconds: 1 });
+    system.unlock();
+    system.startMission(2);
+    hold(system, 1, false, 1);
+    expect(calm[1].playing).toBe(true); // song 2 theme
+    expect(calm[0].playing).toBe(false);
+    expect(calm[2].playing).toBe(false); // song 3 stays locked
+
+    calm[1].ended = true;
+    system.update(1, 0.1, false);
+    expect(calm[0].playing).toBe(true); // rotates to song 1
+    expect(calm[1].playing).toBe(false);
+    expect(calm[2].playing).toBe(false);
+
+    calm[0].ended = true;
+    system.update(1, 0.1, false);
+    expect(calm[1].playing).toBe(true); // back to song 2
+    expect(calm[2].playing).toBe(false);
+  });
+
+  it('REQ-29 mission 3 starts with song 3 then rotates 1, 2, 3, 1', () => {
+    const calm = tracks('calm', 'calm', 'calm');
+    const system = new MusicSystem(calm, { fadeSeconds: 1 });
+    system.unlock();
+    system.startMission(3);
+    hold(system, 1, false, 1);
+    expect(calm[2].playing).toBe(true); // song 3 theme
+
+    calm[2].ended = true;
+    system.update(1, 0.1, false);
+    expect(calm[0].playing).toBe(true); // song 1
+
+    calm[0].ended = true;
+    system.update(1, 0.1, false);
+    expect(calm[1].playing).toBe(true); // song 2
+
+    calm[1].ended = true;
+    system.update(1, 0.1, false);
+    expect(calm[2].playing).toBe(true); // song 3 again
+  });
+
+  it('REQ-29 resetMission clears the unlocked calm songs', () => {
+    const calm = tracks('calm', 'calm');
+    const system = new MusicSystem(calm, { fadeSeconds: 1 });
+    system.unlock();
+    system.startMission(2);
+    hold(system, 1, false, 1);
+    expect(calm[1].playing).toBe(true);
+
+    system.resetMission();
+    hold(system, 1, false, 2);
+
+    expect(calm[0].playing).toBe(false);
+    expect(calm[1].playing).toBe(false);
   });
 });

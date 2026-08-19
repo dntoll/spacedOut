@@ -9,6 +9,7 @@ const NOSE: Nozzle = { offset: { x: 20, y: 0 }, radius: 22 };
 const STARBOARD: Nozzle = { offset: { x: -4, y: 13 }, radius: 18 };
 const PORT: Nozzle = { offset: { x: -4, y: -13 }, radius: 18 };
 const SHIP_SHADOW_RADIUS = 20;
+const INVULNERABILITY_RADIUS = 30;
 
 export class Ship {
   draw(drawing: Drawing, ship: Model.Ship, starLight: StarLight, casters: ShadowCasters | null): void {
@@ -27,6 +28,22 @@ export class Ship {
       });
       drawing.polygon([{ x: 10, y: 0 }, { x: -6, y: 5 }, { x: -4, y: -5 }], '#182c45');
       this.drawWingGuns(drawing, ship);
+      if (ship.isInvulnerable) this.drawInvulnerabilityShield(drawing);
+    });
+  }
+
+  private drawInvulnerabilityShield(drawing: Drawing): void {
+    const shield: RadialPaint = {
+      from: { x: 0, y: 0 }, fromRadius: INVULNERABILITY_RADIUS * 0.6,
+      to: { x: 0, y: 0 }, toRadius: INVULNERABILITY_RADIUS,
+      stops: [
+        { offset: 0, color: 'rgba(126,233,255,0)' },
+        { offset: 0.7, color: 'rgba(126,233,255,0.15)' },
+        { offset: 1, color: 'rgba(126,233,255,0.4)' },
+      ],
+    };
+    drawing.withShadow('#7ee9ff', 12, () => {
+      drawing.circle({ x: 0, y: 0 }, INVULNERABILITY_RADIUS, shield, '#7ee9ff', 1.5);
     });
   }
 

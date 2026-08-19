@@ -5,7 +5,7 @@ import { StorageAdapter, type KeyValueStore } from './StorageAdapter';
 interface MockElement {
   value?: string;
   textContent: string;
-  classList: { toggle: ReturnType<typeof vi.fn>; add: ReturnType<typeof vi.fn> };
+  classList: { toggle: ReturnType<typeof vi.fn>; add: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
   addEventListener: ReturnType<typeof vi.fn>;
   handlers: Map<string, () => void>;
 }
@@ -14,7 +14,7 @@ function makeElement(value?: string): MockElement {
   const el: MockElement = {
     value,
     textContent: '',
-    classList: { toggle: vi.fn(), add: vi.fn() },
+    classList: { toggle: vi.fn(), add: vi.fn(), remove: vi.fn() },
     addEventListener: vi.fn(),
     handlers: new Map(),
   };
@@ -32,27 +32,28 @@ function buildDocument(): Map<string, MockElement> {
   return new Map<string, MockElement>([
     ['#settings-toggle', makeElement()],
     ['#settings-panel', makeElement()],
-    ['#dampening-slider', makeElement('1.5')],
-    ['#thrust-slider', makeElement('170')],
+    ['#settings-dev', makeElement()],
+    ['#dampening-slider', makeElement('2')],
+    ['#thrust-slider', makeElement('500')],
     ['#maxspeed-slider', makeElement('1000')],
     ['#dampening-value', makeElement()],
     ['#thrust-value', makeElement()],
     ['#maxspeed-value', makeElement()],
     ['#music-slider', makeElement('50')],
     ['#music-value', makeElement()],
-    ['#particle-slider', makeElement('100')],
+    ['#particle-slider', makeElement('40')],
     ['#particle-value', makeElement()],
     ['#zoom-slider', makeElement('1.15')],
     ['#zoom-value', makeElement()],
-    ['#sfx-master-slider', makeElement('100')],
+    ['#sfx-master-slider', makeElement('60')],
     ['#sfx-master-value', makeElement()],
-    ['#sfx-thrust-slider', makeElement('100')],
+    ['#sfx-thrust-slider', makeElement('46')],
     ['#sfx-thrust-value', makeElement()],
-    ['#sfx-laser-slider', makeElement('100')],
+    ['#sfx-laser-slider', makeElement('50')],
     ['#sfx-laser-value', makeElement()],
-    ['#sfx-laser-hit-slider', makeElement('100')],
+    ['#sfx-laser-hit-slider', makeElement('61')],
     ['#sfx-laser-hit-value', makeElement()],
-    ['#sfx-asteroid-slider', makeElement('100')],
+    ['#sfx-asteroid-slider', makeElement('42')],
     ['#sfx-asteroid-value', makeElement()],
     ['#sfx-ship-slider', makeElement('100')],
     ['#sfx-ship-value', makeElement()],
@@ -75,8 +76,8 @@ describe('SettingsMenu', () => {
 
     const tuning = menu.getControlTuning();
 
-    expect(tuning.dampening).toBeCloseTo(1.5, 5);
-    expect(tuning.thrustAccel).toBe(170);
+    expect(tuning.dampening).toBeCloseTo(2, 5);
+    expect(tuning.thrustAccel).toBe(500);
     expect(tuning.maxSpeed).toBe(1000);
   });
 
@@ -131,7 +132,7 @@ describe('SettingsMenu', () => {
 
     const saved = new StorageAdapter(store).read<{ dampening: number; thrustAccel: number; maxSpeed: number }>('control-tuning');
     expect(saved?.dampening).toBe(4);
-    expect(saved?.thrustAccel).toBe(170);
+    expect(saved?.thrustAccel).toBe(500);
     expect(saved?.maxSpeed).toBe(1000);
   });
 
@@ -183,7 +184,7 @@ describe('SettingsMenu', () => {
     stubDocument(elements);
     const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
 
-    expect(menu.getParticleVisibility()).toBeCloseTo(1, 5);
+    expect(menu.getParticleVisibility()).toBeCloseTo(0.4, 5);
   });
 
   it('REQ-32 reflects particle slider changes in the visibility', () => {
@@ -270,11 +271,11 @@ describe('SettingsMenu', () => {
     const menu = new SettingsMenu(new StorageAdapter(new FakeStore()));
 
     const sfx = menu.getSfxSettings();
-    expect(sfx.master).toBeCloseTo(1, 5);
-    expect(sfx.thrust).toBeCloseTo(1, 5);
-    expect(sfx.laserShot).toBeCloseTo(1, 5);
-    expect(sfx.laserHit).toBeCloseTo(1, 5);
-    expect(sfx.asteroidCollision).toBeCloseTo(1, 5);
+    expect(sfx.master).toBeCloseTo(0.6, 5);
+    expect(sfx.thrust).toBeCloseTo(0.46, 5);
+    expect(sfx.laserShot).toBeCloseTo(0.5, 5);
+    expect(sfx.laserHit).toBeCloseTo(0.61, 5);
+    expect(sfx.asteroidCollision).toBeCloseTo(0.42, 5);
     expect(sfx.shipCollision).toBeCloseTo(1, 5);
     expect(sfx.collectable).toBeCloseTo(1, 5);
   });
@@ -324,5 +325,21 @@ describe('SettingsMenu', () => {
 
     const saved = new StorageAdapter(store).read<Record<string, number>>('sfx-settings');
     expect(saved?.thrust).toBe(30);
+  });
+
+  it('REQ-78 reveals the dev settings section during development builds', () => {
+    const elements = buildDocument();
+    stubDocument(elements);
+    new SettingsMenu(new StorageAdapter(new FakeStore()), true);
+
+    expect(elements.get('#settings-dev')!.classList.remove).toHaveBeenCalledWith('hidden');
+  });
+
+  it('REQ-78 keeps the dev settings section hidden in production builds', () => {
+    const elements = buildDocument();
+    stubDocument(elements);
+    new SettingsMenu(new StorageAdapter(new FakeStore()), false);
+
+    expect(elements.get('#settings-dev')!.classList.remove).not.toHaveBeenCalled();
   });
 });

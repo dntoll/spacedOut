@@ -21,70 +21,75 @@
         <button class="mission-option" id="mission-3" type="button">MISSION 3 (CHEAT)</button>
       </div>
       <div class="settings-panel hidden" id="settings-panel" aria-label="Ship control tuning">
-        <div class="settings-row">
-          <label for="dampening-slider">DAMPENING</label>
-          <input type="range" id="dampening-slider" min="0" max="6" step="0.1" value="1.5" />
-          <output id="dampening-value">1.5</output>
+        <div class="settings-section">
+          <div class="settings-row">
+            <label for="dampening-slider">DAMPENING</label>
+            <input type="range" id="dampening-slider" min="0" max="6" step="0.1" value="2" />
+            <output id="dampening-value">2</output>
+          </div>
+          <div class="settings-row">
+            <label for="thrust-slider">THRUST</label>
+            <input type="range" id="thrust-slider" min="0" max="500" step="10" value="500" />
+            <output id="thrust-value">500</output>
+          </div>
+          <div class="settings-row">
+            <label for="maxspeed-slider">MAX SPEED</label>
+            <input type="range" id="maxspeed-slider" min="100" max="1500" step="50" value="1000" />
+            <output id="maxspeed-value">1000</output>
+          </div>
+          <div class="settings-row">
+            <label for="music-slider">MUSIC</label>
+            <input type="range" id="music-slider" min="0" max="100" step="1" value="50" />
+            <output id="music-value">50</output>
+          </div>
+          <div class="settings-row">
+            <label for="zoom-slider">ZOOM</label>
+            <input type="range" id="zoom-slider" min="0.5" max="2" step="0.05" value="1.15" />
+            <output id="zoom-value">1.15</output>
+          </div>
+          <div class="settings-row">
+            <label for="sfx-master-slider">SFX</label>
+            <input type="range" id="sfx-master-slider" min="0" max="100" step="1" value="60" />
+            <output id="sfx-master-value">60</output>
+          </div>
         </div>
-        <div class="settings-row">
-          <label for="thrust-slider">THRUST</label>
-          <input type="range" id="thrust-slider" min="0" max="500" step="10" value="170" />
-          <output id="thrust-value">170</output>
-        </div>
-        <div class="settings-row">
-          <label for="maxspeed-slider">MAX SPEED</label>
-          <input type="range" id="maxspeed-slider" min="100" max="1500" step="50" value="1000" />
-          <output id="maxspeed-value">1000</output>
-        </div>
-        <div class="settings-row">
-          <label for="music-slider">MUSIC</label>
-          <input type="range" id="music-slider" min="0" max="100" step="1" value="50" />
-          <output id="music-value">50</output>
-        </div>
-        <div class="settings-row">
-          <label for="particle-slider">PARTICLES</label>
-          <input type="range" id="particle-slider" min="0" max="100" step="5" value="100" />
-          <output id="particle-value">100</output>
-        </div>
-        <div class="settings-row">
-          <label for="zoom-slider">ZOOM</label>
-          <input type="range" id="zoom-slider" min="0.5" max="2" step="0.05" value="1.15" />
-          <output id="zoom-value">1.15</output>
-        </div>
-        <div class="settings-row">
-          <label for="sfx-master-slider">SFX</label>
-          <input type="range" id="sfx-master-slider" min="0" max="100" step="1" value="100" />
-          <output id="sfx-master-value">100</output>
-        </div>
-        <div class="settings-row">
-          <label for="sfx-thrust-slider">ENGINE</label>
-          <input type="range" id="sfx-thrust-slider" min="0" max="100" step="1" value="100" />
-          <output id="sfx-thrust-value">100</output>
-        </div>
-        <div class="settings-row">
-          <label for="sfx-laser-slider">LASER</label>
-          <input type="range" id="sfx-laser-slider" min="0" max="100" step="1" value="100" />
-          <output id="sfx-laser-value">100</output>
-        </div>
-        <div class="settings-row">
-          <label for="sfx-laser-hit-slider">LASER HIT</label>
-          <input type="range" id="sfx-laser-hit-slider" min="0" max="100" step="1" value="100" />
-          <output id="sfx-laser-hit-value">100</output>
-        </div>
-        <div class="settings-row">
-          <label for="sfx-asteroid-slider">ROCK HIT</label>
-          <input type="range" id="sfx-asteroid-slider" min="0" max="100" step="1" value="100" />
-          <output id="sfx-asteroid-value">100</output>
-        </div>
-        <div class="settings-row">
-          <label for="sfx-ship-slider">SHIP HIT</label>
-          <input type="range" id="sfx-ship-slider" min="0" max="100" step="1" value="100" />
-          <output id="sfx-ship-value">100</output>
-        </div>
-        <div class="settings-row">
-          <label for="sfx-collectable-slider">PICKUP</label>
-          <input type="range" id="sfx-collectable-slider" min="0" max="100" step="1" value="100" />
-          <output id="sfx-collectable-value">100</output>
+        <div class="settings-dev hidden" id="settings-dev" aria-label="Development tuning">
+          <div class="settings-dev-header">DEV</div>
+          <div class="settings-row">
+            <label for="particle-slider">PARTICLES</label>
+            <input type="range" id="particle-slider" min="0" max="100" step="5" value="40" />
+            <output id="particle-value">40</output>
+          </div>
+          <div class="settings-row">
+            <label for="sfx-thrust-slider">ENGINE</label>
+            <input type="range" id="sfx-thrust-slider" min="0" max="100" step="1" value="46" />
+            <output id="sfx-thrust-value">46</output>
+          </div>
+          <div class="settings-row">
+            <label for="sfx-laser-slider">LASER</label>
+            <input type="range" id="sfx-laser-slider" min="0" max="100" step="1" value="50" />
+            <output id="sfx-laser-value">50</output>
+          </div>
+          <div class="settings-row">
+            <label for="sfx-laser-hit-slider">LASER HIT</label>
+            <input type="range" id="sfx-laser-hit-slider" min="0" max="100" step="1" value="61" />
+            <output id="sfx-laser-hit-value">61</output>
+          </div>
+          <div class="settings-row">
+            <label for="sfx-asteroid-slider">ROCK HIT</label>
+            <input type="range" id="sfx-asteroid-slider" min="0" max="100" step="1" value="42" />
+            <output id="sfx-asteroid-value">42</output>
+          </div>
+          <div class="settings-row">
+            <label for="sfx-ship-slider">SHIP HIT</label>
+            <input type="range" id="sfx-ship-slider" min="0" max="100" step="1" value="100" />
+            <output id="sfx-ship-value">100</output>
+          </div>
+          <div class="settings-row">
+            <label for="sfx-collectable-slider">PICKUP</label>
+            <input type="range" id="sfx-collectable-slider" min="0" max="100" step="1" value="100" />
+            <output id="sfx-collectable-value">100</output>
+          </div>
         </div>
       </div>
       <div class="speed"><b id="speed-warning">WARNING</b><span id="speed">000</span><small>m/s</small></div>

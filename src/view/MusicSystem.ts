@@ -33,6 +33,7 @@ export class MusicSystem {
   private time = 0;
   private categoryTimer = 0;
   private readonly shotTimes: number[] = [];
+  private missionUnlock = 0;
 
   constructor(tracks: AudioTrack[], options?: MusicSystemOptions) {
     this.fadeSeconds = options?.fadeSeconds ?? DEFAULT_MUSIC_FADE_SECONDS;
@@ -52,6 +53,25 @@ export class MusicSystem {
     this.shotTimes.push(this.time);
   }
 
+  startMission(mission: 1 | 2 | 3): void {
+    this.missionUnlock = mission;
+    const list = this.byCategory.calm;
+    if (list.length === 0) return;
+    const count = Math.min(mission, list.length);
+    this.index.calm = count - 1;
+    const theme = list[this.index.calm];
+    if (theme) {
+      theme.currentTime = 0;
+      this.active = 'calm';
+      this.categoryTimer = 0;
+    }
+  }
+
+  resetMission(): void {
+    this.missionUnlock = 0;
+    this.index.calm = 0;
+  }
+
   update(level: number, dt: number, enemyPursuing: boolean): void {
     this.time += dt;
     this.pruneShots();
@@ -61,13 +81,13 @@ export class MusicSystem {
     const desired = this.desiredCategory(enemyPursuing);
 
     if (this.active === null) {
-      if (level > 0 && this.byCategory[desired].length > 0) { this.active = desired; this.categoryTimer = 0; }
+      if (level > 0 && this.categoryCount(desired) > 0) { this.active = desired; this.categoryTimer = 0; }
       else { this.pauseAll(); return; }
     } else if (desired !== this.active) {
       this.categoryTimer += dt;
       const involvesAction = desired === 'action' || this.active === 'action';
       if (involvesAction || this.categoryTimer >= DWELL_SECONDS) {
-        if (this.byCategory[desired].length > 0) { this.active = desired; this.categoryTimer = 0; }
+        if (this.categoryCount(desired) > 0) { this.active = desired; this.categoryTimer = 0; }
       }
     } else {
       this.categoryTimer += dt;
@@ -80,8 +100,8 @@ export class MusicSystem {
         ended.volume = 0;
         ended.currentTime = 0;
         ended.pause();
-        const list = this.byCategory[cat];
-        this.index[cat] = (this.index[cat] + 1) % list.length;
+        const count = this.categoryCount(cat);
+        if (count > 0) this.index[cat] = (this.index[cat] + 1) % count;
       }
     }
 
@@ -106,6 +126,11 @@ export class MusicSystem {
     return 'calm';
   }
 
+  private categoryCount(cat: MusicCategory): number {
+    if (cat === 'calm') return Math.min(this.missionUnlock, this.byCategory.calm.length);
+    return this.byCategory[cat].length;
+  }
+
   private pruneShots(): void {
     const cutoff = this.time - SHOT_WINDOW_SECONDS;
     while (this.shotTimes.length > 0 && this.shotTimes[0] < cutoff) this.shotTimes.shift();
@@ -114,6 +139,11 @@ export class MusicSystem {
   private activeTrack(): AudioTrack | null {
     if (this.active === null) return null;
     const list = this.byCategory[this.active];
+    if (this.active === 'calm') {
+      const count = this.categoryCount('calm');
+      if (count === 0) return null;
+      return list[Math.min(this.index.calm, count - 1)] ?? null;
+    }
     return list[this.index[this.active]] ?? null;
   }
 
@@ -157,12 +187,23 @@ class HtmlAudioTrack implements AudioTrack {
 
 function buildTracks(): AudioTrack[] {
   const modules = import.meta.glob('/assets/music/*', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
-  const tracks: AudioTrack[] = [];
+  const calm: { track: AudioTrack; mission: number }[] = [];
+  const medium: AudioTrack[] = [];
+  const action: AudioTrack[] = [];
   for (const [path, url] of Object.entries(modules)) {
     const name = path.split('/').pop() ?? '';
     const prefix = name.split(/[_\s]/)[0]?.toLowerCase() ?? '';
-    if (prefix !== 'calm' && prefix !== 'medium' && prefix !== 'action') continue;
-    tracks.push(new HtmlAudioTrack(url, prefix));
+    const missionMatch = /^mission(\d+)$/.exec(prefix);
+    if (missionMatch) {
+      calm.push({ track: new HtmlAudioTrack(url, 'calm'), mission: Number(missionMatch[1]) });
+    } else if (prefix === 'calm') {
+      calm.push({ track: new HtmlAudioTrack(url, 'calm'), mission: Number.MAX_SAFE_INTEGER });
+    } else if (prefix === 'medium') {
+      medium.push(new HtmlAudioTrack(url, 'medium'));
+    } else if (prefix === 'action') {
+      action.push(new HtmlAudioTrack(url, 'action'));
+    }
   }
-  return tracks;
+  calm.sort((a, b) => a.mission - b.mission);
+  return [...calm.map((c) => c.track), ...medium, ...action];
 }

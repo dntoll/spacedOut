@@ -8,12 +8,20 @@ const PARTICLE_STORAGE_KEY = 'particle-visibility';
 const SFX_STORAGE_KEY = 'sfx-settings';
 const ZOOM_STORAGE_KEY = 'default-zoom';
 const DEFAULT_MUSIC_PERCENT = 50;
-const DEFAULT_PARTICLE_PERCENT = 100;
-const DEFAULT_SFX_PERCENT = 100;
+const DEFAULT_PARTICLE_PERCENT = 40;
 const DEFAULT_ZOOM = 1.15;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
-const DEFAULT_TUNING: ControlTuning = { dampening: 1.5, thrustAccel: 170, maxSpeed: 1000 };
+const DEFAULT_TUNING: ControlTuning = { dampening: 2, thrustAccel: 500, maxSpeed: 1000 };
+const DEFAULT_SFX_PERCENTS: Record<SfxChannel, number> = {
+  [SfxChannel.Master]: 60,
+  [SfxChannel.Thrust]: 46,
+  [SfxChannel.LaserShot]: 50,
+  [SfxChannel.LaserHit]: 61,
+  [SfxChannel.AsteroidCollision]: 42,
+  [SfxChannel.ShipCollision]: 100,
+  [SfxChannel.Collectable]: 100,
+};
 
 interface SfxSliderConfig {
   channel: SfxChannel;
@@ -49,10 +57,12 @@ export class SettingsMenu {
   private readonly zoomValue: HTMLElement | null;
   private readonly sfxSliders = new Map<SfxChannel, HTMLInputElement | null>();
   private readonly sfxValues = new Map<SfxChannel, HTMLElement | null>();
+  private readonly devSection: HTMLElement | null;
 
-  constructor(private readonly storage: StorageAdapter) {
+  constructor(private readonly storage: StorageAdapter, private readonly dev: boolean = import.meta.env.DEV) {
     this.panel = document.querySelector('#settings-panel');
     this.toggle = document.querySelector('#settings-toggle');
+    this.devSection = document.querySelector<HTMLElement>('#settings-dev');
     this.dampeningSlider = document.querySelector<HTMLInputElement>('#dampening-slider');
     this.thrustSlider = document.querySelector<HTMLInputElement>('#thrust-slider');
     this.maxSpeedSlider = document.querySelector<HTMLInputElement>('#maxspeed-slider');
@@ -80,6 +90,8 @@ export class SettingsMenu {
     if (persistedZoom != null) this.applyZoom(persistedZoom);
     const persistedSfx = this.storage.read<Partial<Record<keyof SfxSettings, number>>>(SFX_STORAGE_KEY) ?? {};
     this.applySfx(persistedSfx);
+
+    if (this.dev) this.devSection?.classList.remove('hidden');
 
     this.toggle?.addEventListener('click', () => this.togglePanel());
     this.dampeningSlider?.addEventListener('input', () => this.onChange(this.dampeningValue, this.dampeningSlider, 1));
@@ -163,9 +175,10 @@ export class SettingsMenu {
 
   private applySfx(percents: Partial<Record<keyof SfxSettings, number>>): void {
     for (const cfg of SFX_SLIDERS) {
+      const fallback = DEFAULT_SFX_PERCENTS[cfg.channel];
       const stored = percents[cfg.field];
-      let percent = stored != null ? Number(stored) : DEFAULT_SFX_PERCENT;
-      if (!Number.isFinite(percent)) percent = DEFAULT_SFX_PERCENT;
+      let percent = stored != null ? Number(stored) : fallback;
+      if (!Number.isFinite(percent)) percent = fallback;
       const clamped = String(Math.max(0, Math.min(100, Math.round(percent))));
       const slider = this.sfxSliders.get(cfg.channel);
       const value = this.sfxValues.get(cfg.channel);
@@ -214,7 +227,7 @@ export class SettingsMenu {
 
   private sfxFraction(channel: SfxChannel): number {
     const raw = Number(this.sfxSliders.get(channel)?.value);
-    const percent = Number.isFinite(raw) ? raw : DEFAULT_SFX_PERCENT;
+    const percent = Number.isFinite(raw) ? raw : DEFAULT_SFX_PERCENTS[channel];
     return Math.max(0, Math.min(1, percent / 100));
   }
 
