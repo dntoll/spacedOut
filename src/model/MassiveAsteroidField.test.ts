@@ -5,7 +5,6 @@ import { Collision } from './Collision';
 import { FuelContainer } from './FuelContainer';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
-import { SpaceStation } from './SpaceStation';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
 import { SupplyField } from './SupplyField';
@@ -14,7 +13,9 @@ describe('MassiveAsteroidField', () => {
   it('REQ-20 creates immovable asteroids 30–100 ship radii across with concavities and cavities', () => {
     const ship = new Ship();
     const massive: MassiveAsteroid[] = [];
-    new MassiveAsteroidField(ship.position, ship.radius, undefined, 123).forEachActive((asteroid) => massive.push(asteroid));
+    const field = new MassiveAsteroidField(ship.position, ship.radius, undefined, 123);
+    field.prepareAround(ship.position, 1500);
+    field.forEachActive((asteroid) => massive.push(asteroid));
 
     expect(massive).toHaveLength(9);
     for (const asteroid of massive) {
@@ -62,6 +63,7 @@ describe('MassiveAsteroidField', () => {
   it('REQ-24 stably spreads massive asteroids through distant world regions', () => {
     const ship = new Ship();
     const field = new MassiveAsteroidField(ship.position, ship.radius, undefined, 456);
+    field.prepareAround(ship.position, 1500);
     const positions = (active: boolean) => {
       const values: string[] = [];
       const visit = (asteroid: MassiveAsteroid) => values.push(
@@ -83,31 +85,10 @@ describe('MassiveAsteroidField', () => {
     expect(positions(true)).toEqual(origin);
   });
 
-  it('REQ-64 replaces ambient massive asteroids with the stationary destination station', () => {
-    const ship = new Ship();
-    const field = new MassiveAsteroidField(ship.position, ship.radius, undefined, 789);
-    const knownBefore: MassiveAsteroid[] = [];
-    field.forEachKnown((asteroid) => knownBefore.push(asteroid));
-    expect(knownBefore.length).toBeGreaterThan(0);
-
-    field.placeDestinationStation({ x: 80000, y: 0 }, ship.radius * 100);
-
-    const knownAfter: MassiveAsteroid[] = [];
-    field.forEachKnown((asteroid) => knownAfter.push(asteroid));
-    const activeAfter: MassiveAsteroid[] = [];
-    field.forEachActive((asteroid) => activeAfter.push(asteroid));
-    expect(knownAfter).toHaveLength(1);
-    expect(activeAfter).toHaveLength(1);
-    expect(knownAfter[0]).toBe(activeAfter[0]);
-    expect(field.destination).toBe(knownAfter[0]);
-    expect(field.destination).toBeInstanceOf(SpaceStation);
-    expect(field.destination!.velocity).toEqual({ x: 0, y: 0 });
-    expect(field.destination!.mass).toBe(Number.POSITIVE_INFINITY);
-  });
-
   it('REQ-62 suppressAmbient clears ambient asteroids without placing a destination', () => {
     const ship = new Ship();
     const field = new MassiveAsteroidField(ship.position, ship.radius, undefined, 321);
+    field.prepareAround(ship.position, 1500);
     const knownBefore: MassiveAsteroid[] = [];
     field.forEachKnown((asteroid) => knownBefore.push(asteroid));
     expect(knownBefore.length).toBeGreaterThan(0);

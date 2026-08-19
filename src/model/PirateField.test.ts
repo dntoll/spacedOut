@@ -3,6 +3,7 @@ import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
 import { Collision } from './Collision';
 import { Damage } from './Damage';
+import { DiscoveredMap } from './DiscoveredMap';
 import { Drone } from './Drone';
 import { DroneField } from './DroneField';
 import { MassiveAsteroid } from './MassiveAsteroid';
@@ -23,7 +24,7 @@ describe('PirateField', () => {
     const field = new PirateField();
     const detection = field.detectionRange(ship);
 
-    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, true);
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, true, { x: 1, y: 0 });
 
     expect(field.count).toBeGreaterThan(0);
     field.forEachPirate((pirate) => {
@@ -182,7 +183,7 @@ describe('PirateField', () => {
     const ship = new Ship();
     const field = new PirateField();
 
-    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, true);
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, true, { x: 1, y: 0 });
 
     const pirates: Pirate[] = [];
     field.forEachPirate((p) => pirates.push(p));
@@ -325,5 +326,53 @@ describe('PirateField', () => {
     let laserCount = 0;
     field.forEachLaser(() => laserCount++);
     expect(laserCount).toBe(0);
+  });
+
+  it('REQ-63 spawns pirates only in unexplored area so they do not pop into discovered space', () => {
+    const ship = new Ship();
+    const field = new PirateField();
+    const discovered = new DiscoveredMap();
+    // The ship has explored a screen-sized blob around its starting position,
+    // but distant space ahead and off to the sides remains unexplored.
+    discovered.record({ left: -1500, top: -1500, right: 1500, bottom: 1500 });
+
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, true, { x: 1, y: 0 }, discovered);
+
+    expect(field.count).toBeGreaterThan(0);
+    field.forEachPirate((pirate) => {
+      expect(discovered.isCircleDiscovered(pirate.position, pirate.radius)).toBe(false);
+    });
+  });
+
+  it('REQ-63 does not recycle a freshly spawned squad the next frame (no minimap flicker)', () => {
+    const ship = new Ship();
+    const field = new PirateField();
+    const travel = { x: 1, y: 0 };
+
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, true, travel);
+    const countAfterSpawn = field.count;
+    expect(countAfterSpawn).toBeGreaterThan(0);
+
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, true, travel);
+
+    expect(field.count).toBe(countAfterSpawn);
+  });
+
+  it('REQ-63 recycles a peripheral squad once the ship has travelled far past it, freeing the slot', () => {
+    const ship = new Ship();
+    const field = new PirateField();
+    const travel = { x: 1, y: 0 };
+
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, true, travel);
+    const peripheral: Pirate[] = [];
+    field.forEachPirate((p) => { if (p.peripheral) peripheral.push(p); });
+    expect(peripheral.length).toBeGreaterThan(0);
+    const sample = peripheral[0];
+
+    // Move the ship far along the route, well beyond the peripheral recycle distance.
+    ship.position = { x: 12000, y: 0 };
+    field.update(0, ship, emptyBelt(), emptyMassive(), 1500, false, travel);
+
+    expect(field.has(sample)).toBe(false);
   });
 });

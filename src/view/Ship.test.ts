@@ -106,4 +106,36 @@ describe('Ship view', () => {
     new Ship().draw(drawing, hit, new StarLight(), null);
     expect(circles).toHaveLength(0);
   });
+
+  it('REQ-82 REQ-84 uses a cooler nozzle glow when thrust is free', () => {
+    const paints: RadialPaint[] = [];
+    const drawing = {
+      withTransform: (_position: unknown, _angle: number, draw: () => void) => draw(),
+      withShadow: (_color: string, _blur: number, draw: () => void) => draw(),
+      polygon: vi.fn(),
+      circle: (_position: { x: number; y: number }, _radius: number, paint: RadialPaint) => paints.push(paint),
+    } as unknown as Drawing;
+
+    const paid = new ModelShip();
+    paid.velocity = { x: 200, y: 0 };
+    paid.aimAt({ x: 500, y: 0 });
+    paid.startThrust();
+    paid.applyControls(0.1);
+    expect(paid.freeThrust).toBe(false);
+    new Ship().draw(drawing, paid, new StarLight(), null);
+    const paidStops = paints.flatMap((p) => p.stops.map((s) => s.color));
+    expect(paidStops.some((c) => c.includes('255,195,92'))).toBe(true);
+
+    const free = new ModelShip();
+    free.velocity = { x: 50, y: 0 };
+    free.aimAt({ x: 500, y: 0 });
+    free.startThrust();
+    free.applyControls(0.1);
+    expect(free.freeThrust).toBe(true);
+    paints.length = 0;
+    new Ship().draw(drawing, free, new StarLight(), null);
+    const freeStops = paints.flatMap((p) => p.stops.map((s) => s.color));
+    expect(freeStops.some((c) => c.includes('230,215,175'))).toBe(true);
+    expect(freeStops.every((c) => !c.includes('255,195,92'))).toBe(true);
+  });
 });

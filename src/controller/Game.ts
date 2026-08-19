@@ -35,6 +35,7 @@ export class Game {
       else this.model.stopThrust();
       if (this.view.isPlayerFiring) this.model.fireLaser();
     }
+    this.model.recordDiscoveredBounds(this.view.getDiscoveredBounds());
     this.model.update(dt);
     this.view.render(this.model, dt);
     requestAnimationFrame((next) => this.frame(next));

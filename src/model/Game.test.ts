@@ -67,6 +67,7 @@ describe('Game', () => {
 
   it('REQ-51 drops the lowest-meter resource from destroyed asteroids', () => {
     const game = new Game();
+    game.ship.setControlTuning({ dampening: 1.5, thrustAccel: 170, maxSpeed: 100000 });
     game.ship.aimAt({ x: 1e9, y: 0 });
     game.ship.startThrust();
     for (let i = 0; i < 400 && game.ship.fuel > 0; i++) game.ship.applyControls(0.1);
@@ -248,8 +249,7 @@ describe('Game', () => {
 
   it('REQ-65 enters mission 3 without restarting and clears encounters while preserving the station', () => {
     const game = new Game();
-    game.massiveAsteroidField.placeDestinationStation({ x: 2400, y: 0 }, game.ship.radius * 100);
-    const station = game.massiveAsteroidField.destination;
+    game.stationMaze.placeAt({ x: 2400, y: 0 }, 1000, 0, 42);
     game.mission.phase = MissionPhase.Mission2Done;
 
     game.advanceMission();
@@ -259,7 +259,7 @@ describe('Game', () => {
     game.asteroidBelt.forEach(() => asteroidCount++);
     game.supplyField.forEachActive(() => supplyCount++);
     expect(game.mission.phase).toBe(MissionPhase.Mission3Intro);
-    expect(game.massiveAsteroidField.destination).toBe(station);
+    expect(game.stationMaze.isPlaced).toBe(true);
     expect(asteroidCount).toBe(0);
     expect(supplyCount).toBe(0);
     expect(game.droneField.count).toBe(0);
@@ -270,14 +270,26 @@ describe('Game', () => {
     const game = new Game({ startingMission: 3 });
 
     expect(game.mission.phase).toBe(MissionPhase.Mission3Intro);
-    expect(game.massiveAsteroidField.destination).not.toBeNull();
+    expect(game.stationMaze.isPlaced).toBe(true);
     expect(game.ship.fuel).toBe(100);
     expect(game.ship.hp).toBe(100);
     expect(game.ship.ammo).toBe(100);
     expect(game.ship.weaponLevel).toBe(2);
     expect(Math.hypot(
-      game.massiveAsteroidField.destination!.position.x - game.ship.position.x,
-      game.massiveAsteroidField.destination!.position.y - game.ship.position.y,
-    )).toBeLessThan(game.massiveAsteroidField.destination!.radius * 2);
+      game.stationMaze.center!.x - game.ship.position.x,
+      game.stationMaze.center!.y - game.ship.position.y,
+    )).toBeLessThan(game.stationMaze.outerRadius * 2);
+  });
+
+  it('REQ-79 leaves no discovered massive asteroids on the minimap when starting at the mission 3 cheat', () => {
+    const game = new Game({ startingMission: 3 });
+
+    const active: MassiveAsteroid[] = [];
+    game.massiveAsteroidField.forEachActive((asteroid) => active.push(asteroid));
+    const known: MassiveAsteroid[] = [];
+    game.massiveAsteroidField.forEachKnown((asteroid) => known.push(asteroid));
+
+    expect(active).toHaveLength(0);
+    expect(known).toHaveLength(0);
   });
 });

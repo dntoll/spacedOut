@@ -4,13 +4,14 @@ import type { Asteroid } from './Asteroid';
 import type { AsteroidBelt } from './AsteroidBelt';
 import { Damage } from './Damage';
 import type { DamageObserver } from './DamageObserver';
+import { DiscoveredMap } from './DiscoveredMap';
 import { Laser } from './Laser';
 import type { LaserImpactObserver } from './LaserImpactObserver';
 import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
 import { CollisionResolver } from './CollisionResolver';
 import { DamageCalculator } from './DamageCalculator';
-import { Pirate, PIRATE_LASER_DAMAGE } from './Pirate';
+import { Pirate, PIRATE_LASER_DAMAGE, PIRATE_RADIUS } from './Pirate';
 import { PirateDestroyed } from './PirateDestroyed';
 import type { PirateDestroyedObserver } from './PirateDestroyedObserver';
 import type { MassiveAsteroid } from './MassiveAsteroid';
@@ -23,8 +24,9 @@ const TARGET_PERIPHERAL_SQUADS = 1;
 const SQUAD_MIN = 2;
 const SQUAD_MAX = 3;
 const SQUAD_SPREAD = 280;
-const PERIPHERAL_FRACTION = 0.5;
-const PERIPHERAL_DORMANT_EXTRA = 2400;
+const CENTER_BAND = 600;
+const LATERAL_BAND = 1200;
+const DISCOVERY_MARGIN = 200;
 const DETECTION_RADII = 100;
 const HUNT_GIVE_UP_RADIUS = 3000;
 const LASER_CULL_MARGIN = 80;
@@ -89,6 +91,7 @@ export class PirateField {
     spawnExclusionRadius: number,
     spawnEnabled = true,
     travelDirection: Vec2 | null = null,
+    discovered: DiscoveredMap = new DiscoveredMap(),
   ): void {
     this.awakenInRange(ship);
     this.rideAndHunt(dt, ship);
@@ -96,7 +99,7 @@ export class PirateField {
     this.resolveShipCollisions(ship);
     this.updateLasers(dt, ship, asteroidBelt, massiveAsteroidField, spawnExclusionRadius);
     this.recycleDistant(ship, spawnExclusionRadius);
-    if (spawnEnabled) this.spawnSquads(ship, spawnExclusionRadius, travelDirection);
+    if (spawnEnabled) this.spawnSquads(ship, spawnExclusionRadius, travelDirection, discovered);
   }
 
   private resolveAsteroidCollisions(asteroidBelt: AsteroidBelt): void {
@@ -286,9 +289,12 @@ export class PirateField {
   }
 
   private recycleDistant(ship: Ship, spawnExclusionRadius: number): void {
-    const spawnInner = Math.max(1050, spawnExclusionRadius + 180);
-    const dormantRecycle = spawnInner + 800;
-    const peripheralRecycle = spawnInner + PERIPHERAL_DORMANT_EXTRA;
+    const spawnInner = this.squadSpawnInner(ship, spawnExclusionRadius);
+    const detection = this.detectionRange(ship);
+    const dormantRecycle = spawnInner + CENTER_BAND + SQUAD_SPREAD * 2 + PIRATE_RADIUS + DISCOVERY_MARGIN;
+    const lateralHi = detection + SQUAD_SPREAD + 400 + LATERAL_BAND;
+    const peripheralAhead = spawnInner * 0.7;
+    const peripheralRecycle = peripheralAhead + lateralHi + SQUAD_SPREAD * 2 + PIRATE_RADIUS + DISCOVERY_MARGIN;
     for (let i = this.pirates.length - 1; i >= 0; i--) {
       const pirate = this.pirates[i];
       const dx = pirate.position.x - ship.position.x;
@@ -310,46 +316,68 @@ export class PirateField {
     return { combat: combat.size, peripheral: peripheral.size };
   }
 
-  private spawnSquads(ship: Ship, spawnExclusionRadius: number, travelDirection: Vec2 | null): void {
+  private squadSpawnInner(ship: Ship, spawnExclusionRadius: number): number {
     const detection = this.detectionRange(ship);
-    const spawnInner = Math.max(spawnExclusionRadius + 400, detection + 200 + SQUAD_SPREAD);
-    const peripheralRecycle = Math.max(1050, spawnExclusionRadius + 180) + PERIPHERAL_DORMANT_EXTRA;
+    return Math.max(spawnExclusionRadius + 400, detection + 200 + SQUAD_SPREAD);
+  }
+
+  private formationRadius(): number {
+    return SQUAD_SPREAD + PIRATE_RADIUS;
+  }
+
+  private spawnSquads(ship: Ship, spawnExclusionRadius: number, travelDirection: Vec2 | null, discovered: DiscoveredMap): void {
+    if (!travelDirection) return;
+    const spawnInner = this.squadSpawnInner(ship, spawnExclusionRadius);
+    const detection = this.detectionRange(ship);
     for (;;) {
       const counts = this.squadCounts();
       if (counts.combat < TARGET_COMBAT_SQUADS) {
-        this.spawnSquad(ship, spawnInner, detection, false, null, 0);
-        continue;
+        const center = this.pickSquadCenter(ship, spawnInner, detection, false, travelDirection, discovered);
+        if (center) { this.spawnSquad(center, false); continue; }
       }
-      if (counts.peripheral < TARGET_PERIPHERAL_SQUADS && travelDirection) {
-        this.spawnSquad(ship, spawnInner, detection, true, travelDirection, peripheralRecycle);
-        continue;
+      if (counts.peripheral < TARGET_PERIPHERAL_SQUADS) {
+        const center = this.pickSquadCenter(ship, spawnInner, detection, true, travelDirection, discovered);
+        if (center) { this.spawnSquad(center, true); continue; }
       }
       break;
     }
   }
 
-  private spawnSquad(
+  private pickSquadCenter(
     ship: Ship,
     spawnInner: number,
     detection: number,
     peripheral: boolean,
-    travelDirection: Vec2 | null,
-    peripheralRecycle: number,
-  ): void {
-    const squadId = this.nextSquadId++;
-    let center: Vec2;
-    if (peripheral && travelDirection) {
+    travelDirection: Vec2,
+    discovered: DiscoveredMap,
+  ): Vec2 | null {
+    const formationRadius = this.formationRadius();
+    const attempts = 8;
+    if (peripheral) {
       const perp: Vec2 = { x: -travelDirection.y, y: travelDirection.x };
       const lateralLo = detection + SQUAD_SPREAD + 400;
-      const lateralHi = Math.max(lateralLo + 200, peripheralRecycle - SQUAD_SPREAD - 400);
-      const lateral = random(lateralLo, lateralHi) * (random(0, 1) < 0.5 ? 1 : -1);
-      const ahead = random(spawnInner * 0.3, spawnInner * 0.7);
-      center = add(add(ship.position, scale(travelDirection, ahead)), scale(perp, lateral));
-    } else {
-      const angle = random(0, Math.PI * 2);
-      const distance = random(spawnInner, spawnInner + 600);
-      center = { x: ship.position.x + Math.cos(angle) * distance, y: ship.position.y + Math.sin(angle) * distance };
+      const lateralHi = lateralLo + LATERAL_BAND;
+      for (let attempt = 0; attempt < attempts; attempt++) {
+        const lateral = random(lateralLo, lateralHi) * (random(0, 1) < 0.5 ? 1 : -1);
+        const ahead = random(spawnInner * 0.3, spawnInner * 0.7);
+        const center = add(add(ship.position, scale(travelDirection, ahead)), scale(perp, lateral));
+        if (!discovered.isCircleDiscovered(center, formationRadius)) return center;
+      }
+      return null;
     }
+    for (let attempt = 0; attempt < attempts; attempt++) {
+      const ahead = random(spawnInner, spawnInner + CENTER_BAND);
+      const center = add(ship.position, scale(travelDirection, ahead));
+      if (!discovered.isCircleDiscovered(center, formationRadius)) return center;
+    }
+    const further = random(spawnInner + CENTER_BAND, spawnInner + CENTER_BAND * 2);
+    const furtherCenter = add(ship.position, scale(travelDirection, further));
+    if (!discovered.isCircleDiscovered(furtherCenter, formationRadius)) return furtherCenter;
+    return null;
+  }
+
+  private spawnSquad(center: Vec2, peripheral: boolean): void {
+    const squadId = this.nextSquadId++;
     const members = Math.floor(random(SQUAD_MIN, SQUAD_MAX + 1));
     for (let i = 0; i < members; i++) {
       const offset: Vec2 = { x: random(-SQUAD_SPREAD, SQUAD_SPREAD), y: random(-SQUAD_SPREAD, SQUAD_SPREAD) };

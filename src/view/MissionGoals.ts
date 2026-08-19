@@ -8,6 +8,10 @@ const GOAL_LABELS: ReadonlyMap<MissionGoalKind, string> = new Map([
   [MissionGoalKind.TraverseToSignal, 'Traverse to signal'],
   [MissionGoalKind.RecoverLeftWingGun, 'Recover left wing gun (destroy pirates)'],
   [MissionGoalKind.RecoverRightWingGun, 'Recover right wing gun (destroy pirates)'],
+  [MissionGoalKind.OpenGate1, 'Open gate 1 (find its switch)'],
+  [MissionGoalKind.OpenGate2, 'Open gate 2 (find its switch)'],
+  [MissionGoalKind.OpenGate3, 'Open gate 3 (find its switch)'],
+  [MissionGoalKind.ReachCentralChamber, 'Reach the central chamber'],
 ]);
 
 export class MissionGoals {

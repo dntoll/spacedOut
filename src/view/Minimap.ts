@@ -38,6 +38,7 @@ export class Minimap {
       this.drawSupplies(drawing, exploration, model.supplyField, center, position, size, span);
       this.drawDrones(drawing, exploration, model.droneField, center, position, size, span);
       this.drawPirates(drawing, exploration, model.pirateField, center, position, size, span);
+      this.drawStation(drawing, model, center, position, size, span);
       this.drawShip(drawing, model.ship.angle, position, size);
       this.drawSignal(drawing, model, position, size, center);
     });
@@ -164,6 +165,52 @@ export class Minimap {
         2.6,
         '#ff6a4a',
       );
+    });
+  }
+
+  private drawStation(
+    drawing: Drawing,
+    model: Model.Game,
+    worldCenter: Vec2,
+    position: Vec2,
+    size: Size,
+    span: number,
+  ): void {
+    const maze = model.stationMaze;
+    if (!maze || !maze.isPlaced) return;
+    const stationCenter = maze.center!;
+    if (!this.intersectsMap(stationCenter, maze.outerRadius, worldCenter, span)) return;
+    const mapCenter = this.toMap(stationCenter, worldCenter, position, size, span);
+    const scale = size.width / span;
+    const hullRadius = maze.outerRadius * scale;
+    if (hullRadius >= 1.5) drawing.circle(mapCenter, hullRadius, 'rgba(58,36,24,.30)', 'rgba(150,86,52,.5)', 1);
+    drawing.circle(this.toMap(maze.centralCenter!, worldCenter, position, size, span), maze.centralRadius * scale, 'rgba(80,60,40,.3)');
+    maze.forEachWall((wall) => {
+      if (!this.intersectsMap(wall.position, wall.radius, worldCenter, span)) return;
+      const p = this.toMap(wall.position, worldCenter, position, size, span);
+      const hl = wall.halfLength * scale;
+      const hw = wall.halfWidth * scale;
+      if (hl < 0.4 && hw < 0.4) return;
+      drawing.withTransform(p, wall.angle, () => {
+        drawing.polygon(
+          [{ x: hl, y: -hw }, { x: hl, y: hw }, { x: -hl, y: hw }, { x: -hl, y: -hw }],
+          'rgba(58,36,24,.5)',
+          'rgba(120,68,42,.6)',
+          0.5,
+        );
+      });
+    });
+    maze.forEachGate((gate) => {
+      const p = this.toMap(gate.position, worldCenter, position, size, span);
+      drawing.circle(p, 1.6, gate.open ? 'rgba(86,180,120,.6)' : '#d98a4a');
+    });
+    maze.forEachSwitch((sw) => {
+      const p = this.toMap(sw.position, worldCenter, position, size, span);
+      drawing.circle(p, 1.8, sw.activated ? '#5dff9a' : '#5de0ff');
+    });
+    maze.forEachCollectible((container) => {
+      const p = this.toMap(container.position, worldCenter, position, size, span);
+      drawing.circle(p, 1.6, container instanceof Model.HpContainer ? '#5dff9a' : container instanceof Model.AmmoContainer ? '#c98bff' : '#ffc35c');
     });
   }
 

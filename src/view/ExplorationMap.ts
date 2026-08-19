@@ -19,6 +19,36 @@ export class ExplorationMap {
     });
   }
 
+  observeLineOfSight(polygon: Vec2[]): void {
+    if (polygon.length < 3) return;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const p of polygon) {
+      if (p.x < minX) minX = p.x;
+      if (p.y < minY) minY = p.y;
+      if (p.x > maxX) maxX = p.x;
+      if (p.y > maxY) maxY = p.y;
+    }
+    this.forEachCoordinate({ left: minX, top: minY, right: maxX, bottom: maxY }, (column, row) => {
+      const cx = column * ExplorationMap.cellSize + ExplorationMap.cellSize / 2;
+      const cy = row * ExplorationMap.cellSize + ExplorationMap.cellSize / 2;
+      if (this.pointInPolygon(cx, cy, polygon)) {
+        let rows = this.exploredRows.get(column);
+        if (!rows) { rows = new Set<number>(); this.exploredRows.set(column, rows); }
+        rows.add(row);
+      }
+    });
+  }
+
+  private pointInPolygon(x: number, y: number, polygon: Vec2[]): boolean {
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x, yi = polygon[i].y;
+      const xj = polygon[j].x, yj = polygon[j].y;
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+
   isExplored(position: Vec2, radius = 0): boolean {
     let explored = false;
     this.forEachCoordinate({

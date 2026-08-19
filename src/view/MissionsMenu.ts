@@ -27,7 +27,9 @@ export class MissionsMenu {
       || phase === MissionPhase.Mission1Active
       || phase === MissionPhase.Mission1Done
       || phase === MissionPhase.Transition;
-    const mission3 = phase === MissionPhase.Mission3Intro || phase === MissionPhase.Mission3Active;
+    const mission3 = phase === MissionPhase.Mission3Intro
+      || phase === MissionPhase.Mission3Active
+      || phase === MissionPhase.Mission3Done;
     this.mission1Button?.classList.toggle('active', mission1);
     this.mission2Button?.classList.toggle('active', !mission1 && !mission3);
     this.mission3Button?.classList.toggle('active', mission3);

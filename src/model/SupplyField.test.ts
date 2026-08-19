@@ -48,6 +48,8 @@ describe('SupplyField', () => {
   it('REQ-14 collects containers when the ship reaches them', () => {
     const ship = new Ship();
     ship.consumeAmmo(40);
+    ship.setControlTuning({ dampening: 1.5, thrustAccel: 170, maxSpeed: 100000 });
+    ship.velocity = { x: 200, y: 0 };
     ship.aimAt({ x: 500, y: 0 });
     ship.startThrust();
     ship.applyControls(1);
@@ -203,6 +205,7 @@ describe('SupplyField', () => {
 
   it('REQ-51 favors the lowest ship meter when spawning reached-region containers', () => {
     const ship = new Ship();
+    ship.setControlTuning({ dampening: 1.5, thrustAccel: 170, maxSpeed: 100000 });
     ship.aimAt({ x: 1e9, y: 0 });
     ship.startThrust();
     for (let i = 0; i < 400 && ship.fuel > 0; i++) ship.applyControls(0.1);
@@ -221,6 +224,7 @@ describe('SupplyField', () => {
 
   it('REQ-51 favors the next meter when the lowest is already visible on screen', () => {
     const ship = new Ship();
+    ship.setControlTuning({ dampening: 1.5, thrustAccel: 170, maxSpeed: 100000 });
     ship.aimAt({ x: 1e9, y: 0 });
     ship.startThrust();
     for (let i = 0; i < 400 && ship.fuel > 0; i++) ship.applyControls(0.1);

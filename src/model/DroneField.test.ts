@@ -11,7 +11,7 @@ import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Pirate } from './Pirate';
 import type { PhysicsBody } from './PhysicsBody';
 import { Ship } from './Ship';
-import { SpaceStation } from './SpaceStation';
+import { StationMaze } from './StationMaze';
 import { length, sub } from '../math';
 
 const emptyBelt = () => new AsteroidBelt({ x: 0, y: 0 }, []);
@@ -49,27 +49,27 @@ describe('DroneField', () => {
     expect(drone.position.x).toBeCloseTo(massive.position.x + surface + drone.radius * 0.4, 1);
   });
 
-  it('REQ-64 does not attach mining drones to the abandoned destination station', () => {
-    const station = new SpaceStation({ x: 2000, y: 0 }, 1000, 0);
-    const massiveField = new MassiveAsteroidField({ x: 0, y: 0 }, 18, [station]);
+  it('REQ-64 does not attach mining drones to the abandoned station', () => {
+    const stationMaze = new StationMaze();
+    stationMaze.placeAt({ x: 2000, y: 0 }, 1000, 0, 42);
     const field = new DroneField();
 
-    field.update(0, new Ship(), emptyBelt(), massiveField, 0);
+    field.update(0, new Ship(), emptyBelt(), emptyMassive(), 0);
 
     expect(field.count).toBe(0);
   });
 
-  it('REQ-64 does not attract a hunting mining drone to re-home on the destination station', () => {
-    const station = new SpaceStation({ x: 1600, y: 0 }, 1000, 0);
-    const massiveField = new MassiveAsteroidField({ x: 0, y: 0 }, 18, [station]);
-    const formerHost = new Asteroid(1, { x: 1500, y: 0 }, { x: 0, y: 0 }, 30, 0, 0, [1, 1, 1], 0.5);
-    const drone = new Drone(formerHost, 0, [1, 1, 1], 2);
+  it('REQ-64 does not attract a hunting mining drone to re-home on the abandoned station', () => {
+    const stationMaze = new StationMaze();
+    stationMaze.placeAt({ x: 1600, y: 0 }, 1000, 0, 42);
+    const drone = new Drone(null, 0, [1, 1, 1], 2);
     drone.detach();
     drone.position = { x: 1500, y: 0 };
     const field = new DroneField([drone]);
 
-    field.update(0, new Ship(), emptyBelt(), massiveField, 0, false);
+    field.update(0, new Ship(), emptyBelt(), emptyMassive(), 0, false);
 
+    expect(drone.reHomeTarget).toBeNull();
     expect(field.has(drone)).toBe(false);
   });
 

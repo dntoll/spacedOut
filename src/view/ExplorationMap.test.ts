@@ -32,4 +32,14 @@ describe('ExplorationMap', () => {
     // A body whose circle actually reaches explored space is discovered.
     expect(exploration.isCircleExplored({ x: 900, y: 900 }, 1200)).toBe(true);
   });
+
+  it('REQ-83 marks cells covered by a line-of-sight polygon as explored', () => {
+    const exploration = new ExplorationMap();
+    exploration.observeLineOfSight([
+      { x: -400, y: -400 }, { x: 400, y: -400 }, { x: 400, y: 400 }, { x: -400, y: 400 },
+    ]);
+    expect(exploration.isExplored({ x: 0, y: 0 })).toBe(true);
+    expect(exploration.isExplored({ x: 300, y: 300 })).toBe(true);
+    expect(exploration.isExplored({ x: 2000, y: 0 })).toBe(false);
+  });
 });

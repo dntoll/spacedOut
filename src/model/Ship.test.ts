@@ -32,6 +32,7 @@ describe('Ship controls', () => {
 
   it('REQ-16 consumes fuel while thrusting', () => {
     const ship = new Ship();
+    ship.velocity = { x: 200, y: 0 };
     ship.aimAt({ x: 500, y: 0 });
     ship.startThrust();
     const fuelBefore = ship.fuel;
@@ -74,6 +75,7 @@ describe('Ship controls', () => {
     ship.updateEmergencyReload(2);
     expect(ship.ammo).toBe(1);
 
+    ship.setControlTuning({ dampening: 1.5, thrustAccel: 170, maxSpeed: 100000 });
     ship.aimAt({ x: 100000, y: 0 });
     ship.startThrust();
     for (let i = 0; i < 300 && ship.fuel > 0; i++) ship.applyControls(0.1);
@@ -199,5 +201,78 @@ describe('Ship controls', () => {
     expect(ship.weaponLevel).toBe(2);
     ship.upgradeWeapon();
     expect(ship.weaponLevel).toBe(2);
+  });
+
+  it('REQ-82 thrust is free below speed 100 and flags free thrust', () => {
+    const ship = new Ship();
+    ship.velocity = { x: 50, y: 0 };
+    ship.aimAt({ x: 500, y: 0 });
+    ship.startThrust();
+    const fuelBefore = ship.fuel;
+    ship.applyControls(0.5);
+    expect(ship.fuel).toBe(fuelBefore);
+    expect(ship.freeThrust).toBe(true);
+  });
+
+  it('REQ-83 brakes to a full stop when slow and idle for two seconds', () => {
+    const ship = new Ship();
+    ship.velocity = { x: 20, y: 0 };
+    ship.aimAt({ x: 0, y: -100 });
+    for (let i = 0; i < 30; i++) ship.applyControls(0.1);
+    expect(ship.speed).toBeLessThan(1);
+    expect(ship.velocity).toEqual({ x: 0, y: 0 });
+  });
+
+  it('REQ-83 does not brake while thrust is applied within the idle window', () => {
+    const ship = new Ship();
+    ship.velocity = { x: 20, y: 0 };
+    ship.aimAt({ x: 500, y: 0 });
+    ship.startThrust();
+    for (let i = 0; i < 30; i++) ship.applyControls(0.1);
+    expect(ship.speed).toBeGreaterThan(0);
+  });
+
+  it('REQ-83 does not brake when idle but speed is at or above 30', () => {
+    const ship = new Ship();
+    ship.velocity = { x: 200, y: 0 };
+    ship.aimAt({ x: 0, y: -100 });
+    for (let i = 0; i < 30; i++) ship.applyControls(0.1);
+    expect(ship.speed).toBeGreaterThanOrEqual(30);
+  });
+
+  it('REQ-84 consumes no fuel for forward thrust at top speed', () => {
+    const ship = new Ship();
+    ship.setControlTuning({ dampening: 0, thrustAccel: 170, maxSpeed: 1000 });
+    ship.velocity = { x: 1000, y: 0 };
+    ship.aimAt({ x: 500, y: 0 });
+    ship.startThrust();
+    const fuelBefore = ship.fuel;
+    ship.applyControls(0.5);
+    expect(ship.fuel).toBe(fuelBefore);
+    expect(ship.freeThrust).toBe(true);
+  });
+
+  it('REQ-84 consumes fuel for corrective thrust at top speed', () => {
+    const ship = new Ship();
+    ship.setControlTuning({ dampening: 0, thrustAccel: 170, maxSpeed: 1000 });
+    ship.velocity = { x: 1000, y: 0 };
+    ship.aimAt({ x: 0, y: 500 });
+    ship.startThrust();
+    const fuelBefore = ship.fuel;
+    ship.applyControls(0.5);
+    expect(ship.fuel).toBeLessThan(fuelBefore);
+    expect(ship.freeThrust).toBe(false);
+  });
+
+  it('REQ-84 treats near-top forward speed as free despite float dips', () => {
+    const ship = new Ship();
+    ship.setControlTuning({ dampening: 0, thrustAccel: 170, maxSpeed: 1000 });
+    ship.velocity = { x: 999.5, y: 0 };
+    ship.aimAt({ x: 500, y: 0 });
+    ship.startThrust();
+    const fuelBefore = ship.fuel;
+    ship.applyControls(0.5);
+    expect(ship.fuel).toBe(fuelBefore);
+    expect(ship.freeThrust).toBe(true);
   });
 });

@@ -70,19 +70,21 @@ export class Ship {
     const portPower = Math.max(0, dirVec.y) * level;
     const starboardPower = Math.max(0, -dirVec.y) * level;
 
-    if (tailPower > 0.001) this.drawGlow(drawing, TAIL, Math.min(1, tailPower));
-    if (nosePower > 0.001) this.drawGlow(drawing, NOSE, nosePower);
-    if (starboardPower > 0.001) this.drawGlow(drawing, STARBOARD, starboardPower);
-    if (portPower > 0.001) this.drawGlow(drawing, PORT, portPower);
+    if (tailPower > 0.001) this.drawGlow(drawing, TAIL, Math.min(1, tailPower), ship.freeThrust);
+    if (nosePower > 0.001) this.drawGlow(drawing, NOSE, nosePower, ship.freeThrust);
+    if (starboardPower > 0.001) this.drawGlow(drawing, STARBOARD, starboardPower, ship.freeThrust);
+    if (portPower > 0.001) this.drawGlow(drawing, PORT, portPower, ship.freeThrust);
   }
 
-  private drawGlow(drawing: Drawing, nozzle: Nozzle, power: number): void {
+  private drawGlow(drawing: Drawing, nozzle: Nozzle, power: number, free: boolean): void {
+    const core = free ? `rgba(230,215,175,${0.25 + power * 0.5})` : `rgba(255,195,92,${0.25 + power * 0.5})`;
+    const edge = free ? 'rgba(200,200,175,0)' : 'rgba(255,140,40,0)';
     const glow: RadialPaint = {
       from: { ...nozzle.offset }, fromRadius: 0,
       to: { ...nozzle.offset }, toRadius: nozzle.radius,
       stops: [
-        { offset: 0, color: `rgba(255,195,92,${0.25 + power * 0.5})` },
-        { offset: 1, color: 'rgba(255,140,40,0)' },
+        { offset: 0, color: core },
+        { offset: 1, color: edge },
       ],
     };
     drawing.circle(nozzle.offset, nozzle.radius, glow);

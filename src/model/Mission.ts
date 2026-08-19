@@ -1,6 +1,7 @@
 import type { AsteroidBelt } from './AsteroidBelt';
 import type { DroneField } from './DroneField';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
+import type { StationMaze } from './StationMaze';
 import type { Ship } from './Ship';
 import type { Vec2 } from '../types';
 import { length, random, sub } from '../math';
@@ -16,6 +17,7 @@ export enum MissionPhase {
   Mission2Done,
   Mission3Intro,
   Mission3Active,
+  Mission3Done,
 }
 
 export enum SpawnMode {
@@ -32,6 +34,10 @@ export enum MissionGoalKind {
   TraverseToSignal,
   RecoverLeftWingGun,
   RecoverRightWingGun,
+  OpenGate1,
+  OpenGate2,
+  OpenGate3,
+  ReachCentralChamber,
 }
 
 export interface MissionGoal {
@@ -40,11 +46,11 @@ export interface MissionGoal {
 }
 
 const TRAVEL_DISTANCE = 80000;
-const DESTINATION_RADII = 100;
+const STATION_RADIUS = 1000;
 const REQUIRED_WEAPON_LEVEL = 2;
 const ENCOUNTER_SPAWN_START_FRACTION = 0.1;
 const ENCOUNTER_SPAWN_END_FRACTION = 0.9;
-const MISSION3_STATION_CLEARANCE = 150;
+const MISSION3_STATION_CLEARANCE = 200;
 
 export class Mission {
   phase: MissionPhase = MissionPhase.Mission1Intro;
@@ -61,13 +67,18 @@ export class Mission {
   private traverseComplete = false;
   private leftWingGunRecovered = false;
   private rightWingGunRecovered = false;
+  private gate1Opened = false;
+  private gate2Opened = false;
+  private gate3Opened = false;
+  private centralReached = false;
 
   get isPaused(): boolean {
     return this.phase === MissionPhase.Mission1Intro
       || this.phase === MissionPhase.Mission1Done
       || this.phase === MissionPhase.Mission2Intro
       || this.phase === MissionPhase.Mission2Done
-      || this.phase === MissionPhase.Mission3Intro;
+      || this.phase === MissionPhase.Mission3Intro
+      || this.phase === MissionPhase.Mission3Done;
   }
 
   get spawnMode(): SpawnMode {
@@ -114,6 +125,18 @@ export class Mission {
         { kind: MissionGoalKind.RecoverRightWingGun, complete: this.rightWingGunRecovered },
       ];
     }
+    if (
+      this.phase === MissionPhase.Mission3Intro
+      || this.phase === MissionPhase.Mission3Active
+      || this.phase === MissionPhase.Mission3Done
+    ) {
+      return [
+        { kind: MissionGoalKind.OpenGate1, complete: this.gate1Opened },
+        { kind: MissionGoalKind.OpenGate2, complete: this.gate2Opened },
+        { kind: MissionGoalKind.OpenGate3, complete: this.gate3Opened },
+        { kind: MissionGoalKind.ReachCentralChamber, complete: this.centralReached },
+      ];
+    }
     return [];
   }
 
@@ -137,15 +160,16 @@ export class Mission {
     this.phase = MissionPhase.Mission2Intro;
   }
 
-  jumpToMission3Briefing(ship: Ship, massiveAsteroidField: MassiveAsteroidField): void {
+  jumpToMission3Briefing(ship: Ship, stationMaze: StationMaze): void {
     this.signalDirection = null;
-    this.destinationRadius = ship.radius * DESTINATION_RADII;
-    this.destination = {
-      x: ship.position.x + this.destinationRadius + ship.radius + MISSION3_STATION_CLEARANCE,
-      y: ship.position.y,
-    };
+    const radius = STATION_RADIUS;
+    const center: Vec2 = { x: ship.position.x - radius, y: ship.position.y };
+    const entranceAngle = 0;
+    stationMaze.placeAt(center, radius, entranceAngle, Math.floor(Math.random() * 0x1_0000_0000));
+    this.destinationRadius = stationMaze.entranceRadius;
+    this.destination = stationMaze.entrancePosition ? { ...stationMaze.entrancePosition } : null;
     this.cachedRemaining = 0;
-    massiveAsteroidField.placeDestinationStation(this.destination, this.destinationRadius);
+    this.initialDistance = 0;
     this.phase = MissionPhase.Mission3Intro;
   }
 
@@ -160,6 +184,7 @@ export class Mission {
     droneField: DroneField,
     asteroidBelt: AsteroidBelt,
     massiveAsteroidField: MassiveAsteroidField,
+    stationMaze: StationMaze,
     visited: VisitedMap,
     screenRadius: number,
   ): void {
@@ -181,33 +206,41 @@ export class Mission {
         this.phase = MissionPhase.Mission2Intro;
       }
     } else if (this.phase === MissionPhase.Mission2Active) {
-      this.beginTraversalIfNeeded(ship, massiveAsteroidField);
-      this.cachedRemaining = this.computeRemaining(ship, massiveAsteroidField);
+      this.beginTraversalIfNeeded(ship, stationMaze);
+      this.cachedRemaining = this.computeRemaining(ship, stationMaze);
       this.traverseComplete = this.cachedRemaining <= ship.radius;
       this.leftWingGunRecovered = ship.weaponLevel >= 1;
       this.rightWingGunRecovered = ship.weaponLevel >= REQUIRED_WEAPON_LEVEL;
       if (this.destination && this.traverseComplete && this.leftWingGunRecovered && this.rightWingGunRecovered) {
         this.phase = MissionPhase.Mission2Done;
       }
+    } else if (this.phase === MissionPhase.Mission3Active) {
+      this.gate1Opened = stationMaze.isGateOpen(1);
+      this.gate2Opened = stationMaze.isGateOpen(2);
+      this.gate3Opened = stationMaze.isGateOpen(3);
+      this.centralReached = stationMaze.isCentralReached(ship);
+      if (this.centralReached) this.phase = MissionPhase.Mission3Done;
     }
   }
 
-  private computeRemaining(ship: Ship, massiveField: MassiveAsteroidField): number {
+  private computeRemaining(ship: Ship, stationMaze: StationMaze): number {
     if (!this.destination) return this.initialDistance;
-    const surface = massiveField.destination
-      ? massiveField.boundaryRadiusAt(massiveField.destination, ship.position)
-      : this.destinationRadius;
-    return Math.max(0, length(sub(this.destination, ship.position)) - surface - ship.radius);
+    return Math.max(0, length(sub(this.destination, ship.position)) - this.destinationRadius - ship.radius);
   }
 
-  private beginTraversalIfNeeded(ship: Ship, massiveAsteroidField: MassiveAsteroidField): void {
+  private beginTraversalIfNeeded(ship: Ship, stationMaze: StationMaze): void {
     if (this.destination || !this.signalDirection) return;
-    this.destination = {
+    const center: Vec2 = {
       x: ship.position.x + this.signalDirection.x * TRAVEL_DISTANCE,
       y: ship.position.y + this.signalDirection.y * TRAVEL_DISTANCE,
     };
-    this.destinationRadius = ship.radius * DESTINATION_RADII;
-    this.initialDistance = Math.max(0, TRAVEL_DISTANCE - this.destinationRadius);
-    massiveAsteroidField.placeDestinationStation(this.destination, this.destinationRadius);
+    const entranceAngle = Math.atan2(
+      ship.position.y - center.y,
+      ship.position.x - center.x,
+    );
+    stationMaze.placeAt(center, STATION_RADIUS, entranceAngle, Math.floor(Math.random() * 0x1_0000_0000));
+    this.destination = stationMaze.entrancePosition ? { ...stationMaze.entrancePosition } : null;
+    this.destinationRadius = stationMaze.entranceRadius;
+    this.initialDistance = Math.max(0, TRAVEL_DISTANCE - STATION_RADIUS - this.destinationRadius);
   }
 }

@@ -26,7 +26,10 @@ export class MissionOverlay {
       this.setText('Well done', '', 'Click to continue.');
       this.node.classList.remove('hidden');
     } else if (phase === MissionPhase.Mission3Intro) {
-      this.setText('Mission: Find clues on what happened to the spacestation', '', 'Click to continue.');
+      this.setText('Mission 3: Enter the abandoned space station and reach its central chamber.', 'Find the switches to open the gates.', 'Click to continue.');
+      this.node.classList.remove('hidden');
+    } else if (phase === MissionPhase.Mission3Done) {
+      this.setText('Well done', 'You reached the central chamber and found the clues.', 'Click to continue.');
       this.node.classList.remove('hidden');
     } else {
       this.hide();

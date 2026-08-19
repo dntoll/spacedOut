@@ -6,10 +6,21 @@ export interface PolygonObstacle extends PhysicsBody {
   vertices: number[];
 }
 
+export interface CapsuleObstacle extends PhysicsBody {
+  a: Vec2;
+  b: Vec2;
+  wallRadius: number;
+}
+
+export type ShipObstacle = PolygonObstacle | CapsuleObstacle;
+
+export const isCapsuleObstacle = (obstacle: ShipObstacle): obstacle is CapsuleObstacle =>
+  'a' in obstacle && 'b' in obstacle && 'wallRadius' in obstacle;
+
 export interface SweepHit {
   time: number;
   normal: Vec2;
-  obstacle: PolygonObstacle;
+  obstacle: ShipObstacle;
 }
 
 interface LocalHit { time: number; normal: Vec2 }
@@ -36,6 +47,17 @@ export class SweptCircleCollision {
     const combined = normalize(simultaneous.reduce((sum, hit) => add(sum, hit.normal), { x: 0, y: 0 }));
     const localNormal = length(combined) > 0 ? combined : simultaneous[0].normal;
     return { time: earliest, normal: this.rotate(localNormal, obstacle.angle), obstacle };
+  }
+
+  static findCapsule(start: Vec2, end: Vec2, radius: number, obstacle: CapsuleObstacle): SweepHit | undefined {
+    const combined = radius + obstacle.wallRadius;
+    const hits = this.edgeCapsuleHits(start, end, obstacle.a, obstacle.b, combined);
+    if (hits.length === 0) return undefined;
+    const earliest = Math.min(...hits.map((hit) => hit.time));
+    const simultaneous = hits.filter((hit) => Math.abs(hit.time - earliest) < 0.0001);
+    const combinedNormal = normalize(simultaneous.reduce((sum, hit) => add(sum, hit.normal), { x: 0, y: 0 }));
+    const normal = length(combinedNormal) > 0 ? combinedNormal : simultaneous[0].normal;
+    return { time: earliest, normal, obstacle };
   }
 
   private static edgeCapsuleHits(start: Vec2, end: Vec2, a: Vec2, b: Vec2, radius: number): LocalHit[] {

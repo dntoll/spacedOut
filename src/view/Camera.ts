@@ -1,13 +1,8 @@
 import { clamp, length } from '../math';
-import type { Vec2 } from '../types';
+import type { Bounds, Vec2 } from '../types';
 import type { Drawing } from './Drawing';
 
-export interface WorldBounds {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
+export type WorldBounds = Bounds;
 
 const DRONE_THREAT_ZOOM_OUT = 0.25;
 const DRONE_THREAT_FLOOR = 0.30;

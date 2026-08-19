@@ -3,26 +3,26 @@ import { Asteroid } from './Asteroid';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
-import { SpaceStation } from './SpaceStation';
+import { StationWall } from './StationWall';
 
 const squareAsteroid = (id: number, x = 0, y = 0, radius = 50) => new MassiveAsteroid(
   id, { x, y }, radius, 0, [1, 1, 1, 1], [], 0.5,
 );
 
 describe('ShipCollisionSystem', () => {
-  it('REQ-64 collides with the destination station while the station remains fixed', () => {
-    const station = new SpaceStation({ x: 0, y: 0 }, 1000, 0);
+  it('REQ-64 collides with the station hull while the hull remains fixed', () => {
+    const wall = new StationWall({ x: 1000, y: 0 }, Math.PI / 2, 500, 26);
     const ship = new Ship();
     ship.previousPosition = { x: 1200, y: 0 };
     ship.position = { x: 900, y: 0 };
     ship.velocity = { x: -300, y: 0 };
 
-    new ShipCollisionSystem().resolve(ship, [station], 1);
+    new ShipCollisionSystem().resolve(ship, [wall], 1);
 
-    expect(ship.position.x).toBeGreaterThan(1000 + ship.radius);
+    expect(ship.position.x).toBeGreaterThan(1000);
     expect(ship.velocity.x).toBeGreaterThan(0);
-    expect(station.position).toEqual({ x: 0, y: 0 });
-    expect(station.velocity).toEqual({ x: 0, y: 0 });
+    expect(wall.position).toEqual({ x: 1000, y: 0 });
+    expect(wall.velocity).toEqual({ x: 0, y: 0 });
   });
 
   it('REQ-22 sweeps the ship center against radius-expanded edges without penetration', () => {

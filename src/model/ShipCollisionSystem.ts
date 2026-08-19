@@ -6,19 +6,21 @@ import type { DamageObserver } from './DamageObserver';
 import { DamageCalculator } from './DamageCalculator';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import type { Ship } from './Ship';
-import { SweptCircleCollision, type PolygonObstacle, type SweepHit } from './SweptCircleCollision';
+import { SweptCircleCollision, type ShipObstacle, type SweepHit, isCapsuleObstacle } from './SweptCircleCollision';
 
 export class ShipCollisionSystem {
   private readonly collisionObservers = new Set<CollisionObserver>();
   private readonly damageObservers = new Set<DamageObserver>();
 
-  resolve(ship: Ship, obstacles: PolygonObstacle[], dt: number): void {
+  resolve(ship: Ship, obstacles: ShipObstacle[], dt: number): void {
     let start = { ...ship.previousPosition };
     let end = { ...ship.position };
 
     for (let iteration = 0; iteration < 6; iteration++) {
       const hits = obstacles
-        .map((obstacle) => SweptCircleCollision.find(start, end, ship.radius, obstacle))
+        .map((obstacle) => isCapsuleObstacle(obstacle)
+          ? SweptCircleCollision.findCapsule(start, end, ship.radius, obstacle)
+          : SweptCircleCollision.find(start, end, ship.radius, obstacle))
         .filter((hit): hit is SweepHit => hit !== undefined);
       if (hits.length === 0) {
         ship.position = end;
@@ -35,7 +37,7 @@ export class ShipCollisionSystem {
       const separationNormal = length(combinedNormal) > 0 ? combinedNormal : simultaneous[0].normal;
       ship.position = add(contactCenter, scale(separationNormal, 0.05));
 
-      const uniqueObstacles = new Set<PolygonObstacle>();
+      const uniqueObstacles = new Set<ShipObstacle>();
       const incomingVelocity = { ...ship.velocity };
       let combinedVelocityChange = { x: 0, y: 0 };
       for (const hit of simultaneous) {

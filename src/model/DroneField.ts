@@ -14,7 +14,6 @@ import { MassiveAsteroid } from './MassiveAsteroid';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
 import type { PhysicsBody } from './PhysicsBody';
 import type { Ship } from './Ship';
-import { SpaceStation } from './SpaceStation';
 
 const TARGET_POPULATION = 24;
 const DETACH_RANGE_RADII = 12;
@@ -224,7 +223,6 @@ export class DroneField {
       if (distSq < nearestDistSq) { nearestDistSq = distSq; nearest = asteroid; }
     });
     massiveAsteroidField.forEachActive((asteroid) => {
-      if (asteroid instanceof SpaceStation) return;
       const dx = asteroid.position.x - center.x;
       const dy = asteroid.position.y - center.y;
       const distSq = dx * dx + dy * dy;
@@ -324,7 +322,6 @@ export class DroneField {
       weighted.push({ host: asteroid, weight: 1 });
     });
     massiveAsteroidField.forEachActive((asteroid) => {
-      if (asteroid instanceof SpaceStation) return;
       if (length(sub(asteroid.position, center)) < spawnInner) return;
       const cap = this.capacityFor(asteroid, massiveAsteroidField);
       const count = hostCounts.get(asteroid) ?? 0;

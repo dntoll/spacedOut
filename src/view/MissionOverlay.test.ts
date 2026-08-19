@@ -97,25 +97,36 @@ describe('MissionOverlay', () => {
     expect(nodes.get('#mission')?.classList.add).toHaveBeenCalledWith('hidden');
   });
 
-  it('REQ-76 shows the mission 3 clue briefing', () => {
+  it('REQ-76 shows the mission 3 briefing with the central-chamber objective', () => {
     const nodes = stubNodes();
     const overlay = new MissionOverlay();
 
     overlay.show(MissionPhase.Mission3Intro);
 
-    expect(nodes.get('#mission-title')?.textContent).toBe('Mission: Find clues on what happened to the spacestation');
-    expect(nodes.get('#mission-signal')?.textContent).toBe('');
+    expect(nodes.get('#mission-title')?.textContent).toBe('Mission 3: Enter the abandoned space station and reach its central chamber.');
+    expect(nodes.get('#mission-signal')?.textContent).toBe('Find the switches to open the gates.');
     expect(nodes.get('#mission-detail')?.textContent).toBe('Click to continue.');
     expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
   });
 
-  it('REQ-76 hides the overlay during the intentionally empty mission 3', () => {
+  it('REQ-76 hides the overlay during the active mission 3 maze', () => {
     const nodes = stubNodes();
     const overlay = new MissionOverlay();
 
     overlay.show(MissionPhase.Mission3Active);
 
     expect(nodes.get('#mission')?.classList.add).toHaveBeenCalledWith('hidden');
+  });
+
+  it('REQ-76 shows well done when mission 3 is complete', () => {
+    const nodes = stubNodes();
+    const overlay = new MissionOverlay();
+
+    overlay.show(MissionPhase.Mission3Done);
+
+    expect(nodes.get('#mission-title')?.textContent).toBe('Well done');
+    expect(nodes.get('#mission-detail')?.textContent).toBe('Click to continue.');
+    expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
   });
 
   it('REQ-52 consumes a continue click once', () => {

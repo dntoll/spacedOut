@@ -9,6 +9,13 @@ const MAX_AMMO = 100;
 const EMERGENCY_RELOAD_INTERVAL = 2;
 const EMERGENCY_RELOAD_AMOUNT = 1;
 const MAX_WEAPON_LEVEL = 2;
+const FREE_THRUST_SPEED = 100;
+const BRAKE_SPEED_THRESHOLD = 30;
+const BRAKE_IDLE_DELAY = 2;
+const BRAKE_RATE = 6;
+const BRAKE_SNAP_SPEED = 1;
+const TOP_SPEED_FRACTION = 0.99;
+const FORWARDNESS_FREE = 0.95;
 
 export interface ShipInitialLevels {
   fuel?: number;
@@ -33,6 +40,8 @@ export class Ship extends PhysicsBody {
   private turningRate = 0;
   private directionalVec: Vec2 | null = null;
   private directionalLevel = 0;
+  private timeSinceThrust = 0;
+  private freeThrustValue = false;
 
   constructor(initial?: ShipInitialLevels) {
     const radius = 18;
@@ -65,6 +74,7 @@ export class Ship extends PhysicsBody {
     if (this.directionalLevel <= 0.0001 || !this.directionalVec) return null;
     return { vec: { ...this.directionalVec }, level: this.directionalLevel };
   }
+  get freeThrust(): boolean { return this.freeThrustValue; }
 
   aimAt(target: Vec2): void { this.aimTarget = { ...target }; }
 
@@ -127,6 +137,7 @@ export class Ship extends PhysicsBody {
   }
 
   applyControls(dt: number): void {
+    this.freeThrustValue = false;
     const aim = sub(this.aimTarget, this.position);
     if (length(aim) > 3) {
       const target = Math.atan2(aim.y, aim.x);
@@ -143,7 +154,14 @@ export class Ship extends PhysicsBody {
 
     const ptrActive = this.throttle > 0;
     const dirActive = this.directionalLevel > 0.0001 && this.directionalVec !== null;
-    if (!ptrActive && !dirActive) return;
+    if (!ptrActive && !dirActive) {
+      this.timeSinceThrust += dt;
+      if (this.timeSinceThrust >= BRAKE_IDLE_DELAY && this.speed < BRAKE_SPEED_THRESHOLD) {
+        this.applyBrake(dt);
+      }
+      return;
+    }
+    this.timeSinceThrust = 0;
 
     const forward = { x: Math.cos(this.angle), y: Math.sin(this.angle) };
     let thrustDirWorld: Vec2 = { x: 0, y: 0 };
@@ -158,19 +176,41 @@ export class Ship extends PhysicsBody {
     const tdir = scale(thrustDirWorld, 1 / tmag);
     const tmagClamped = Math.min(1, tmag);
 
+    const speedBefore = this.speed;
     const along = Math.max(0, dot(this.velocity, tdir));
     const across = sub(this.velocity, scale(tdir, along));
     const dampFactor = Math.exp(-this.dampening * dt);
     this.velocity = add(scale(tdir, along), scale(across, dampFactor));
 
     this.velocity = add(this.velocity, scale(tdir, this.thrustAccel * tmagClamped * dt));
-    this.fuelLevel = Math.max(0, this.fuelLevel - 5 * tmagClamped * dt);
+
+    let fuelCost = 5 * tmagClamped * dt;
+    let free = false;
+    if (speedBefore < FREE_THRUST_SPEED) {
+      fuelCost = 0;
+      free = true;
+    } else if (speedBefore >= this.maxSpeed * TOP_SPEED_FRACTION) {
+      const forwardness = speedBefore > 0.0001 ? clamp(along / speedBefore, 0, 1) : 0;
+      if (forwardness >= FORWARDNESS_FREE) {
+        fuelCost = 0;
+        free = true;
+      } else {
+        fuelCost = 5 * tmagClamped * (1 - forwardness) * dt;
+      }
+    }
+    this.fuelLevel = Math.max(0, this.fuelLevel - fuelCost);
+    this.freeThrustValue = free;
     if (this.fuelLevel <= 0) {
       this.throttle = 0;
       this.directionalLevel = 0;
       this.directionalVec = null;
     }
     if (this.speed > this.maxSpeed) this.velocity = scale(this.velocity, this.maxSpeed / this.speed);
+  }
+
+  private applyBrake(dt: number): void {
+    this.velocity = scale(this.velocity, Math.exp(-BRAKE_RATE * dt));
+    if (this.speed < BRAKE_SNAP_SPEED) this.velocity = { x: 0, y: 0 };
   }
 
   private rotate(v: Vec2, angle: number): Vec2 {

@@ -30,6 +30,11 @@ function stubModel(ship: Ship, asteroids: Asteroid[] = [], massives: MassiveAste
   } as unknown as Model.Game;
 }
 
+function rgbOf(color: string): { r: number; g: number; b: number } {
+  const m = color.match(/rgba?\((\d+),(\d+),(\d+)/)!;
+  return { r: +m[1], g: +m[2], b: +m[3] };
+}
+
 const VIEWPORT = { width: 800, height: 600 };
 
 describe('ParticleField', () => {
@@ -383,5 +388,91 @@ describe('ParticleField', () => {
     const litSum = lit.circles.reduce((s, c) => s + alphaOf(c), 0);
     const shadowedSum = shadowed.circles.reduce((s, c) => s + alphaOf(c), 0);
     expect(shadowedSum).toBeLessThan(litSum);
+  });
+
+  it('REQ-82 emits cooler exhaust particles when thrust is free below speed 100', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const ship = new Ship();
+    ship.velocity = { x: 50, y: 0 };
+    ship.aimAt({ x: 500, y: 0 });
+    ship.startThrust();
+    ship.applyControls(0.1);
+    expect(ship.freeThrust).toBe(true);
+    const camera = new Camera();
+    const field = new ParticleField();
+    const { drawing, circles } = countingDrawing();
+
+    for (let i = 0; i < 20; i++) field.update(0.01, stubModel(ship), camera, VIEWPORT);
+    field.draw(drawing);
+
+    const fresh = circles.filter((c) => rgbOf(c.color).r > 210);
+    expect(fresh.length).toBeGreaterThan(0);
+    expect(fresh.every((c) => rgbOf(c.color).b >= 150)).toBe(true);
+    vi.restoreAllMocks();
+  });
+
+  it('REQ-82 emits amber exhaust particles when thrust costs fuel above speed 100', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const ship = new Ship();
+    ship.velocity = { x: 200, y: 0 };
+    ship.aimAt({ x: 500, y: 0 });
+    ship.startThrust();
+    ship.applyControls(0.1);
+    expect(ship.freeThrust).toBe(false);
+    const camera = new Camera();
+    const field = new ParticleField();
+    const { drawing, circles } = countingDrawing();
+
+    for (let i = 0; i < 20; i++) field.update(0.01, stubModel(ship), camera, VIEWPORT);
+    field.draw(drawing);
+
+    const fresh = circles.filter((c) => rgbOf(c.color).r > 210);
+    expect(fresh.length).toBeGreaterThan(0);
+    expect(fresh.some((c) => rgbOf(c.color).b < 110)).toBe(true);
+    vi.restoreAllMocks();
+  });
+
+  it('REQ-84 emits cooler exhaust for forward thrust at top speed', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const ship = new Ship();
+    ship.setControlTuning({ dampening: 0, thrustAccel: 170, maxSpeed: 1000 });
+    ship.velocity = { x: 1000, y: 0 };
+    ship.aimAt({ x: 500, y: 0 });
+    ship.startThrust();
+    ship.applyControls(0.1);
+    expect(ship.freeThrust).toBe(true);
+    const camera = new Camera();
+    const field = new ParticleField();
+    const { drawing, circles } = countingDrawing();
+
+    for (let i = 0; i < 20; i++) field.update(0.01, stubModel(ship), camera, VIEWPORT);
+    field.draw(drawing);
+
+    const fresh = circles.filter((c) => rgbOf(c.color).r > 210);
+    expect(fresh.length).toBeGreaterThan(0);
+    expect(fresh.every((c) => rgbOf(c.color).b >= 150)).toBe(true);
+    vi.restoreAllMocks();
+  });
+
+  it('REQ-84 emits amber exhaust for corrective thrust at top speed', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const ship = new Ship();
+    ship.setControlTuning({ dampening: 0, thrustAccel: 170, maxSpeed: 1000 });
+    ship.velocity = { x: 1000, y: 0 };
+    ship.aimAt({ x: 0, y: 500 });
+    ship.startThrust();
+    ship.applyControls(0.1);
+    expect(ship.freeThrust).toBe(false);
+    const camera = new Camera();
+    const field = new ParticleField();
+    const { drawing, circles } = countingDrawing();
+
+    for (let i = 0; i < 20; i++) field.update(0.01, stubModel(ship), camera, VIEWPORT);
+    field.draw(drawing);
+
+    const fresh = circles.filter((c) => rgbOf(c.color).r > 210);
+    expect(fresh.length).toBeGreaterThan(0);
+    expect(fresh.some((c) => rgbOf(c.color).b < 110)).toBe(true);
+    vi.restoreAllMocks();
   });
 });

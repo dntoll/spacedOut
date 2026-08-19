@@ -11,3 +11,8 @@ export const normalize = (v: Vec2): Vec2 => {
 };
 export const clamp = (n: number, lo: number, hi: number): number => Math.max(lo, Math.min(hi, n));
 export const random = (lo: number, hi: number): number => lo + Math.random() * (hi - lo);
+export const closestPointOnSegment = (point: Vec2, a: Vec2, b: Vec2): Vec2 => {
+  const edge = sub(b, a);
+  const amount = clamp(dot(sub(point, a), edge) / dot(edge, edge), 0, 1);
+  return add(a, scale(edge, amount));
+};

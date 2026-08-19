@@ -233,4 +233,46 @@ describe('Minimap', () => {
       call[1] === 'rgba(90,112,132,.74)' && call[2] === 'rgba(157,203,220,.82)');
     expect(drewMassiveOutline).toBe(false);
   });
+
+  it('REQ-81 shows the abandoned station hull, walls, gates, switches, and collectibles on the minimap', () => {
+    const ship = new Model.Ship();
+    const stationMaze = new Model.StationMaze();
+    stationMaze.placeAt({ x: 0, y: 0 }, 1000, 0, 42);
+    const model = {
+      ship,
+      supplyField: new Model.SupplyField({ x: 100000, y: 0 }, undefined, 1),
+      massiveAsteroidField: new Model.MassiveAsteroidField(ship.position, ship.radius, []),
+      asteroidBelt: { forEach: () => undefined },
+      droneField: { forEach: () => undefined },
+      pirateField: { forEachPirate: () => {} },
+      mission: { signalDirection: null, isTraversal: false },
+      stationMaze,
+      elapsed: 0,
+    } as unknown as Model.Game;
+    const exploration = new ExplorationMap();
+    exploration.observe({ left: -1200, top: -1200, right: 1200, bottom: 1200 });
+    const circle = vi.fn();
+    const polygon = vi.fn();
+    const drawing = {
+      size: { width: 1000, height: 700 },
+      rectangle: vi.fn(),
+      circle,
+      polygon,
+      dashedLine: vi.fn(),
+      arc: vi.fn(),
+      withClipRectangle: vi.fn((_position: unknown, _size: unknown, draw: () => void) => draw()),
+      withTransform: vi.fn((_position: unknown, _angle: unknown, draw: () => void) => draw()),
+    } as unknown as Drawing;
+    const camera = new Camera();
+    camera.update(ship.position, { x: 0, y: 0 }, 1);
+
+    new Minimap().draw(drawing, exploration, model, camera);
+
+    const hullDrawn = circle.mock.calls.some((call) => call[2] === 'rgba(58,36,24,.30)');
+    expect(hullDrawn).toBe(true);
+    const wallDrawn = polygon.mock.calls.some((call) => call[1] === 'rgba(58,36,24,.5)');
+    expect(wallDrawn).toBe(true);
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.8, '#5de0ff');
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.6, '#d98a4a');
+  });
 });

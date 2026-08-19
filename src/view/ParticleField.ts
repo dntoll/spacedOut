@@ -22,6 +22,7 @@ const CULL_MARGIN = 500;
 const DUST_COLOR = { r: 120, g: 200, b: 235 };
 const COOL_ALPHA = 0.6;
 const FUEL_COLOR = { r: 255, g: 195, b: 92 };
+const FREE_FUEL_COLOR = { r: 230, g: 215, b: 175 };
 const HOT_ALPHA = 0.9;
 const IMPACT_HOT_COLOR = { r: 220, g: 250, b: 255 };
 const IMPACT_COOL_COLOR = { r: 70, g: 180, b: 255 };
@@ -143,12 +144,13 @@ export class ParticleField {
       { offset: { x: -4, y: -13 }, emit: { x: 0, y: -1 }, power: Math.max(0, dirVec.y) * level },
       { offset: { x: -4, y: 13 }, emit: { x: 0, y: 1 }, power: Math.max(0, -dirVec.y) * level },
     ];
+    const color = ship.freeThrust ? FREE_FUEL_COLOR : FUEL_COLOR;
     for (const nozzle of nozzles) {
       if (nozzle.power <= 0.001) continue;
       this.emissionCarry += dt * nozzle.power * (28 + nozzle.power * 46 + ship.speed * 0.06);
       while (this.emissionCarry >= 1) {
         this.emissionCarry--;
-        this.particles.push(this.createExhaustParticle(ship, forward, nozzle));
+        this.particles.push(this.createExhaustParticle(ship, forward, nozzle, color));
       }
     }
   }
@@ -184,7 +186,7 @@ export class ParticleField {
     );
   }
 
-  private createExhaustParticle(ship: Model.Ship, forward: Vec2, nozzle: { offset: Vec2; emit: Vec2; power: number }): Particle {
+  private createExhaustParticle(ship: Model.Ship, forward: Vec2, nozzle: { offset: Vec2; emit: Vec2; power: number }, color: { r: number; g: number; b: number }): Particle {
     const side = { x: -forward.y, y: forward.x };
     const emitWorld = this.rotate(nozzle.emit, ship.angle);
     const offsetWorld = this.rotate(nozzle.offset, ship.angle);
@@ -199,7 +201,7 @@ export class ParticleField {
       random(1.5, 4),
       burn,
       burn,
-      FUEL_COLOR,
+      color,
       HOT_ALPHA,
     );
   }

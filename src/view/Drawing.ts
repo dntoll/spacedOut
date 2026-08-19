@@ -128,6 +128,18 @@ export class Drawing {
     });
   }
 
+  withClipPath(points: Vec2[], draw: () => void): void {
+    if (points.length < 3) { draw(); return; }
+    this.withState(() => {
+      this.activeCtx.beginPath();
+      this.activeCtx.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) this.activeCtx.lineTo(points[i].x, points[i].y);
+      this.activeCtx.closePath();
+      this.activeCtx.clip();
+      draw();
+    });
+  }
+
   rectangle(position: Vec2, size: Size, fill: Paint): void {
     this.activeCtx.fillStyle = this.resolvePaint(fill);
     this.activeCtx.fillRect(position.x, position.y, size.width, size.height);
