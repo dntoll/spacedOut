@@ -44,6 +44,7 @@ const DESTINATION_RADII = 100;
 const REQUIRED_WEAPON_LEVEL = 2;
 const ENCOUNTER_SPAWN_START_FRACTION = 0.1;
 const ENCOUNTER_SPAWN_END_FRACTION = 0.9;
+const MISSION3_STATION_CLEARANCE = 150;
 
 export class Mission {
   phase: MissionPhase = MissionPhase.Mission1Intro;
@@ -140,7 +141,7 @@ export class Mission {
     this.signalDirection = null;
     this.destinationRadius = ship.radius * DESTINATION_RADII;
     this.destination = {
-      x: ship.position.x + this.destinationRadius + ship.radius + 600,
+      x: ship.position.x + this.destinationRadius + ship.radius + MISSION3_STATION_CLEARANCE,
       y: ship.position.y,
     };
     this.cachedRemaining = 0;
