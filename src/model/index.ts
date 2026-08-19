@@ -39,6 +39,7 @@ export type { PirateDestroyedObserver } from './PirateDestroyedObserver';
 export { RandomSequence } from './RandomSequence';
 export { Ship, type ShipInitialLevels } from './Ship';
 export { ShipCollisionSystem } from './ShipCollisionSystem';
+export { SpaceStation } from './SpaceStation';
 export { SupplyContainer } from './SupplyContainer';
 export { SupplyField } from './SupplyField';
 export { SupplyRegion } from './SupplyRegion';

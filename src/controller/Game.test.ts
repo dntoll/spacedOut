@@ -6,7 +6,7 @@ import { Game } from './Game';
 const stubModel = (isGameOver: boolean): Model.Game =>
   ({
     isGameOver,
-    mission: { isPaused: false, requestsRestart: false },
+    mission: { isPaused: false },
     advanceMission: vi.fn(),
     setThrustTarget: vi.fn(),
     setDirectionalThrust: vi.fn(),
@@ -131,7 +131,7 @@ describe('Controller Game', () => {
 
     const deadModel = stubModel(false);
     const freshModel = stubModel(false);
-    const createModel = vi.fn((mission?: 1 | 2) => freshModel);
+    const createModel = vi.fn((mission?: 1 | 2 | 3) => freshModel);
     const view = stubView(false);
     (view.consumeMissionSelection as ReturnType<typeof vi.fn>).mockReturnValueOnce(2);
     const controller = new Game(deadModel, view, createModel);
@@ -143,6 +143,22 @@ describe('Controller Game', () => {
     expect(view.reset).toHaveBeenCalledOnce();
     expect(freshModel.addCollisionObserver).toHaveBeenCalledWith(view);
     expect(deadModel.update).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+
+  it('REQ-66 restarts at the mission 3 cheat when selected', () => {
+    vi.stubGlobal('performance', { now: () => 1000 });
+    const rafCbs: ((t: number) => void)[] = [];
+    vi.stubGlobal('requestAnimationFrame', (cb: (t: number) => void) => { rafCbs.push(cb); return rafCbs.length; });
+    const createModel = vi.fn(() => stubModel(false));
+    const view = stubView(false);
+    (view.consumeMissionSelection as ReturnType<typeof vi.fn>).mockReturnValueOnce(3);
+    const controller = new Game(stubModel(false), view, createModel);
+
+    controller.start();
+    rafCbs[0](1016);
+
+    expect(createModel).toHaveBeenCalledWith(3);
     vi.unstubAllGlobals();
   });
 });

@@ -50,7 +50,9 @@ export class NebulaField {
       this.nextGap = CLOUD_GAP_BASE;
       return;
     }
-    this.spawn(model, camera, viewport, model.ship.speed * SPEED_CLEARANCE_GAIN);
+    if (model.mission.encounterSpawningAllowed) {
+      this.spawn(model, camera, viewport, model.ship.speed * SPEED_CLEARANCE_GAIN);
+    }
     const pushers: Vec2[] = [model.ship.position];
     model.pirateField.forEachPirate((pirate) => pushers.push(pirate.position));
     model.droneField.forEach((drone) => pushers.push(drone.position));

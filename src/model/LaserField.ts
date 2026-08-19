@@ -35,6 +35,11 @@ export class LaserField {
   forEach(visitor: (laser: Laser) => void): void { this.lasers.forEach(visitor); }
   get count(): number { return this.lasers.length; }
 
+  clear(): void {
+    this.lasers.length = 0;
+    this.cooldown = 0;
+  }
+
   addCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.add(observer); }
   removeCollisionObserver(observer: CollisionObserver): void { this.collisionObservers.delete(observer); }
   addLaserShotObserver(observer: LaserShotObserver): void { this.laserShotObservers.add(observer); }

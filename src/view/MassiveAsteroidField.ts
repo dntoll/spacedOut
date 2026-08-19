@@ -1,17 +1,24 @@
 import { length, sub } from '../math';
-import type * as Model from '../model';
+import * as Model from '../model';
 import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
 import type { Drawing, RadialPaint } from './Drawing';
+import { SpaceStation } from './SpaceStation';
 import type { StarLight } from './StarLight';
 
 export class MassiveAsteroidField {
+  private readonly station = new SpaceStation();
+
   draw(drawing: Drawing, field: Model.MassiveAsteroidField, shipPosition: Vec2, camera: Camera, starLight: StarLight): void {
     const { width, height } = drawing.size;
     const visibleRange = Math.hypot(width, height) / camera.zoom * 0.7;
     field.forEachActive((asteroid) => {
       if (length(sub(asteroid.position, shipPosition)) <= visibleRange + asteroid.radius) {
-        this.drawAsteroid(drawing, asteroid, camera.zoom, starLight);
+        if (asteroid instanceof Model.SpaceStation) {
+          this.station.draw(drawing, asteroid, camera.zoom, starLight);
+        } else {
+          this.drawAsteroid(drawing, asteroid, camera.zoom, starLight);
+        }
       }
     });
   }

@@ -7,8 +7,9 @@ import { MassiveAsteroid } from './MassiveAsteroid';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Mission, MissionGoalKind, MissionPhase, SpawnMode } from './Mission';
 import { Ship } from './Ship';
+import { SpaceStation } from './SpaceStation';
 import { VisitedMap } from './VisitedMap';
-import { length } from '../math';
+import { length, sub } from '../math';
 
 const emptyDroneField = () => new DroneField();
 const emptyBelt = () => new AsteroidBelt({ x: 0, y: 0 }, []);
@@ -200,13 +201,11 @@ describe('Mission', () => {
     const { mission, visited } = reachMission2Intro();
 
     expect(mission.phase).toBe(MissionPhase.Mission2Intro);
-    expect(mission.requestsRestart).toBe(false);
 
     mission.advance(visited);
 
     expect(mission.phase).toBe(MissionPhase.Mission2Active);
     expect(mission.isPaused).toBe(false);
-    expect(mission.requestsRestart).toBe(false);
   });
 
   it('REQ-60 runs the traversal in the mission-2 travel spawn mode', () => {
@@ -242,12 +241,35 @@ describe('Mission', () => {
     expect(mission.distanceRemaining).toBeLessThan(initial);
   });
 
-  it('REQ-64 places a huge destination asteroid and ends the mission when the ship arrives', () => {
+  it('REQ-75 allows encounter spawning only between 10% and 90% of mission 2 travel', () => {
+    const { mission, visited, ship, field } = reachMission2Intro();
+    mission.advance(visited);
+    const start = { ...ship.position };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    const destination = mission.destinationPosition!;
+    const placeAt = (fraction: number): void => {
+      ship.position = {
+        x: start.x + (destination.x - start.x) * fraction,
+        y: start.y + (destination.y - start.y) * fraction,
+      };
+      mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
+    };
+
+    placeAt(0.05);
+    expect(mission.encounterSpawningAllowed).toBe(false);
+    placeAt(0.5);
+    expect(mission.encounterSpawningAllowed).toBe(true);
+    placeAt(0.95);
+    expect(mission.encounterSpawningAllowed).toBe(false);
+  });
+
+  it('REQ-64 places a huge abandoned station and ends the mission when the ship arrives', () => {
     const { mission, visited, ship, field } = reachMission2Intro();
     mission.advance(visited);
     mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
 
     expect(field.destination).not.toBeNull();
+    expect(field.destination).toBeInstanceOf(SpaceStation);
     expect(field.destination!.radius).toBeGreaterThan(ship.radius * 30);
 
     ship.position = { ...mission.destinationPosition! };
@@ -294,7 +316,7 @@ describe('Mission', () => {
     expect(mission.phase).toBe(MissionPhase.Mission2Done);
   });
 
-  it('REQ-65 requests a restart on the mission 2 done continue click', () => {
+  it('REQ-65 proceeds from mission 2 completion to the mission 3 briefing without restarting', () => {
     const { mission, visited, ship, field } = reachMission2Intro();
     mission.advance(visited);
     mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
@@ -303,11 +325,11 @@ describe('Mission', () => {
     ship.position = { ...mission.destinationPosition! };
     mission.update(0, ship, emptyDroneField(), emptyBelt(), field, visited, SCREEN_RADIUS);
     expect(mission.phase).toBe(MissionPhase.Mission2Done);
-    expect(mission.requestsRestart).toBe(false);
 
     mission.advance(visited);
 
-    expect(mission.requestsRestart).toBe(true);
+    expect(mission.phase).toBe(MissionPhase.Mission3Intro);
+    expect(mission.isPaused).toBe(true);
   });
 
   it('REQ-66 jumps straight to the mission 2 briefing with a randomized signal direction', () => {
@@ -320,6 +342,33 @@ describe('Mission', () => {
     expect(mission.isPaused).toBe(true);
     expect(mission.signalDirection).not.toBeNull();
     expect(length(mission.signalDirection!)).toBeCloseTo(1, 6);
+  });
+
+  it('REQ-66 jumps straight to the mission 3 briefing beside the destination station', () => {
+    const mission = new Mission();
+    const ship = new Ship();
+    const field = emptyField();
+
+    mission.jumpToMission3Briefing(ship, field);
+
+    expect(mission.phase).toBe(MissionPhase.Mission3Intro);
+    expect(mission.isPaused).toBe(true);
+    expect(field.destination).not.toBeNull();
+    expect(mission.destinationPosition).toEqual(field.destination!.position);
+    expect(length(sub(field.destination!.position, ship.position))).toBeLessThan(field.destination!.radius * 2);
+  });
+
+  it('REQ-76 starts an empty mission 3 with no goals or world spawning', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    mission.jumpToMission3Briefing(new Ship(), emptyField());
+
+    mission.advance(visited);
+
+    expect(mission.phase).toBe(MissionPhase.Mission3Active);
+    expect(mission.isPaused).toBe(false);
+    expect(mission.spawnMode).toBe(SpawnMode.Suppressed);
+    expect(mission.currentGoals).toEqual([]);
   });
 
   it('REQ-74 lists the fuel, hull, ammo, and drone goals during mission 1', () => {

@@ -215,4 +215,69 @@ describe('Game', () => {
 
     expect(game.pirateField.count).toBeGreaterThan(0);
   });
+
+  it.each([
+    ['beginning', 0.05],
+    ['ending', 0.95],
+  ])('REQ-75 does not spawn mission 2 encounters in the %s 10%% of travel', (_zone, fraction) => {
+    const game = new Game({ startingMission: 2 });
+    game.advanceMission();
+    game.setSpawnExclusionRadius(1500);
+    game.update(0);
+    const start = { ...game.ship.position };
+    const destination = game.mission.destinationPosition!;
+    const asteroidCount = (): number => {
+      let count = 0;
+      game.asteroidBelt.forEach(() => count++);
+      return count;
+    };
+    const initialAsteroids = asteroidCount();
+
+    game.ship.position = {
+      x: start.x + (destination.x - start.x) * fraction,
+      y: start.y + (destination.y - start.y) * fraction,
+    };
+    game.update(0);
+    game.update(0);
+
+    expect(game.mission.encounterSpawningAllowed).toBe(false);
+    expect(asteroidCount()).toBe(initialAsteroids);
+    expect(game.droneField.count).toBe(0);
+    expect(game.pirateField.count).toBe(0);
+  });
+
+  it('REQ-65 enters mission 3 without restarting and clears encounters while preserving the station', () => {
+    const game = new Game();
+    game.massiveAsteroidField.placeDestinationStation({ x: 2400, y: 0 }, game.ship.radius * 100);
+    const station = game.massiveAsteroidField.destination;
+    game.mission.phase = MissionPhase.Mission2Done;
+
+    game.advanceMission();
+
+    let asteroidCount = 0;
+    let supplyCount = 0;
+    game.asteroidBelt.forEach(() => asteroidCount++);
+    game.supplyField.forEachActive(() => supplyCount++);
+    expect(game.mission.phase).toBe(MissionPhase.Mission3Intro);
+    expect(game.massiveAsteroidField.destination).toBe(station);
+    expect(asteroidCount).toBe(0);
+    expect(supplyCount).toBe(0);
+    expect(game.droneField.count).toBe(0);
+    expect(game.pirateField.count).toBe(0);
+  });
+
+  it('REQ-66 starts the mission 3 cheat beside the station with its completed mission 2 loadout', () => {
+    const game = new Game({ startingMission: 3 });
+
+    expect(game.mission.phase).toBe(MissionPhase.Mission3Intro);
+    expect(game.massiveAsteroidField.destination).not.toBeNull();
+    expect(game.ship.fuel).toBe(100);
+    expect(game.ship.hp).toBe(100);
+    expect(game.ship.ammo).toBe(100);
+    expect(game.ship.weaponLevel).toBe(2);
+    expect(Math.hypot(
+      game.massiveAsteroidField.destination!.position.x - game.ship.position.x,
+      game.massiveAsteroidField.destination!.position.y - game.ship.position.y,
+    )).toBeLessThan(game.massiveAsteroidField.destination!.radius * 2);
+  });
 });

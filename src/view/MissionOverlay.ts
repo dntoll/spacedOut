@@ -25,6 +25,9 @@ export class MissionOverlay {
     } else if (phase === MissionPhase.Mission2Done) {
       this.setText('Well done', '', 'Click to continue.');
       this.node.classList.remove('hidden');
+    } else if (phase === MissionPhase.Mission3Intro) {
+      this.setText('Mission: Find clues on what happened to the spacestation', '', 'Click to continue.');
+      this.node.classList.remove('hidden');
     } else {
       this.hide();
     }

@@ -48,6 +48,12 @@ export class PirateField {
   get count(): number { return this.pirates.length; }
   has(pirate: Pirate): boolean { return this.pirates.includes(pirate); }
 
+  clear(): void {
+    this.pirates.length = 0;
+    this.lasers.length = 0;
+    this.nextSquadId = 0;
+  }
+
   anyHunting(): boolean {
     for (const pirate of this.pirates) { if (pirate.awake) return true; }
     return false;

@@ -7,7 +7,9 @@ export class Game {
   constructor(
     private model: Model.Game,
     private view: View.Game,
-    private readonly createModel: (mission?: 1 | 2) => Model.Game = (mission) => new Model.Game(mission === 2 ? { startingMission: 2 } : {}),
+    private readonly createModel: (mission?: 1 | 2 | 3) => Model.Game = (mission) => new Model.Game(
+      mission === 2 || mission === 3 ? { startingMission: mission } : {},
+    ),
   ) {
     this.attachObservers(this.model);
   }
@@ -22,8 +24,6 @@ export class Game {
       this.restart(selection);
     } else if (this.model.isGameOver) {
       if (this.view.consumeRestartRequest()) this.restart();
-    } else if (this.model.mission.requestsRestart) {
-      this.restart();
     } else if (this.model.mission.isPaused) {
       if (this.view.consumeMissionContinueClick()) this.model.advanceMission();
     } else {
@@ -40,7 +40,7 @@ export class Game {
     requestAnimationFrame((next) => this.frame(next));
   }
 
-  private restart(mission: 1 | 2 = 1): void {
+  private restart(mission: 1 | 2 | 3 = 1): void {
     this.model = this.createModel(mission);
     this.attachObservers(this.model);
     this.view.reset();

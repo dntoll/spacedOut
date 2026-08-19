@@ -3,12 +3,28 @@ import { Asteroid } from './Asteroid';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
+import { SpaceStation } from './SpaceStation';
 
 const squareAsteroid = (id: number, x = 0, y = 0, radius = 50) => new MassiveAsteroid(
   id, { x, y }, radius, 0, [1, 1, 1, 1], [], 0.5,
 );
 
 describe('ShipCollisionSystem', () => {
+  it('REQ-64 collides with the destination station while the station remains fixed', () => {
+    const station = new SpaceStation({ x: 0, y: 0 }, 1000, 0);
+    const ship = new Ship();
+    ship.previousPosition = { x: 1200, y: 0 };
+    ship.position = { x: 900, y: 0 };
+    ship.velocity = { x: -300, y: 0 };
+
+    new ShipCollisionSystem().resolve(ship, [station], 1);
+
+    expect(ship.position.x).toBeGreaterThan(1000 + ship.radius);
+    expect(ship.velocity.x).toBeGreaterThan(0);
+    expect(station.position).toEqual({ x: 0, y: 0 });
+    expect(station.velocity).toEqual({ x: 0, y: 0 });
+  });
+
   it('REQ-22 sweeps the ship center against radius-expanded edges without penetration', () => {
     const obstacle = squareAsteroid(1);
     const ship = new Ship();

@@ -47,6 +47,12 @@ export class SupplyField {
 
   drop(container: SupplyContainer): void { this.drops.push(container); }
 
+  clear(): void {
+    this.regions.clear();
+    this.activeRegions = [];
+    this.drops.length = 0;
+  }
+
   visibleTypes(ship: Ship, visibleRadius: number): Set<SupplyType> {
     const types = new Set<SupplyType>();
     const radiusSquared = visibleRadius * visibleRadius;

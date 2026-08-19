@@ -14,6 +14,8 @@ export enum MissionPhase {
   Mission2Intro,
   Mission2Active,
   Mission2Done,
+  Mission3Intro,
+  Mission3Active,
 }
 
 export enum SpawnMode {
@@ -40,11 +42,12 @@ export interface MissionGoal {
 const TRAVEL_DISTANCE = 80000;
 const DESTINATION_RADII = 100;
 const REQUIRED_WEAPON_LEVEL = 2;
+const ENCOUNTER_SPAWN_START_FRACTION = 0.1;
+const ENCOUNTER_SPAWN_END_FRACTION = 0.9;
 
 export class Mission {
   phase: MissionPhase = MissionPhase.Mission1Intro;
   private chartedCells: ReadonlySet<string> = new Set();
-  requestsRestart = false;
   signalDirection: Vec2 | null = null;
   private destination: Vec2 | null = null;
   private destinationRadius = 0;
@@ -62,11 +65,12 @@ export class Mission {
     return this.phase === MissionPhase.Mission1Intro
       || this.phase === MissionPhase.Mission1Done
       || this.phase === MissionPhase.Mission2Intro
-      || this.phase === MissionPhase.Mission2Done;
+      || this.phase === MissionPhase.Mission2Done
+      || this.phase === MissionPhase.Mission3Intro;
   }
 
   get spawnMode(): SpawnMode {
-    if (this.phase === MissionPhase.Transition) return SpawnMode.Suppressed;
+    if (this.phase === MissionPhase.Transition || this.phase === MissionPhase.Mission3Active) return SpawnMode.Suppressed;
     if (this.phase === MissionPhase.Mission2Active) return SpawnMode.Mission2Travel;
     return SpawnMode.Normal;
   }
@@ -78,6 +82,12 @@ export class Mission {
 
   get distanceRemaining(): number { return this.cachedRemaining; }
   get initialTravelDistance(): number { return this.initialDistance; }
+  get encounterSpawningAllowed(): boolean {
+    if (!this.isTraversal || this.initialDistance <= 0) return false;
+    const traveledFraction = 1 - this.cachedRemaining / this.initialDistance;
+    return traveledFraction >= ENCOUNTER_SPAWN_START_FRACTION
+      && traveledFraction < ENCOUNTER_SPAWN_END_FRACTION;
+  }
 
   get currentGoals(): readonly MissionGoal[] {
     if (
@@ -115,13 +125,27 @@ export class Mission {
     } else if (this.phase === MissionPhase.Mission2Intro) {
       this.phase = MissionPhase.Mission2Active;
     } else if (this.phase === MissionPhase.Mission2Done) {
-      this.requestsRestart = true;
+      this.phase = MissionPhase.Mission3Intro;
+    } else if (this.phase === MissionPhase.Mission3Intro) {
+      this.phase = MissionPhase.Mission3Active;
     }
   }
 
   jumpToMission2Briefing(): void {
     this.randomizeSignal();
     this.phase = MissionPhase.Mission2Intro;
+  }
+
+  jumpToMission3Briefing(ship: Ship, massiveAsteroidField: MassiveAsteroidField): void {
+    this.signalDirection = null;
+    this.destinationRadius = ship.radius * DESTINATION_RADII;
+    this.destination = {
+      x: ship.position.x + this.destinationRadius + ship.radius + 600,
+      y: ship.position.y,
+    };
+    this.cachedRemaining = 0;
+    massiveAsteroidField.placeDestinationStation(this.destination, this.destinationRadius);
+    this.phase = MissionPhase.Mission3Intro;
   }
 
   private randomizeSignal(): void {
@@ -183,6 +207,6 @@ export class Mission {
     };
     this.destinationRadius = ship.radius * DESTINATION_RADII;
     this.initialDistance = Math.max(0, TRAVEL_DISTANCE - this.destinationRadius);
-    massiveAsteroidField.placeDestination(this.destination, this.destinationRadius);
+    massiveAsteroidField.placeDestinationStation(this.destination, this.destinationRadius);
   }
 }

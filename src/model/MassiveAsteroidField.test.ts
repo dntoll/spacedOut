@@ -5,6 +5,7 @@ import { Collision } from './Collision';
 import { FuelContainer } from './FuelContainer';
 import { MassiveAsteroid } from './MassiveAsteroid';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
+import { SpaceStation } from './SpaceStation';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
 import { SupplyField } from './SupplyField';
@@ -82,14 +83,14 @@ describe('MassiveAsteroidField', () => {
     expect(positions(true)).toEqual(origin);
   });
 
-  it('REQ-62 clears ambient massive asteroids when the destination is placed for mission 2', () => {
+  it('REQ-64 replaces ambient massive asteroids with the stationary destination station', () => {
     const ship = new Ship();
     const field = new MassiveAsteroidField(ship.position, ship.radius, undefined, 789);
     const knownBefore: MassiveAsteroid[] = [];
     field.forEachKnown((asteroid) => knownBefore.push(asteroid));
     expect(knownBefore.length).toBeGreaterThan(0);
 
-    field.placeDestination({ x: 80000, y: 0 }, ship.radius * 100);
+    field.placeDestinationStation({ x: 80000, y: 0 }, ship.radius * 100);
 
     const knownAfter: MassiveAsteroid[] = [];
     field.forEachKnown((asteroid) => knownAfter.push(asteroid));
@@ -99,6 +100,9 @@ describe('MassiveAsteroidField', () => {
     expect(activeAfter).toHaveLength(1);
     expect(knownAfter[0]).toBe(activeAfter[0]);
     expect(field.destination).toBe(knownAfter[0]);
+    expect(field.destination).toBeInstanceOf(SpaceStation);
+    expect(field.destination!.velocity).toEqual({ x: 0, y: 0 });
+    expect(field.destination!.mass).toBe(Number.POSITIVE_INFINITY);
   });
 
   it('REQ-62 suppressAmbient clears ambient asteroids without placing a destination', () => {

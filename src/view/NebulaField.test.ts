@@ -19,7 +19,7 @@ const stubDrawing = (): { drawing: Drawing; circles: ReturnType<typeof vi.fn> } 
 
 const traversalModel = (shipPosition: Vec2 = { x: 0, y: 0 }): Model.Game =>
   ({
-    mission: { isTraversal: true, signalDirection: { x: 1, y: 0 } },
+    mission: { isTraversal: true, signalDirection: { x: 1, y: 0 }, encounterSpawningAllowed: true },
     ship: { position: shipPosition, speed: 0 },
     asteroidBelt: { forEachIsland: () => {} },
     pirateField: { forEachPirate: () => {} },
@@ -46,6 +46,20 @@ describe('NebulaField', () => {
     const field = new NebulaField();
     const camera = new Camera();
     const model = { mission: { isTraversal: false, signalDirection: null }, ship: { position: { x: 0, y: 0 } } } as unknown as Model.Game;
+
+    field.update(0.016, model, camera, { width: 800, height: 600 });
+    field.draw(drawing);
+
+    expect(circles).not.toHaveBeenCalled();
+  });
+
+  it('REQ-75 does not spawn nebulas while encounter spawning is outside the travel window', () => {
+    const { drawing, circles } = stubDrawing();
+    const field = new NebulaField();
+    const camera = new Camera();
+    camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
+    const model = traversalModel();
+    (model.mission as { encounterSpawningAllowed: boolean }).encounterSpawningAllowed = false;
 
     field.update(0.016, model, camera, { width: 800, height: 600 });
     field.draw(drawing);
@@ -123,7 +137,7 @@ describe('NebulaField', () => {
     const camera = new Camera();
     camera.update({ x: 0, y: 0 }, { x: 0, y: 0 }, 1);
     const model = {
-      mission: { isTraversal: true, signalDirection: { x: 1, y: 0 } },
+      mission: { isTraversal: true, signalDirection: { x: 1, y: 0 }, encounterSpawningAllowed: true },
       ship: { position: { x: 0, y: 0 }, speed: 0 },
       asteroidBelt: {
         forEachIsland: (visitor: (island: { center: Vec2; radius: number; outline: Vec2[] }) => void) =>

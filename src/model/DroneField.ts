@@ -14,6 +14,7 @@ import { MassiveAsteroid } from './MassiveAsteroid';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
 import type { PhysicsBody } from './PhysicsBody';
 import type { Ship } from './Ship';
+import { SpaceStation } from './SpaceStation';
 
 const TARGET_POPULATION = 24;
 const DETACH_RANGE_RADII = 12;
@@ -37,6 +38,12 @@ export class DroneField {
   forEach(visitor: (drone: Drone) => void): void { this.drones.forEach(visitor); }
   get count(): number { return this.drones.length; }
   has(drone: Drone): boolean { return this.drones.includes(drone); }
+
+  clear(): void {
+    this.drones.length = 0;
+    this.massiveCapacity.clear();
+    this.populatedIslands.clear();
+  }
 
   anyHunting(): boolean {
     for (const drone of this.drones) { if (drone.isHunting) return true; }
@@ -217,6 +224,7 @@ export class DroneField {
       if (distSq < nearestDistSq) { nearestDistSq = distSq; nearest = asteroid; }
     });
     massiveAsteroidField.forEachActive((asteroid) => {
+      if (asteroid instanceof SpaceStation) return;
       const dx = asteroid.position.x - center.x;
       const dy = asteroid.position.y - center.y;
       const distSq = dx * dx + dy * dy;
@@ -316,6 +324,7 @@ export class DroneField {
       weighted.push({ host: asteroid, weight: 1 });
     });
     massiveAsteroidField.forEachActive((asteroid) => {
+      if (asteroid instanceof SpaceStation) return;
       if (length(sub(asteroid.position, center)) < spawnInner) return;
       const cap = this.capacityFor(asteroid, massiveAsteroidField);
       const count = hostCounts.get(asteroid) ?? 0;

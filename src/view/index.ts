@@ -19,6 +19,7 @@ export { ShadowVolume } from './ShadowVolume';
 export { Ship } from './Ship';
 export { SoundSystem, type SfxSettings, SfxChannel } from './SoundSystem';
 export { SpaceBackground } from './SpaceBackground';
+export { SpaceStation } from './SpaceStation';
 export { StarLight, type ShadowCasters } from './StarLight';
 export { StorageAdapter, type KeyValueStore } from './StorageAdapter';
 export { SupplyField } from './SupplyField';

@@ -9,7 +9,7 @@ type StubNode = {
 
 const stubNodes = (): Map<string, StubNode> => {
   const nodes = new Map<string, StubNode>();
-  for (const selector of ['#missions-panel', '#missions-toggle', '#mission-1', '#mission-2']) {
+  for (const selector of ['#missions-panel', '#missions-toggle', '#mission-1', '#mission-2', '#mission-3']) {
     nodes.set(selector, {
       classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
       addEventListener: vi.fn(),
@@ -47,6 +47,16 @@ describe('MissionsMenu', () => {
     expect(menu.consumeSelection()).toBeNull();
   });
 
+  it('REQ-66 exposes a mission 3 cheat selection', () => {
+    const nodes = stubNodes();
+    const menu = new MissionsMenu();
+    const pickMission3 = nodes.get('#mission-3')!.addEventListener.mock.calls[0][1] as () => void;
+
+    pickMission3();
+
+    expect(menu.consumeSelection()).toBe(3);
+  });
+
   it('REQ-66 hides the panel after a selection is consumed', () => {
     const nodes = stubNodes();
     const menu = new MissionsMenu();
@@ -65,9 +75,15 @@ describe('MissionsMenu', () => {
     menu.setCurrentMissionFrom(MissionPhase.Mission1Active);
     expect(nodes.get('#mission-1')?.classList.toggle).toHaveBeenCalledWith('active', true);
     expect(nodes.get('#mission-2')?.classList.toggle).toHaveBeenCalledWith('active', false);
+    expect(nodes.get('#mission-3')?.classList.toggle).toHaveBeenCalledWith('active', false);
 
     menu.setCurrentMissionFrom(MissionPhase.Mission2Intro);
     expect(nodes.get('#mission-1')?.classList.toggle).toHaveBeenCalledWith('active', false);
     expect(nodes.get('#mission-2')?.classList.toggle).toHaveBeenCalledWith('active', true);
+
+    menu.setCurrentMissionFrom(MissionPhase.Mission3Active);
+    expect(nodes.get('#mission-1')?.classList.toggle).toHaveBeenCalledWith('active', false);
+    expect(nodes.get('#mission-2')?.classList.toggle).toHaveBeenCalledWith('active', false);
+    expect(nodes.get('#mission-3')?.classList.toggle).toHaveBeenCalledWith('active', true);
   });
 });

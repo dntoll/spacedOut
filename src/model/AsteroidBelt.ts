@@ -80,6 +80,11 @@ export class AsteroidBelt {
 
   has(asteroid: Asteroid): boolean { return this.asteroids.includes(asteroid); }
 
+  clear(): void {
+    this.asteroids.length = 0;
+    this.islands.length = 0;
+  }
+
   anyWithin(position: Vec2, radius: number): boolean {
     for (const asteroid of this.asteroids) {
       if (length(sub(asteroid.position, position)) <= radius + asteroid.radius) return true;

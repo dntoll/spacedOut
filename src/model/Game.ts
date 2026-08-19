@@ -17,7 +17,7 @@ import type { LaserImpactObserver } from './LaserImpactObserver';
 import { LaserField } from './LaserField';
 import type { LaserShotObserver } from './LaserShotObserver';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
-import { Mission, SpawnMode } from './Mission';
+import { Mission, MissionPhase, SpawnMode } from './Mission';
 import { PirateField } from './PirateField';
 import { PirateDestroyed } from './PirateDestroyed';
 import type { PirateDestroyedObserver } from './PirateDestroyedObserver';
@@ -36,7 +36,7 @@ const DROP_AMOUNT = 24;
 const PIRATE_WEAPON_DROP_PROBABILITY = 0.2;
 
 export interface GameOptions {
-  startingMission?: 1 | 2;
+  startingMission?: 1 | 2 | 3;
 }
 
 export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver, DroneDestroyedObserver {
@@ -63,6 +63,14 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
       this.ship.collectAmmo(100);
       this.mission.jumpToMission2Briefing();
       this.massiveAsteroidField.suppressAmbient();
+    } else if (options?.startingMission === 3) {
+      this.ship.collectFuel(100);
+      this.ship.repair(100);
+      this.ship.collectAmmo(100);
+      this.ship.upgradeWeapon();
+      this.ship.upgradeWeapon();
+      this.mission.jumpToMission3Briefing(this.ship, this.massiveAsteroidField);
+      this.clearMissionEncounters();
     }
   }
 
@@ -85,7 +93,13 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
   }
   setSpawnExclusionRadius(radius: number): void { this.spawnExclusionRadius = Math.max(0, radius); }
 
-  advanceMission(): void { this.mission.advance(this.visitedMap); }
+  advanceMission(): void {
+    const previous = this.mission.phase;
+    this.mission.advance(this.visitedMap);
+    if (previous === MissionPhase.Mission2Done && this.mission.phase === MissionPhase.Mission3Intro) {
+      this.clearMissionEncounters();
+    }
+  }
   addCollisionObserver(observer: CollisionObserver): void {
     this.asteroidBelt.addCollisionObserver(observer);
     this.massiveAsteroidField.addCollisionObserver(observer);
@@ -174,6 +188,14 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
     return new AmmoContainer({ ...position }, DROP_AMOUNT);
   }
 
+  private clearMissionEncounters(): void {
+    this.asteroidBelt.clear();
+    this.supplyField.clear();
+    this.droneField.clear();
+    this.pirateField.clear();
+    this.laserField.clear();
+  }
+
   update(dt: number): void {
     dt = Math.min(dt, 0.033);
     this.elapsed += dt;
@@ -187,18 +209,20 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
     this.visitedMap.visit(this.ship.position);
     const spawnBoundary = this.spawnExclusionRadius + this.ship.speed * 1.2;
     const mode = this.mission.spawnMode;
-    const asteroidsEnabled = mode === SpawnMode.Normal || mode === SpawnMode.Mission2Travel;
+    const mission2EncountersEnabled = mode === SpawnMode.Mission2Travel
+      && this.mission.encounterSpawningAllowed;
+    const asteroidsEnabled = mode === SpawnMode.Normal || mission2EncountersEnabled;
     const islands = mode === SpawnMode.Mission2Travel;
     const suppliesEnabled = mode === SpawnMode.Normal;
     const massiveEnabled = mode === SpawnMode.Normal;
     const dronesEnabled = mode === SpawnMode.Normal;
-    const piratesEnabled = mode === SpawnMode.Mission2Travel
+    const piratesEnabled = mission2EncountersEnabled
       && this.mission.distanceRemaining <= this.mission.initialTravelDistance * 0.75;
     this.asteroidBelt.update(dt, this.ship.position, spawnBoundary, asteroidsEnabled, islands, this.mission.signalDirection);
     this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary, this.spawnExclusionRadius, suppliesEnabled);
     this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary, massiveEnabled);
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
-    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, dronesEnabled, islands);
+    this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, dronesEnabled, mission2EncountersEnabled);
     this.pirateField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, piratesEnabled, this.mission.isTraversal ? this.mission.signalDirection : null);
     const droneBodies: PhysicsBody[] = [];
     this.droneField.forEach((drone) => droneBodies.push(drone));
