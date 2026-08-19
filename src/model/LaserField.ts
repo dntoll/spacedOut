@@ -1,4 +1,4 @@
-import { add, closestPointOnSegment, length, normalize, scale, sub } from '../math';
+import { add, length, normalize, scale, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { Asteroid } from './Asteroid';
 import type { AsteroidBelt } from './AsteroidBelt';
@@ -10,15 +10,15 @@ import type { LaserImpactObserver } from './LaserImpactObserver';
 import { Laser } from './Laser';
 import { LaserShot } from './LaserShot';
 import type { LaserShotObserver } from './LaserShotObserver';
-import { MassiveAsteroid } from './MassiveAsteroid';
+import { MassiveAsteroid, boundaryRadiusAt } from './MassiveAsteroid';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
 import type { Pirate } from './Pirate';
 import type { PirateField } from './PirateField';
 import type { Ship } from './Ship';
-import { isCapsuleObstacle } from './SweptCircleCollision';
+import type { PolygonObstacle } from './SweptCircleCollision';
 
 export interface StationObstacleSource {
-  forEachObstacle(visitor: (obstacle: MassiveAsteroid) => void): void;
+  forEachObstacle(visitor: (obstacle: PolygonObstacle) => void): void;
 }
 
 const NOSE_OFFSET = 22;
@@ -80,7 +80,7 @@ export class LaserField {
     cullRadius = Number.POSITIVE_INFINITY,
     droneField?: DroneField,
     pirateField?: PirateField,
-    stationMaze?: StationObstacleSource,
+    station?: StationObstacleSource,
   ): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
     const maxRange = cullRadius + CULL_MARGIN;
@@ -124,8 +124,8 @@ export class LaserField {
         }
       }
 
-      if (stationMaze) {
-        const wall = this.stationHit(laser, stationMaze);
+      if (station) {
+        const wall = this.stationHit(laser, station);
         if (wall) {
           this.emitSpark(laser.position, normalize(sub(laser.position, wall.position)));
           this.lasers.splice(i, 1);
@@ -135,17 +135,12 @@ export class LaserField {
     }
   }
 
-  private stationHit(laser: Laser, stationMaze: StationObstacleSource): MassiveAsteroid | null {
-    let hit: MassiveAsteroid | null = null;
-    stationMaze.forEachObstacle((obstacle) => {
+  private stationHit(laser: Laser, station: StationObstacleSource): PolygonObstacle | null {
+    let hit: PolygonObstacle | null = null;
+    station.forEachObstacle((obstacle) => {
       if (hit) return;
-      if (isCapsuleObstacle(obstacle)) {
-        const closest = closestPointOnSegment(laser.position, obstacle.a, obstacle.b);
-        if (length(sub(closest, laser.position)) <= obstacle.wallRadius + laser.radius) hit = obstacle;
-      } else {
-        const boundary = MassiveAsteroid.boundaryRadiusAt(obstacle, laser.position);
-        if (length(sub(obstacle.position, laser.position)) <= boundary + laser.radius) hit = obstacle;
-      }
+      const boundary = boundaryRadiusAt(obstacle, laser.position);
+      if (length(sub(obstacle.position, laser.position)) <= boundary + laser.radius) hit = obstacle;
     });
     return hit;
   }

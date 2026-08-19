@@ -1,22 +1,14 @@
 import type { Vec2 } from '../types';
-import { MassiveAsteroid } from './MassiveAsteroid';
+import { StationObstacle } from './StationObstacle';
 import { rectangleVertices } from './StationGeometry';
 
-let nextMachineryId = 0x8_4000_0000;
-
-export class StationMachinery extends MassiveAsteroid {
+export class StationMachinery extends StationObstacle {
+  readonly vertices: number[];
   readonly variant: number;
 
   constructor(position: Vec2, radius: number, angle: number, variant: number) {
-    super(
-      nextMachineryId++,
-      position,
-      radius,
-      angle,
-      rectangleVertices(radius, radius * 0.72, 18),
-      [],
-      0.5,
-    );
+    super(position, radius, angle);
+    this.vertices = rectangleVertices(radius, radius * 0.72, 18);
     this.variant = variant;
   }
 }

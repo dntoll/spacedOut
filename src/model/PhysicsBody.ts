@@ -11,6 +11,7 @@ export class PhysicsBody {
     public mass: number,
     public angle: number,
     public angularVelocity: number,
+    public readonly massive = false,
   ) {
     this.previousPosition = { ...position };
   }

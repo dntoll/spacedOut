@@ -13,13 +13,13 @@ export class StationCarver {
   private readonly carveable: Uint8Array;
   private readonly half: number;
 
-  constructor(radius: number, gridN: number) {
+  constructor(radius: number, cellSize: number) {
     this.radius = radius;
-    this.gridN = gridN;
-    this.cellSize = (radius * 2) / gridN;
-    this.half = gridN / 2;
-    this.bitmap = new Uint8Array(gridN * gridN);
-    this.carveable = new Uint8Array(gridN * gridN);
+    this.cellSize = cellSize;
+    this.gridN = Math.ceil((radius * 2) / cellSize);
+    this.half = this.gridN / 2;
+    this.bitmap = new Uint8Array(this.gridN * this.gridN);
+    this.carveable = new Uint8Array(this.gridN * this.gridN);
     this.markCarveable();
   }
 
@@ -68,43 +68,39 @@ export class StationCarver {
     return this.inBounds(c, r) && this.bitmap[this.idx(c, r)] === 1;
   }
 
-  fits(centerLocal: Vec2, radius: number): boolean {
-    const rCells = Math.ceil(radius / this.cellSize) + 1;
-    const center = this.localToCell(centerLocal);
-    const rSq = radius * radius;
-    for (let dr = -rCells; dr <= rCells; dr++) {
-      for (let dc = -rCells; dc <= rCells; dc++) {
-        const c = center.c + dc;
-        const r = center.r + dr;
+  fitsRect(centerLocal: Vec2, halfW: number, halfH: number): boolean {
+    const cMin = Math.floor((centerLocal.x - halfW) / this.cellSize + this.half);
+    const cMax = Math.ceil((centerLocal.x + halfW) / this.cellSize + this.half);
+    const rMin = Math.floor((centerLocal.y - halfH) / this.cellSize + this.half);
+    const rMax = Math.ceil((centerLocal.y + halfH) / this.cellSize + this.half);
+    for (let r = rMin; r <= rMax; r++) {
+      for (let c = cMin; c <= cMax; c++) {
         if (!this.inBounds(c, r)) continue;
-        const cellCenter = this.cellCenterLocal(c, r);
-        const dx = cellCenter.x - centerLocal.x;
-        const dy = cellCenter.y - centerLocal.y;
-        if (dx * dx + dy * dy > rSq) continue;
         if (this.bitmap[this.idx(c, r)] === 1) return false;
       }
     }
     return true;
   }
 
-  carveRoom(centerLocal: Vec2, radius: number, jitter = 0): void {
-    const rCells = Math.ceil(radius / this.cellSize) + 1;
-    const center = this.localToCell(centerLocal);
-    for (let dr = -rCells; dr <= rCells; dr++) {
-      for (let dc = -rCells; dc <= rCells; dc++) {
-        const c = center.c + dc;
-        const r = center.r + dr;
+  carveRectRoom(centerLocal: Vec2, halfW: number, halfH: number, jitter = 0): void {
+    const cMin = Math.floor((centerLocal.x - halfW) / this.cellSize + this.half);
+    const cMax = Math.ceil((centerLocal.x + halfW) / this.cellSize + this.half);
+    const rMin = Math.floor((centerLocal.y - halfH) / this.cellSize + this.half);
+    const rMax = Math.ceil((centerLocal.y + halfH) / this.cellSize + this.half);
+    for (let r = rMin; r <= rMax; r++) {
+      for (let c = cMin; c <= cMax; c++) {
         if (!this.isCarveable(c, r)) continue;
         const cellCenter = this.cellCenterLocal(c, r);
-        const dx = cellCenter.x - centerLocal.x;
-        const dy = cellCenter.y - centerLocal.y;
-        const effectiveR = radius + (jitter > 0 ? (this.hash(c, r) - 0.5) * 2 * jitter : 0);
-        if (dx * dx + dy * dy <= effectiveR * effectiveR) this.bitmap[this.idx(c, r)] = 1;
+        const dx = Math.abs(cellCenter.x - centerLocal.x);
+        const dy = Math.abs(cellCenter.y - centerLocal.y);
+        const ew = halfW + (jitter > 0 ? (this.hash(c, r) - 0.5) * 2 * jitter : 0);
+        const eh = halfH + (jitter > 0 ? (this.hash(r, c) - 0.5) * 2 * jitter : 0);
+        if (dx <= ew && dy <= eh) this.bitmap[this.idx(c, r)] = 1;
       }
     }
   }
 
-  carveCorridor(aLocal: Vec2, bLocal: Vec2, halfWidth: number): void {
+  carveRectCorridor(aLocal: Vec2, bLocal: Vec2, halfWidth: number): void {
     const dx = bLocal.x - aLocal.x;
     const dy = bLocal.y - aLocal.y;
     const len = Math.hypot(dx, dy);
@@ -126,7 +122,7 @@ export class StationCarver {
         const ry = cellCenter.y - aLocal.y;
         const proj = rx * ux + ry * uy;
         const perp = rx * px + ry * py;
-        if (proj >= -halfWidth && proj <= len + halfWidth && Math.abs(perp) <= halfWidth) {
+        if (proj >= 0 && proj <= len && Math.abs(perp) <= halfWidth) {
           this.bitmap[this.idx(c, r)] = 1;
         }
       }

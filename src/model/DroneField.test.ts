@@ -11,7 +11,7 @@ import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Pirate } from './Pirate';
 import type { PhysicsBody } from './PhysicsBody';
 import { Ship } from './Ship';
-import { StationMaze } from './StationMaze';
+import { Station } from './Station';
 import { length, sub } from '../math';
 
 const emptyBelt = () => new AsteroidBelt({ x: 0, y: 0 }, []);
@@ -50,8 +50,8 @@ describe('DroneField', () => {
   });
 
   it('REQ-64 does not attach mining drones to the abandoned station', () => {
-    const stationMaze = new StationMaze();
-    stationMaze.placeAt({ x: 2000, y: 0 }, 1000, 0, 42);
+    const station = new Station();
+    station.placeAt({ x: 2000, y: 0 }, 1000, 0, 42);
     const field = new DroneField();
 
     field.update(0, new Ship(), emptyBelt(), emptyMassive(), 0);
@@ -60,8 +60,8 @@ describe('DroneField', () => {
   });
 
   it('REQ-64 does not attract a hunting mining drone to re-home on the abandoned station', () => {
-    const stationMaze = new StationMaze();
-    stationMaze.placeAt({ x: 1600, y: 0 }, 1000, 0, 42);
+    const station = new Station();
+    station.placeAt({ x: 1600, y: 0 }, 1000, 0, 42);
     const drone = new Drone(null, 0, [1, 1, 1], 2);
     drone.detach();
     drone.position = { x: 1500, y: 0 };

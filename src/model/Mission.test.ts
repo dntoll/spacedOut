@@ -7,29 +7,29 @@ import { MassiveAsteroid } from './MassiveAsteroid';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Mission, MissionGoalKind, MissionPhase, SpawnMode } from './Mission';
 import { Ship } from './Ship';
-import { StationMaze } from './StationMaze';
+import { Station } from './Station';
 import { VisitedMap } from './VisitedMap';
 import { length, sub } from '../math';
 
 const emptyDroneField = () => new DroneField();
 const emptyBelt = () => new AsteroidBelt({ x: 0, y: 0 }, []);
 const emptyField = () => new MassiveAsteroidField({ x: 0, y: 0 }, 18, []);
-const emptyStation = () => new StationMaze();
+const emptyStation = () => new Station();
 const SCREEN_RADIUS = 1000;
 
-const reachMission2Intro = (): { mission: Mission; visited: VisitedMap; ship: Ship; field: MassiveAsteroidField; stationMaze: StationMaze } => {
+const reachMission2Intro = (): { mission: Mission; visited: VisitedMap; ship: Ship; field: MassiveAsteroidField; station: Station } => {
   const mission = new Mission();
   const visited = new VisitedMap();
   const field = emptyField();
-  const stationMaze = emptyStation();
+  const station = emptyStation();
   mission.advance(visited);
-  mission.update(0, new Ship(), emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+  mission.update(0, new Ship(), emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
   visited.visit({ x: 0, y: 0 });
   mission.advance(visited);
   const ship = new Ship();
   ship.position = { x: 5000, y: 5000 };
-  mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
-  return { mission, visited, ship, field, stationMaze };
+  mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
+  return { mission, visited, ship, field, station };
 };
 
 describe('Mission', () => {
@@ -211,20 +211,20 @@ describe('Mission', () => {
   });
 
   it('REQ-60 runs the traversal in the mission-2 travel spawn mode', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
 
     expect(mission.spawnMode).toBe(SpawnMode.Mission2Travel);
     expect(mission.isTraversal).toBe(true);
 
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.spawnMode).toBe(SpawnMode.Mission2Travel);
   });
 
   it('REQ-61 reports a remaining distance that shrinks as the ship approaches the destination', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
 
     expect(mission.destinationPosition).not.toBeNull();
     const initial = mission.distanceRemaining;
@@ -238,23 +238,23 @@ describe('Mission', () => {
       x: ship.position.x + (dir.x / dist) * step,
       y: ship.position.y + (dir.y / dist) * step,
     };
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
 
     expect(mission.distanceRemaining).toBeLessThan(initial);
   });
 
   it('REQ-75 allows encounter spawning only between 10% and 90% of mission 2 travel', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
     const start = { ...ship.position };
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     const destination = mission.destinationPosition!;
     const placeAt = (fraction: number): void => {
       ship.position = {
         x: start.x + (destination.x - start.x) * fraction,
         y: start.y + (destination.y - start.y) * fraction,
       };
-      mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+      mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     };
 
     placeAt(0.05);
@@ -266,66 +266,66 @@ describe('Mission', () => {
   });
 
   it('REQ-64 places a huge abandoned maze station and ends the mission when the ship reaches the entrance', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
 
-    expect(stationMaze.isPlaced).toBe(true);
-    expect(stationMaze.outerRadius).toBeGreaterThan(ship.radius * 30);
-    expect(stationMaze.entrancePosition).not.toBeNull();
+    expect(station.isPlaced).toBe(true);
+    expect(station.outerRadius).toBeGreaterThan(ship.radius * 30);
+    expect(station.entrancePosition).not.toBeNull();
 
     ship.position = { ...mission.destinationPosition! };
     ship.upgradeWeapon();
     ship.upgradeWeapon();
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
 
     expect(mission.phase).toBe(MissionPhase.Mission2Done);
     expect(mission.isPaused).toBe(true);
   });
 
   it('REQ-64 does not end until the ship reaches the entrance', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     ship.upgradeWeapon();
     ship.upgradeWeapon();
     const destination = { ...mission.destinationPosition! };
 
     ship.position = { x: destination.x + 5400, y: destination.y };
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.phase).toBe(MissionPhase.Mission2Active);
 
     ship.position = { ...destination };
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.phase).toBe(MissionPhase.Mission2Done);
   });
 
   it('REQ-64 does not end on arrival until both wing guns are recovered', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     ship.position = { ...mission.destinationPosition! };
 
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.phase).toBe(MissionPhase.Mission2Active);
 
     ship.upgradeWeapon();
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.phase).toBe(MissionPhase.Mission2Active);
 
     ship.upgradeWeapon();
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.phase).toBe(MissionPhase.Mission2Done);
   });
 
   it('REQ-65 proceeds from mission 2 completion to the mission 3 briefing without restarting', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     ship.upgradeWeapon();
     ship.upgradeWeapon();
     ship.position = { ...mission.destinationPosition! };
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.phase).toBe(MissionPhase.Mission2Done);
 
     mission.advance(visited);
@@ -349,22 +349,22 @@ describe('Mission', () => {
   it('REQ-66 jumps straight to the mission 3 briefing beside the destination station', () => {
     const mission = new Mission();
     const ship = new Ship();
-    const stationMaze = emptyStation();
+    const station = emptyStation();
 
-    mission.jumpToMission3Briefing(ship, stationMaze);
+    mission.jumpToMission3Briefing(ship, station);
 
     expect(mission.phase).toBe(MissionPhase.Mission3Intro);
     expect(mission.isPaused).toBe(true);
-    expect(stationMaze.isPlaced).toBe(true);
-    expect(mission.destinationPosition).toEqual(stationMaze.entrancePosition);
-    expect(length(sub(stationMaze.center!, ship.position))).toBeLessThan(stationMaze.outerRadius * 2);
+    expect(station.isPlaced).toBe(true);
+    expect(mission.destinationPosition).toEqual(station.entrancePosition);
+    expect(length(sub(station.center!, ship.position))).toBeLessThan(station.outerRadius * 2);
   });
 
   it('REQ-76 starts mission 3 inside the station with gate and central-chamber goals', () => {
     const mission = new Mission();
     const visited = new VisitedMap();
-    const stationMaze = emptyStation();
-    mission.jumpToMission3Briefing(new Ship(), stationMaze);
+    const station = emptyStation();
+    mission.jumpToMission3Briefing(new Ship(), station);
 
     mission.advance(visited);
 
@@ -425,7 +425,7 @@ describe('Mission', () => {
   });
 
   it('REQ-74 lists the traverse and left/right wing-gun goals during mission 2', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
 
     expect(mission.currentGoals.map((g) => g.kind)).toEqual([
@@ -435,11 +435,11 @@ describe('Mission', () => {
     ]);
     expect(mission.currentGoals.every((g) => !g.complete)).toBe(true);
 
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     ship.upgradeWeapon();
     ship.upgradeWeapon();
     ship.position = { ...mission.destinationPosition! };
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
 
     expect(mission.currentGoals[0].complete).toBe(true);
     expect(mission.currentGoals[1].complete).toBe(true);
@@ -447,20 +447,20 @@ describe('Mission', () => {
   });
 
   it('REQ-74 completes the left wing-gun goal after the first upgrade and the right after the second', () => {
-    const { mission, visited, ship, field, stationMaze } = reachMission2Intro();
+    const { mission, visited, ship, field, station } = reachMission2Intro();
     mission.advance(visited);
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
 
     expect(mission.currentGoals[1].complete).toBe(false);
     expect(mission.currentGoals[2].complete).toBe(false);
 
     ship.upgradeWeapon();
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.currentGoals[1].complete).toBe(true);
     expect(mission.currentGoals[2].complete).toBe(false);
 
     ship.upgradeWeapon();
-    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, stationMaze, visited, SCREEN_RADIUS);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), field, station, visited, SCREEN_RADIUS);
     expect(mission.currentGoals[1].complete).toBe(true);
     expect(mission.currentGoals[2].complete).toBe(true);
   });

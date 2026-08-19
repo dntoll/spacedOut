@@ -20,7 +20,7 @@ export { Ship } from './Ship';
 export { SoundSystem, type SfxSettings, SfxChannel } from './SoundSystem';
 export { SpaceBackground } from './SpaceBackground';
 export { StarLight, type ShadowCasters } from './StarLight';
-export { StationMaze } from './StationMaze';
+export { Station } from './Station';
 export { StorageAdapter, type KeyValueStore } from './StorageAdapter';
 export { SupplyField } from './SupplyField';
 export { ThrustSound, type ThrustAudio, type ThrustPhase } from './ThrustSound';

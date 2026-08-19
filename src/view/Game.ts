@@ -28,8 +28,7 @@ import { SoundGate } from './SoundGate';
 import { SoundSystem } from './SoundSystem';
 import { SpaceBackground } from './SpaceBackground';
 import { StarLight } from './StarLight';
-import { StationMaze } from './StationMaze';
-import { StationDarkness } from './StationDarkness';
+import { Station } from './Station';
 import { StorageAdapter } from './StorageAdapter';
 import { SupplyField } from './SupplyField';
 
@@ -50,8 +49,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly laserField = new LaserField();
   private readonly droneField = new DroneField();
   private readonly pirateField = new PirateField();
-  private readonly stationMaze = new StationMaze();
-  private readonly stationDarkness = new StationDarkness();
+  private readonly station = new Station();
   private readonly particleField = new ParticleField();
   private readonly nebulaField = new NebulaField();
   private readonly explorationMap = new ExplorationMap();
@@ -212,7 +210,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.shadowVolume.render(this.drawing, casters, this.starLight, this.camera);
     this.drawing.compositeShadowLayer('multiply');
     this.camera.drawWorld(this.drawing, () => {
-      this.stationMaze.draw(this.drawing, model.stationMaze, this.starLight, this.camera.zoom);
+      this.station.draw(this.drawing, model.station, this.starLight, this.camera.zoom);
       this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera, this.starLight);
       this.nebulaField.draw(this.drawing, this.camera.getVisibleWorldBounds(this.drawing.size));
       this.particleField.draw(this.drawing, this.starLight, casters);
@@ -222,9 +220,6 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
       this.pirateField.draw(this.drawing, model.pirateField, model.ship, this.camera, this.starLight, casters);
       this.laserField.draw(this.drawing, model.laserField);
       if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship, this.starLight, casters);
-      if (model.mission.phase === MissionPhase.Mission3Active) {
-        this.stationDarkness.draw(this.drawing, model.stationMaze, model.ship, this.camera, this.explorationMap);
-      }
     });
     this.background.drawVignette(this.drawing);
     this.minimap.draw(this.drawing, this.explorationMap, model, this.camera);

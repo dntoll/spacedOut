@@ -1,7 +1,7 @@
 import type { AsteroidBelt } from './AsteroidBelt';
 import type { DroneField } from './DroneField';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
-import type { StationMaze } from './StationMaze';
+import type { Station } from './Station';
 import type { Ship } from './Ship';
 import type { Vec2 } from '../types';
 import { length, random, sub } from '../math';
@@ -160,14 +160,14 @@ export class Mission {
     this.phase = MissionPhase.Mission2Intro;
   }
 
-  jumpToMission3Briefing(ship: Ship, stationMaze: StationMaze): void {
+  jumpToMission3Briefing(ship: Ship, station: Station): void {
     this.signalDirection = null;
     const radius = STATION_RADIUS;
     const center: Vec2 = { x: ship.position.x - radius, y: ship.position.y };
     const entranceAngle = 0;
-    stationMaze.placeAt(center, radius, entranceAngle, Math.floor(Math.random() * 0x1_0000_0000));
-    this.destinationRadius = stationMaze.entranceRadius;
-    this.destination = stationMaze.entrancePosition ? { ...stationMaze.entrancePosition } : null;
+    station.placeAt(center, radius, entranceAngle, Math.floor(Math.random() * 0x1_0000_0000));
+    this.destinationRadius = station.entranceRadius;
+    this.destination = station.entrancePosition ? { ...station.entrancePosition } : null;
     this.cachedRemaining = 0;
     this.initialDistance = 0;
     this.phase = MissionPhase.Mission3Intro;
@@ -184,7 +184,7 @@ export class Mission {
     droneField: DroneField,
     asteroidBelt: AsteroidBelt,
     massiveAsteroidField: MassiveAsteroidField,
-    stationMaze: StationMaze,
+    station: Station,
     visited: VisitedMap,
     screenRadius: number,
   ): void {
@@ -206,8 +206,8 @@ export class Mission {
         this.phase = MissionPhase.Mission2Intro;
       }
     } else if (this.phase === MissionPhase.Mission2Active) {
-      this.beginTraversalIfNeeded(ship, stationMaze);
-      this.cachedRemaining = this.computeRemaining(ship, stationMaze);
+      this.beginTraversalIfNeeded(ship, station);
+      this.cachedRemaining = this.computeRemaining(ship, station);
       this.traverseComplete = this.cachedRemaining <= ship.radius;
       this.leftWingGunRecovered = ship.weaponLevel >= 1;
       this.rightWingGunRecovered = ship.weaponLevel >= REQUIRED_WEAPON_LEVEL;
@@ -215,20 +215,20 @@ export class Mission {
         this.phase = MissionPhase.Mission2Done;
       }
     } else if (this.phase === MissionPhase.Mission3Active) {
-      this.gate1Opened = stationMaze.isGateOpen(1);
-      this.gate2Opened = stationMaze.isGateOpen(2);
-      this.gate3Opened = stationMaze.isGateOpen(3);
-      this.centralReached = stationMaze.isCentralReached(ship);
+      this.gate1Opened = station.isGateOpen(1);
+      this.gate2Opened = station.isGateOpen(2);
+      this.gate3Opened = station.isGateOpen(3);
+      this.centralReached = station.isCentralReached(ship);
       if (this.centralReached) this.phase = MissionPhase.Mission3Done;
     }
   }
 
-  private computeRemaining(ship: Ship, stationMaze: StationMaze): number {
+  private computeRemaining(ship: Ship, station: Station): number {
     if (!this.destination) return this.initialDistance;
     return Math.max(0, length(sub(this.destination, ship.position)) - this.destinationRadius - ship.radius);
   }
 
-  private beginTraversalIfNeeded(ship: Ship, stationMaze: StationMaze): void {
+  private beginTraversalIfNeeded(ship: Ship, station: Station): void {
     if (this.destination || !this.signalDirection) return;
     const center: Vec2 = {
       x: ship.position.x + this.signalDirection.x * TRAVEL_DISTANCE,
@@ -238,9 +238,9 @@ export class Mission {
       ship.position.y - center.y,
       ship.position.x - center.x,
     );
-    stationMaze.placeAt(center, STATION_RADIUS, entranceAngle, Math.floor(Math.random() * 0x1_0000_0000));
-    this.destination = stationMaze.entrancePosition ? { ...stationMaze.entrancePosition } : null;
-    this.destinationRadius = stationMaze.entranceRadius;
+    station.placeAt(center, STATION_RADIUS, entranceAngle, Math.floor(Math.random() * 0x1_0000_0000));
+    this.destination = station.entrancePosition ? { ...station.entrancePosition } : null;
+    this.destinationRadius = station.entranceRadius;
     this.initialDistance = Math.max(0, TRAVEL_DISTANCE - STATION_RADIUS - this.destinationRadius);
   }
 }

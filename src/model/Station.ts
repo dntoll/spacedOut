@@ -1,7 +1,6 @@
-import { closestPointOnSegment, length, sub } from '../math';
+import { length, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { AsteroidBelt } from './AsteroidBelt';
-import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
 import { CollisionResolver } from './CollisionResolver';
 import { CollectablePickup } from './CollectablePickup';
@@ -9,25 +8,25 @@ import type { CollectablePickupObserver } from './CollectablePickupObserver';
 import { AmmoContainer } from './AmmoContainer';
 import { FuelContainer } from './FuelContainer';
 import { HpContainer } from './HpContainer';
-import { MassiveAsteroid } from './MassiveAsteroid';
+import { boundaryRadiusAt } from './MassiveAsteroid';
 import type { DroneField } from './DroneField';
 import type { LaserField } from './LaserField';
 import type { PirateField } from './PirateField';
 import type { Ship } from './Ship';
 import { StationGate } from './StationGate';
 import { StationMachinery } from './StationMachinery';
-import { StationMazeGenerator, type StationLayout, type StationRoomInstance } from './StationMazeGenerator';
+import { StationGenerator, type StationLayout, type StationRoomInstance } from './StationGenerator';
 import type { StationCarver } from './StationCarver';
 import { StationSwitch } from './StationSwitch';
 import { StationWall } from './StationWall';
-import { isCapsuleObstacle } from './SweptCircleCollision';
+import type { PolygonObstacle } from './SweptCircleCollision';
 import { SupplyType } from './SupplyChooser';
 import type { SupplyContainer } from './SupplyContainer';
 import type { SupplyField } from './SupplyField';
 
 const CENTRAL_REACH_MARGIN = 1.05;
 
-export class StationMaze {
+export class Station {
   private layout: StationLayout | null = null;
   private readonly pickupObservers = new Set<CollectablePickupObserver>();
   private readonly collisionObservers = new Set<CollisionObserver>();
@@ -55,7 +54,7 @@ export class StationMaze {
   roomById(id: string): StationRoomInstance | undefined { return this.layout?.rooms.find((r) => r.id === id); }
 
   placeAt(center: Vec2, outerRadius: number, entranceAngle: number, seed: number): void {
-    this.layout = StationMazeGenerator.generate(center, outerRadius, entranceAngle, seed);
+    this.layout = StationGenerator.generate(center, outerRadius, entranceAngle, seed);
     this.collectibleContainers = this.layout.collectibles.map((spec) => this.createContainer(spec.type, spec.position));
   }
 
@@ -79,6 +78,16 @@ export class StationMaze {
     return length(sub(ship.position, this.layout.centralCenter)) <= this.layout.centralRadius * CENTRAL_REACH_MARGIN;
   }
 
+  forEachHullWall(visitor: (wall: StationWall) => void): void {
+    if (!this.layout) return;
+    this.layout.exteriorWalls.forEach(visitor);
+  }
+
+  forEachInteriorWall(visitor: (wall: StationWall) => void): void {
+    if (!this.layout) return;
+    this.layout.interiorWalls.forEach(visitor);
+  }
+
   forEachWall(visitor: (wall: StationWall) => void): void {
     if (!this.layout) return;
     this.layout.exteriorWalls.forEach(visitor);
@@ -90,7 +99,7 @@ export class StationMaze {
   forEachMachinery(visitor: (m: StationMachinery) => void): void { this.layout?.machinery.forEach(visitor); }
   forEachCollectible(visitor: (c: SupplyContainer) => void): void { this.collectibleContainers.forEach(visitor); }
 
-  forEachObstacle(visitor: (obstacle: MassiveAsteroid) => void): void {
+  forEachObstacle(visitor: (obstacle: PolygonObstacle) => void): void {
     if (!this.layout) return;
     this.layout.exteriorWalls.forEach(visitor);
     this.layout.interiorWalls.forEach(visitor);
@@ -98,7 +107,7 @@ export class StationMaze {
     this.layout.machinery.forEach(visitor);
   }
 
-  forEachObstacleNear(position: Vec2, radius: number, visitor: (obstacle: MassiveAsteroid) => void): void {
+  forEachObstacleNear(position: Vec2, radius: number, visitor: (obstacle: PolygonObstacle) => void): void {
     if (!this.layout) return;
     const reachSq = (radius + this.layout.outerRadius) * (radius + this.layout.outerRadius);
     this.forEachObstacle((obstacle) => {
@@ -112,15 +121,9 @@ export class StationMaze {
     if (!this.layout) return;
     this.forEachObstacle((obstacle) => {
       const resolve = (body: import('./PhysicsBody').PhysicsBody): void => {
-        if (isCapsuleObstacle(obstacle)) {
-          const closest = closestPointOnSegment(body.position, obstacle.a, obstacle.b);
-          const collision = CollisionResolver.resolveAgainstStaticBoundary(body, closest, obstacle.wallRadius);
-          if (collision) for (const observer of this.collisionObservers) observer.onCollision(collision);
-        } else {
-          const boundary = MassiveAsteroid.boundaryRadiusAt(obstacle, body.position);
-          const collision = CollisionResolver.resolveAgainstStaticBoundary(body, obstacle.position, boundary);
-          if (collision) for (const observer of this.collisionObservers) observer.onCollision(collision);
-        }
+        const boundary = boundaryRadiusAt(obstacle, body.position);
+        const collision = CollisionResolver.resolveAgainstStaticBoundary(body, obstacle.position, boundary);
+        if (collision) for (const observer of this.collisionObservers) observer.onCollision(collision);
       };
       asteroidBelt.forEach((asteroid) => resolve(asteroid));
       supplyField.forEachActive((container) => resolve(container));
@@ -210,19 +213,11 @@ export class StationMaze {
     if (!this.layout) return;
     const reach = container.radius + 200;
     this.forEachObstacle((obstacle) => {
-      if (isCapsuleObstacle(obstacle)) {
-        const closest = closestPointOnSegment(container.position, obstacle.a, obstacle.b);
-        const dx = closest.x - container.position.x;
-        const dy = closest.y - container.position.y;
-        if (dx * dx + dy * dy > (reach + obstacle.wallRadius) * (reach + obstacle.wallRadius)) return;
-        CollisionResolver.resolveAgainstStaticBoundary(container, closest, obstacle.wallRadius);
-      } else {
-        const dx = obstacle.position.x - container.position.x;
-        const dy = obstacle.position.y - container.position.y;
-        if (dx * dx + dy * dy > (reach + obstacle.radius) * (reach + obstacle.radius)) return;
-        const boundary = MassiveAsteroid.boundaryRadiusAt(obstacle, container.position);
-        CollisionResolver.resolveAgainstStaticBoundary(container, obstacle.position, boundary);
-      }
+      const dx = obstacle.position.x - container.position.x;
+      const dy = obstacle.position.y - container.position.y;
+      if (dx * dx + dy * dy > (reach + obstacle.radius) * (reach + obstacle.radius)) return;
+      const boundary = boundaryRadiusAt(obstacle, container.position);
+      CollisionResolver.resolveAgainstStaticBoundary(container, obstacle.position, boundary);
     });
   }
 

@@ -236,8 +236,8 @@ describe('Minimap', () => {
 
   it('REQ-81 shows the abandoned station hull, walls, gates, switches, and collectibles on the minimap', () => {
     const ship = new Model.Ship();
-    const stationMaze = new Model.StationMaze();
-    stationMaze.placeAt({ x: 0, y: 0 }, 1000, 0, 42);
+    const station = new Model.Station();
+    station.placeAt({ x: 0, y: 0 }, 1000, 0, 42);
     const model = {
       ship,
       supplyField: new Model.SupplyField({ x: 100000, y: 0 }, undefined, 1),
@@ -246,7 +246,7 @@ describe('Minimap', () => {
       droneField: { forEach: () => undefined },
       pirateField: { forEachPirate: () => {} },
       mission: { signalDirection: null, isTraversal: false },
-      stationMaze,
+      station,
       elapsed: 0,
     } as unknown as Model.Game;
     const exploration = new ExplorationMap();
@@ -268,11 +268,11 @@ describe('Minimap', () => {
 
     new Minimap().draw(drawing, exploration, model, camera);
 
-    const hullDrawn = circle.mock.calls.some((call) => call[2] === 'rgba(58,36,24,.30)');
+    const hullDrawn = circle.mock.calls.some((call) => call[2] === 'rgba(40,24,12,.4)');
     expect(hullDrawn).toBe(true);
     const wallDrawn = polygon.mock.calls.some((call) => call[1] === 'rgba(58,36,24,.5)');
     expect(wallDrawn).toBe(true);
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.8, '#5de0ff');
-    expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.6, '#d98a4a');
+    expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.6, '#e8923a');
   });
 });

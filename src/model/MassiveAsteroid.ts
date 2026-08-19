@@ -6,6 +6,27 @@ export interface AsteroidCavity {
   radius: number;
 }
 
+export interface RadialPolygon {
+  position: Vec2;
+  angle: number;
+  vertices: number[];
+  radius: number;
+}
+
+export const boundaryRadiusAt = (body: RadialPolygon, worldPosition: Vec2): number => {
+  const worldAngle = Math.atan2(
+    worldPosition.y - body.position.y,
+    worldPosition.x - body.position.x,
+  );
+  const localAngle = ((worldAngle - body.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+  const vertexPosition = localAngle / (Math.PI * 2) * body.vertices.length;
+  const firstIndex = Math.floor(vertexPosition) % body.vertices.length;
+  const secondIndex = (firstIndex + 1) % body.vertices.length;
+  const blend = vertexPosition - Math.floor(vertexPosition);
+  const variation = body.vertices[firstIndex] * (1 - blend) + body.vertices[secondIndex] * blend;
+  return body.radius * variation;
+};
+
 export class MassiveAsteroid extends PhysicsBody {
   constructor(
     public readonly id: number,
@@ -16,20 +37,10 @@ export class MassiveAsteroid extends PhysicsBody {
     public readonly cavities: AsteroidCavity[],
     public readonly shade: number,
   ) {
-    super(position, { x: 0, y: 0 }, radius, Number.POSITIVE_INFINITY, angle, 0);
+    super(position, { x: 0, y: 0 }, radius, Number.POSITIVE_INFINITY, angle, 0, true);
   }
 
   static boundaryRadiusAt(asteroid: MassiveAsteroid, worldPosition: Vec2): number {
-    const worldAngle = Math.atan2(
-      worldPosition.y - asteroid.position.y,
-      worldPosition.x - asteroid.position.x,
-    );
-    const localAngle = ((worldAngle - asteroid.angle) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
-    const vertexPosition = localAngle / (Math.PI * 2) * asteroid.vertices.length;
-    const firstIndex = Math.floor(vertexPosition) % asteroid.vertices.length;
-    const secondIndex = (firstIndex + 1) % asteroid.vertices.length;
-    const blend = vertexPosition - Math.floor(vertexPosition);
-    const variation = asteroid.vertices[firstIndex] * (1 - blend) + asteroid.vertices[secondIndex] * blend;
-    return asteroid.radius * variation;
+    return boundaryRadiusAt(asteroid, worldPosition);
   }
 }

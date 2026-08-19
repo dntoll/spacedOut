@@ -26,7 +26,7 @@ import type { PirateLaserShotObserver } from './PirateLaserShotObserver';
 import type { PirateCollisionObserver } from './PirateCollisionObserver';
 import { Ship } from './Ship';
 import { ShipCollisionSystem } from './ShipCollisionSystem';
-import { StationMaze } from './StationMaze';
+import { Station } from './Station';
 import { SupplyChooser, SupplyType } from './SupplyChooser';
 import { SupplyContainer } from './SupplyContainer';
 import { SupplyField } from './SupplyField';
@@ -51,7 +51,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
   readonly laserField = new LaserField();
   readonly droneField = new DroneField();
   readonly pirateField = new PirateField();
-  readonly stationMaze = new StationMaze();
+  readonly station = new Station();
   readonly mission = new Mission();
   readonly visitedMap = new VisitedMap();
   readonly discoveredMap = new DiscoveredMap();
@@ -75,7 +75,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
       this.ship.collectAmmo(100);
       this.ship.upgradeWeapon();
       this.ship.upgradeWeapon();
-      this.mission.jumpToMission3Briefing(this.ship, this.stationMaze);
+      this.mission.jumpToMission3Briefing(this.ship, this.station);
       this.clearMissionEncounters();
     }
   }
@@ -114,7 +114,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
     this.laserField.addCollisionObserver(observer);
     this.pirateField.addCollisionObserver(observer);
     this.droneField.addCollisionObserver(observer);
-    this.stationMaze.addCollisionObserver(observer);
+    this.station.addCollisionObserver(observer);
   }
   removeCollisionObserver(observer: CollisionObserver): void {
     this.asteroidBelt.removeCollisionObserver(observer);
@@ -123,7 +123,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
     this.laserField.removeCollisionObserver(observer);
     this.pirateField.removeCollisionObserver(observer);
     this.droneField.removeCollisionObserver(observer);
-    this.stationMaze.removeCollisionObserver(observer);
+    this.station.removeCollisionObserver(observer);
   }
   addDamageObserver(observer: DamageObserver): void {
     this.shipCollisions.addDamageObserver(observer);
@@ -169,11 +169,11 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
   }
   addCollectablePickupObserver(observer: CollectablePickupObserver): void {
     this.supplyField.addCollectablePickupObserver(observer);
-    this.stationMaze.addCollectablePickupObserver(observer);
+    this.station.addCollectablePickupObserver(observer);
   }
   removeCollectablePickupObserver(observer: CollectablePickupObserver): void {
     this.supplyField.removeCollectablePickupObserver(observer);
-    this.stationMaze.removeCollectablePickupObserver(observer);
+    this.station.removeCollectablePickupObserver(observer);
   }
 
   onDestroyed(event: AsteroidDestroyed): void {
@@ -241,7 +241,7 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
     this.supplyField.update(dt, this.ship, this.asteroidBelt, spawnBoundary, this.spawnExclusionRadius, suppliesEnabled);
     this.massiveAsteroidField.prepareAround(this.ship.position, spawnBoundary, massiveEnabled);
     this.massiveAsteroidField.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
-    this.stationMaze.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
+    this.station.resolveBodyCollisions(this.asteroidBelt, this.supplyField);
     this.droneField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, dronesEnabled, mission2EncountersEnabled);
     this.pirateField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, spawnBoundary, piratesEnabled, this.mission.isTraversal ? this.mission.signalDirection : null, this.discoveredMap);
     const droneBodies: PhysicsBody[] = [];
@@ -250,15 +250,15 @@ export class Game implements AsteroidDestroyedObserver, PirateDestroyedObserver,
     this.pirateField.forEachPirate((pirate) => pirateBodies.push(pirate));
     this.droneField.applySeparation(pirateBodies, dt);
     this.pirateField.applySeparation(droneBodies, dt);
-    this.laserField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, this.spawnExclusionRadius, this.droneField, this.pirateField, this.stationMaze);
+    this.laserField.update(dt, this.ship, this.asteroidBelt, this.massiveAsteroidField, this.spawnExclusionRadius, this.droneField, this.pirateField, this.station);
 
     const obstacles: ShipObstacle[] = [];
     this.asteroidBelt.forEach((asteroid) => obstacles.push(asteroid));
     this.massiveAsteroidField.forEachActive((asteroid) => obstacles.push(asteroid));
-    this.stationMaze.forEachObstacleNear(this.ship.position, spawnBoundary + this.ship.radius * 2, (obstacle) => obstacles.push(obstacle));
+    this.station.forEachObstacleNear(this.ship.position, spawnBoundary + this.ship.radius * 2, (obstacle) => obstacles.push(obstacle));
     this.shipCollisions.resolve(this.ship, obstacles, dt);
 
-    this.stationMaze.update(dt, this.ship, this.asteroidBelt, this.droneField, this.pirateField, this.laserField);
-    this.mission.update(dt, this.ship, this.droneField, this.asteroidBelt, this.massiveAsteroidField, this.stationMaze, this.visitedMap, this.spawnExclusionRadius);
+    this.station.update(dt, this.ship, this.asteroidBelt, this.droneField, this.pirateField, this.laserField);
+    this.mission.update(dt, this.ship, this.droneField, this.asteroidBelt, this.massiveAsteroidField, this.station, this.visitedMap, this.spawnExclusionRadius);
   }
 }

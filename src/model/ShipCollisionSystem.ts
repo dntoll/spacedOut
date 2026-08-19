@@ -4,7 +4,6 @@ import { CollisionResolver } from './CollisionResolver';
 import { Damage } from './Damage';
 import type { DamageObserver } from './DamageObserver';
 import { DamageCalculator } from './DamageCalculator';
-import { MassiveAsteroid } from './MassiveAsteroid';
 import type { Ship } from './Ship';
 import { SweptCircleCollision, type ShipObstacle, type SweepHit, isCapsuleObstacle } from './SweptCircleCollision';
 
@@ -46,7 +45,7 @@ export class ShipCollisionSystem {
         ship.velocity = { ...incomingVelocity };
         const collision = CollisionResolver.resolveSweptContact(ship, hit.obstacle, hit.normal);
         combinedVelocityChange = add(combinedVelocityChange, sub(ship.velocity, incomingVelocity));
-        const damage = DamageCalculator.damageFor(collision.impactSpeed, hit.obstacle instanceof MassiveAsteroid);
+        const damage = DamageCalculator.damageFor(collision.impactSpeed, hit.obstacle.massive);
         if (damage > 0 && !ship.isInvulnerable) {
           ship.takeDamage(damage);
           const origin = ship.isAlive ? collision.position : ship.position;
