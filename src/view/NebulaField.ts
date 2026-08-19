@@ -1,8 +1,9 @@
 import { add, length, random, scale, sub } from '../math';
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
-import type { Camera } from './Camera';
-import type { Drawing, Size, RadialPaint } from './Drawing';
+import type { Camera, WorldBounds } from './Camera';
+import type { Drawing, Size } from './Drawing';
+import { NebulaCloud } from './NebulaCloud';
 import { NebulaParticle, type NebulaColor } from './NebulaParticle';
 
 const CLOUD_GAP_BASE = 15000;
@@ -36,15 +37,15 @@ const PALETTE: NebulaColor[] = [
 ];
 
 export class NebulaField {
-  private particles: NebulaParticle[] = [];
+  private clouds: NebulaCloud[] = [];
   private lastCloudProgress = -CLOUD_GAP_BASE;
   private nextGap = CLOUD_GAP_BASE;
 
-  reset(): void { this.particles = []; this.lastCloudProgress = -CLOUD_GAP_BASE; this.nextGap = CLOUD_GAP_BASE; }
+  reset(): void { this.clouds = []; this.lastCloudProgress = -CLOUD_GAP_BASE; this.nextGap = CLOUD_GAP_BASE; }
 
   update(dt: number, model: Model.Game, camera: Camera, viewport: Size): void {
     if (!model.mission.isTraversal) {
-      this.particles = [];
+      this.clouds = [];
       this.lastCloudProgress = -CLOUD_GAP_BASE;
       this.nextGap = CLOUD_GAP_BASE;
       return;
@@ -53,25 +54,13 @@ export class NebulaField {
     const pushers: Vec2[] = [model.ship.position];
     model.pirateField.forEachPirate((pirate) => pushers.push(pirate.position));
     model.droneField.forEach((drone) => pushers.push(drone.position));
-    for (const particle of this.particles) particle.update(dt, pushers);
+    for (const cloud of this.clouds) cloud.update(dt, pushers);
     this.cull(model.ship.position, camera, viewport, model.ship.speed * SPEED_CLEARANCE_GAIN);
   }
 
-  draw(drawing: Drawing): void {
+  draw(drawing: Drawing, visibleBounds?: WorldBounds): void {
     drawing.withAdditiveBlend(() => {
-      for (const particle of this.particles) {
-        const { r, g, b } = particle.color;
-        const paint: RadialPaint = {
-          from: { x: particle.position.x, y: particle.position.y }, fromRadius: 0,
-          to: { x: particle.position.x, y: particle.position.y }, toRadius: particle.size,
-          stops: [
-            { offset: 0, color: `rgba(${r},${g},${b},${particle.alpha})` },
-            { offset: 0.6, color: `rgba(${r},${g},${b},${particle.alpha * 0.35})` },
-            { offset: 1, color: `rgba(${r},${g},${b},0)` },
-          ],
-        };
-        drawing.circle(particle.position, particle.size, paint);
-      }
+      for (const cloud of this.clouds) cloud.draw(drawing, visibleBounds);
     });
   }
 
@@ -96,31 +85,33 @@ export class NebulaField {
       const color = PALETTE[Math.floor(random(0, PALETTE.length))];
       const rotation = random(0, Math.PI * 2);
       const shapeRoll = random(0, 1);
+      let particles: NebulaParticle[];
       if (shapeRoll < 1 / 3) {
-        this.spawnEllipse(cloudCenter, color, rotation, CLOUD_SIZE);
+        particles = this.spawnEllipse(cloudCenter, color, rotation, CLOUD_SIZE);
       } else if (shapeRoll < 2 / 3) {
-        this.spawnBlob(cloudCenter, color, rotation, CLOUD_SIZE);
+        particles = this.spawnBlob(cloudCenter, color, rotation, CLOUD_SIZE);
       } else {
-        this.spawnWisp(cloudCenter, color, rotation);
+        particles = this.spawnWisp(cloudCenter, color, rotation);
       }
+      this.clouds.push(new NebulaCloud(particles));
     }
   }
 
-  private spawnEllipse(center: Vec2, color: NebulaColor, rotation: number, count: number): void {
+  private spawnEllipse(center: Vec2, color: NebulaColor, rotation: number, count: number): NebulaParticle[] {
     const aspect = random(CLOUD_ASPECT_MIN, CLOUD_ASPECT_MAX);
     const a = CLOUD_SPREAD * aspect;
     const b = CLOUD_SPREAD / aspect;
-    this.scatterEllipse(center, color, rotation, count, a, b);
+    return this.scatterEllipse(center, color, rotation, count, a, b);
   }
 
-  private spawnWisp(center: Vec2, color: NebulaColor, rotation: number): void {
+  private spawnWisp(center: Vec2, color: NebulaColor, rotation: number): NebulaParticle[] {
     const aspect = random(WISP_ASPECT_MIN, WISP_ASPECT_MAX);
     const a = CLOUD_SPREAD * aspect;
     const b = CLOUD_SPREAD / aspect;
-    this.scatterEllipse(center, color, rotation, WISP_CLOUD_SIZE, a, b);
+    return this.scatterEllipse(center, color, rotation, WISP_CLOUD_SIZE, a, b);
   }
 
-  private spawnBlob(center: Vec2, color: NebulaColor, rotation: number, count: number): void {
+  private spawnBlob(center: Vec2, color: NebulaColor, rotation: number, count: number): NebulaParticle[] {
     const kernelCount = Math.floor(random(BLOB_KERNEL_MIN, BLOB_KERNEL_MAX + 1));
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
@@ -130,14 +121,17 @@ export class NebulaField {
       kernels.push(add(center, { x: local.x * cos - local.y * sin, y: local.x * sin + local.y * cos }));
     }
     const perKernel = Math.ceil(count / kernelCount);
+    const particles: NebulaParticle[] = [];
     for (const kernel of kernels) {
-      this.scatterEllipse(kernel, color, rotation, perKernel, BLOB_KERNEL_RADIUS, BLOB_KERNEL_RADIUS);
+      particles.push(...this.scatterEllipse(kernel, color, rotation, perKernel, BLOB_KERNEL_RADIUS, BLOB_KERNEL_RADIUS));
     }
+    return particles;
   }
 
-  private scatterEllipse(center: Vec2, color: NebulaColor, rotation: number, count: number, a: number, b: number): void {
+  private scatterEllipse(center: Vec2, color: NebulaColor, rotation: number, count: number, a: number, b: number): NebulaParticle[] {
     const cos = Math.cos(rotation);
     const sin = Math.sin(rotation);
+    const particles: NebulaParticle[] = [];
     for (let i = 0; i < count; i++) {
       const angle = random(0, Math.PI * 2);
       const t = Math.sqrt(random(0, 1));
@@ -148,8 +142,9 @@ export class NebulaField {
       });
       const size = random(PARTICLE_MIN, PARTICLE_MAX);
       const tint = this.tint(color);
-      this.particles.push(new NebulaParticle({ ...home }, home, size, tint, PARTICLE_ALPHA));
+      particles.push(new NebulaParticle({ ...home }, home, size, tint, PARTICLE_ALPHA));
     }
+    return particles;
   }
 
   private nearIsland(model: Model.Game, cloudCenter: Vec2): boolean {
@@ -173,6 +168,6 @@ export class NebulaField {
 
   private cull(shipPosition: Vec2, camera: Camera, viewport: Size, speedClearance: number): void {
     const maxDist = camera.getVisibleWorldRadius(viewport) + 2 * MAX_CLOUD_EXTENT + speedClearance + SPAWN_MARGIN + CULL_TAIL;
-    this.particles = this.particles.filter((p) => length(sub(p.position, shipPosition)) <= maxDist);
+    this.clouds = this.clouds.filter((cloud) => cloud.isWithin(shipPosition, maxDist));
   }
 }

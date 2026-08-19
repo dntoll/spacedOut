@@ -168,7 +168,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.drawing.compositeShadowLayer('multiply');
     this.camera.drawWorld(this.drawing, () => {
       this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera, this.starLight);
-      this.nebulaField.draw(this.drawing);
+      this.nebulaField.draw(this.drawing, this.camera.getVisibleWorldBounds(this.drawing.size));
       this.particleField.draw(this.drawing, this.starLight, casters);
       this.supplyField.draw(this.drawing, model.supplyField, this.starLight, casters);
       this.asteroidBelt.draw(this.drawing, model.asteroidBelt, model.ship.position, this.camera, this.starLight, casters);
