@@ -3,9 +3,7 @@ import type { Vec2 } from '../types';
 import type { Drawing, RadialPaint } from './Drawing';
 
 const DIM_ALPHA = 0.62;
-const CORNER_EPSILON = 1e-4;
-const BOUNDARY_RAYS = 48;
-const ENDPOINT_REACH_FACTOR = 2;
+const RAY_COUNT = 180;
 
 interface Segment { ax: number; ay: number; bx: number; by: number }
 
@@ -78,21 +76,12 @@ export class StationLamp {
 
   private computeVisibility(station: Model.Station, origin: Vec2, radius: number): Vec2[] {
     const segments = this.gatherSegments(station, origin, radius);
-    const reachSq = radius * radius * ENDPOINT_REACH_FACTOR * ENDPOINT_REACH_FACTOR;
-    const angles: number[] = [];
-    for (const s of segments) {
-      for (const endpoint of [{ x: s.ax, y: s.ay }, { x: s.bx, y: s.by }]) {
-        const dx = endpoint.x - origin.x;
-        const dy = endpoint.y - origin.y;
-        if (dx * dx + dy * dy > reachSq) continue;
-        const a = Math.atan2(dy, dx);
-        angles.push(a - CORNER_EPSILON, a + CORNER_EPSILON);
-      }
-    }
-    for (let i = 0; i < BOUNDARY_RAYS; i++) angles.push((i / BOUNDARY_RAYS) * Math.PI * 2);
-
-    const hits: { angle: number; x: number; y: number }[] = [];
-    for (const a of angles) {
+    // Uniform angular rays, each stopped at the nearest wall (or the radius).
+    // One hit per angle, emitted in angular order, yields a simple star polygon
+    // (never self-intersecting) regardless of obstacle density.
+    const pts: Vec2[] = [];
+    for (let i = 0; i < RAY_COUNT; i++) {
+      const a = (i / RAY_COUNT) * Math.PI * 2;
       const dx = Math.cos(a);
       const dy = Math.sin(a);
       let bestT = radius;
@@ -100,10 +89,9 @@ export class StationLamp {
         const t = raySegmentT(origin.x, origin.y, dx, dy, s);
         if (t !== null && t < bestT) bestT = t;
       }
-      hits.push({ angle: a, x: origin.x + dx * bestT, y: origin.y + dy * bestT });
+      pts.push({ x: origin.x + dx * bestT, y: origin.y + dy * bestT });
     }
-    hits.sort((p, q) => p.angle - q.angle);
-    return hits.map((h) => ({ x: h.x, y: h.y }));
+    return pts;
   }
 
   private gatherSegments(station: Model.Station, origin: Vec2, radius: number): Segment[] {

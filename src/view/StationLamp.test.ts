@@ -168,15 +168,15 @@ describe('StationLamp', () => {
   it('REQ-87 closed gate blocks the lamp; opening the gate lets the lamp through within radius and line of sight', () => {
     const station = placeStation();
     const lamp = new StationLamp();
-    const hub0 = roomCenter(station, 'area', 1);
-    const hub1 = roomCenter(station, 'area', 2);
+    const entrance = roomCenter(station, 'entrance', 0);
+    const area1 = roomCenter(station, 'area', 1);
     const gate = gatePosition(station, 1);
-    // Direction along the hub0 -> hub1 spine corridor (gate 1 sits between them).
-    const dir = { x: hub1.x - hub0.x, y: hub1.y - hub0.y };
+    // Gate 1 sits on the corridor between the entrance and section B (area 1).
+    const dir = { x: area1.x - entrance.x, y: area1.y - entrance.y };
     const dl = Math.hypot(dir.x, dir.y);
     const ux = dir.x / dl;
     const uy = dir.y / dl;
-    // Ship just before the gate (hub0 side), probe just past the gate (hub1 side), within radius.
+    // Ship just before the gate (entrance side), probe just past the gate (area-1 side), within radius.
     const shipPos: Vec2 = { x: gate.x - ux * 160, y: gate.y - uy * 160 };
     const probe: Vec2 = { x: gate.x + ux * 160, y: gate.y + uy * 160 };
     expect(Math.hypot(probe.x - shipPos.x, probe.y - shipPos.y)).toBeLessThan(R);

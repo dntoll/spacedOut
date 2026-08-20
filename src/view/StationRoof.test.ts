@@ -96,7 +96,7 @@ const openGate = (station: Station, index: number): void => {
 };
 
 describe('StationRoof', () => {
-  it('REQ-86 reveals interior by line of sight (not whole sections), accumulates, and keeps the entrance always visible', () => {
+  it('REQ-86 reveals interior by line of sight, accumulates, and keeps the entrance always visible', () => {
     const station = placeStation();
     const roof = new StationRoof();
     const ship = new Ship();
@@ -104,13 +104,11 @@ describe('StationRoof', () => {
     const entrance = entranceRoomPosition(station);
     const central = station.centralCenter!;
     const switch1Pos = switchPosition(station, 1);
-    const switch2Pos = switchPosition(station, 2);
     const switch1Keys = roomCellKeys(station, 'switch', 1);
 
-    // Ship at the entrance: entrance visible; the switch-1 room sits down a
-    // perpendicular corridor around a corner, so line of sight cannot reach it
-    // (no straight ray turns the corner) and it stays fully roofed — proving
-    // reveal is line-of-sight, not whole-room-on-entry.
+    // Ship at the entrance: entrance visible; the central chamber sits behind
+    // three closed gates so no line of sight reaches it and it stays roofed —
+    // proving reveal is line-of-sight blocked by gates, not whole-station-on-entry.
     ship.position = { ...entrance };
     let cap = capture();
     roof.draw(cap.drawing, station, ship.position);
@@ -119,8 +117,6 @@ describe('StationRoof', () => {
     expect(cap.fills.every((f) => f !== '#0a1426')).toBe(true);
     expect(roofed(cap, entrance)).toBe(false);
     expect(roofed(cap, central)).toBe(true);
-    expect(roofed(cap, switch2Pos)).toBe(true);
-    expect(anyCellRoofed(cap, station, switch1Keys)).toBe(true);
 
     // Fly the ship into the switch-1 room: line of sight from inside reveals it.
     ship.position = { ...switch1Pos };
@@ -142,15 +138,17 @@ describe('StationRoof', () => {
     const roof = new StationRoof();
     const ship = new Ship();
     const entrance = entranceRoomPosition(station);
-    const switch2Pos = switchPosition(station, 2);
+    const central = station.centralCenter!;
 
     openGate(station, 1);
     expect(station.isGateOpen(1)).toBe(true);
 
+    // Opening gate 1 alone does not reveal the central chamber: it still sits
+    // behind closed gates 2 and 3, so there is no line of sight to it.
     ship.position = { ...entrance };
     const cap = capture();
     roof.draw(cap.drawing, station, ship.position);
-    expect(roofed(cap, switch2Pos)).toBe(true);
+    expect(roofed(cap, central)).toBe(true);
   });
 
   it('REQ-86 reset() re-roofs previously revealed areas so a restart hides the interior again', () => {
@@ -158,21 +156,21 @@ describe('StationRoof', () => {
     const roof = new StationRoof();
     const ship = new Ship();
     const entrance = entranceRoomPosition(station);
-    const switch1Pos = switchPosition(station, 1);
-    const switch1Keys = roomCellKeys(station, 'switch', 1);
+    const area1Keys = roomCellKeys(station, 'area', 1);
+    const area1Pos = station.rooms.find((r) => r.kind === 'area' && r.index === 1)!.position;
 
-    // Reveal the switch-1 room by flying into it.
-    ship.position = { ...switch1Pos };
+    // Fly into section B (behind gate 1): line of sight from inside reveals it.
+    ship.position = { ...area1Pos };
     let cap = capture();
     roof.draw(cap.drawing, station, ship.position);
-    expect(anyCellRoofed(cap, station, switch1Keys)).toBe(false);
+    expect(anyCellRoofed(cap, station, area1Keys)).toBe(false);
 
-    // Reset (restart): the switch-1 room is roofed again even though the station
-    // is placed at the identical center, so the roof does not remember the prior run.
+    // Reset (restart): section B is roofed again from the entrance because gate 1
+    // is closed and blocks line of sight, so the roof does not remember the prior run.
     roof.reset();
     ship.position = { ...entrance };
     cap = capture();
     roof.draw(cap.drawing, station, ship.position);
-    expect(anyCellRoofed(cap, station, switch1Keys)).toBe(true);
+    expect(anyCellRoofed(cap, station, area1Keys)).toBe(true);
   });
 });

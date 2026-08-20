@@ -1,3 +1,4 @@
+import { length, normalize, sub } from '../math';
 import type { Vec2 } from '../types';
 import { RandomSequence } from './RandomSequence';
 import { StationCarver, type BoundarySegment } from './StationCarver';
@@ -51,12 +52,17 @@ const WALL_HALF_FRACTION = 0.012;
 const CORRIDOR_HALF_FRACTION = 0.07;
 const SWITCH_RADIUS = 26;
 const SHIP_RADIUS = 18;
-const MACHINERY_RADIUS_FRACTION = 0.028;
+const MACHINERY_RADIUS_FRACTION = 0.014;
 const MACHINERY_BLOCK_MARGIN = 6;
 const PLACE_RETRIES = 80;
-const BRANCHES_PER_ZONE = 12;
-const CENTRAL_ANNEXES = 4;
+const SECTION_BRANCHES = 10;
+const SECTION_CROSS_LINKS = 4;
+const SECTION_RADIUS_FRACTION = 0.28;
+const BRANCH_HW_FRACTION = 0.042;
+const CORRIDOR_LEN_FRACTION = 0.05;
 const BRANCH_KEEP_OUT_FRACTION = 0.88;
+const SECTION_SAMPLE_RETRIES = 200;
+const GENERATION_RETRIES = 16;
 
 interface RoomPlacement {
   id: string;
@@ -67,206 +73,171 @@ interface RoomPlacement {
   hh: number;
 }
 
-interface CorridorPlan {
-  from: string;
-  to: string;
-  gate: number | null;
-}
-
-interface SpineSpec {
-  id: string;
-  kind: RoomKind;
-  index: number;
-  x: number;
-  y: number;
-  hw: number;
-  hh: number;
-}
-
-interface SwitchSpec {
-  id: string;
-  x: number;
-  y: number;
-  hw: number;
-  hh: number;
-}
-
-interface ZoneSpec {
-  minX: number;
-  maxX: number;
-  hub: string;
-  switchId: string;
-}
-
-const SPINE: SpineSpec[] = [
-  { id: 'central', kind: 'central', index: 0, x: 0.00, y: 0.00, hw: 0.13, hh: 0.15 },
-  { id: 'hub2', kind: 'area', index: 3, x: 0.26, y: 0.00, hw: 0.09, hh: 0.11 },
-  { id: 'hub1', kind: 'area', index: 2, x: 0.50, y: 0.00, hw: 0.09, hh: 0.11 },
-  { id: 'hub0', kind: 'area', index: 1, x: 0.74, y: 0.00, hw: 0.09, hh: 0.11 },
-  { id: 'entrance', kind: 'entrance', index: 0, x: 0.95, y: 0.00, hw: 0.06, hh: 0.08 },
-];
-
-const SWITCH_SPECS: SwitchSpec[] = [
-  { id: 'switch1', x: 0.74, y: -0.24, hw: 0.07, hh: 0.07 },
-  { id: 'switch2', x: 0.50, y: 0.24, hw: 0.07, hh: 0.07 },
-  { id: 'switch3', x: 0.26, y: -0.24, hw: 0.07, hh: 0.07 },
-];
-
-const SPINE_CORRIDORS: CorridorPlan[] = [
-  { from: 'entrance', to: 'hub0', gate: null },
-  { from: 'hub0', to: 'hub1', gate: 1 },
-  { from: 'hub1', to: 'hub2', gate: 2 },
-  { from: 'hub2', to: 'central', gate: 3 },
-];
-
-const ZONES: ZoneSpec[] = [
-  { minX: 0.62, maxX: 1.00, hub: 'hub0', switchId: 'switch1' },
-  { minX: 0.38, maxX: 0.62, hub: 'hub1', switchId: 'switch2' },
-  { minX: 0.14, maxX: 0.38, hub: 'hub2', switchId: 'switch3' },
-];
+// The station is divided into four gated sections chained entrance -> central:
+//   A (entrance + switch 1) --gate 1--> B (switch 2) --gate 2--> C (switch 3) --gate 3--> D (central)
+// Per REQ-80, switch i is reachable only after gate i-1 opens, and the central chamber
+// only after gate 3. Sections are placed at randomized anchors forming a non-self-
+// intersecting path, separated by solid rock so the gate corridor is the only connection
+// between adjacent sections. Each section grows a randomized looped maze of branch rooms
+// and cross-link corridors confined to a disc around its hub.
 
 export class StationGenerator {
   static generate(center: Vec2, outerRadius: number, entranceAngle: number, seed: number): StationLayout {
+    for (let attempt = 0; attempt < GENERATION_RETRIES; attempt++) {
+      const layout = this.tryGenerate(center, outerRadius, entranceAngle, (seed + attempt) >>> 0);
+      if (layout) return layout;
+    }
+    throw new Error('station generation failed: could not satisfy gating invariants');
+  }
+
+  private static tryGenerate(center: Vec2, outerRadius: number, entranceAngle: number, seed: number): StationLayout | null {
     const random = new RandomSequence(seed >>> 0);
     const carver = new StationCarver(outerRadius, CELL_SIZE);
     const wallHalf = outerRadius * WALL_HALF_FRACTION;
     const corridorHalf = outerRadius * CORRIDOR_HALF_FRACTION;
+    const R = outerRadius;
+    const sectionRadius = R * SECTION_RADIUS_FRACTION;
+    const branchHwBase = R * BRANCH_HW_FRACTION;
+    const corridorLen = R * CORRIDOR_LEN_FRACTION;
+    const keepOut = R * BRANCH_KEEP_OUT_FRACTION;
+    const jitter = (n: number): number => random.between(-n, n);
     const localToWorld = (local: Vec2): Vec2 => carver.localToWorld(local, center, entranceAngle);
-    const jitter = (amount: number): number => random.between(-amount, amount);
 
     const placements = new Map<string, RoomPlacement>();
-    const place = (id: string, kind: RoomKind, index: number, local: Vec2, hw: number, hh: number): RoomPlacement => {
+    const sectionRooms: RoomPlacement[][] = [[], [], [], []];
+    const place = (id: string, kind: RoomKind, index: number, local: Vec2, hw: number, hh: number, section: number): RoomPlacement => {
       const p: RoomPlacement = { id, kind, index, local: { ...local }, hw, hh };
       placements.set(id, p);
+      sectionRooms[section].push(p);
       return p;
     };
 
-    for (const spec of SPINE) {
-      const local = { x: spec.x * outerRadius, y: spec.y * outerRadius };
-      const hw = spec.hw * outerRadius;
-      const hh = spec.hh * outerRadius;
-      carver.carveRectRoom(local, hw, hh, outerRadius * 0.004);
-      place(spec.id, spec.kind, spec.index, local, hw, hh);
-    }
-    for (const spec of SWITCH_SPECS) {
-      const local = { x: spec.x * outerRadius + jitter(outerRadius * 0.01), y: spec.y * outerRadius + jitter(outerRadius * 0.01) };
-      const hw = spec.hw * outerRadius;
-      const hh = spec.hh * outerRadius;
-      carver.carveRectRoom(local, hw, hh, outerRadius * 0.004);
-      place(spec.id, 'switch', SWITCH_SPECS.indexOf(spec) + 1, local, hw, hh);
-    }
+    // --- Section anchors -----------------------------------------------------
+    const A: Vec2 = { x: R * 0.95, y: 0 };
+    const D: Vec2 = { x: 0, y: 0 };
+    const sampled = this.sampleSections(random, A, D, R, keepOut);
+    if (!sampled) return null;
+    const { B, C } = sampled;
+    const anchors: Vec2[] = [A, B, C, D];
 
-    for (const corridor of SPINE_CORRIDORS) {
-      const from = placements.get(corridor.from)!;
-      const to = placements.get(corridor.to)!;
-      carver.carveRectCorridor(from.local, to.local, corridorHalf);
-    }
+    // --- Hub rooms -----------------------------------------------------------
+    carver.carveRectRoom(A, R * 0.06, R * 0.08, R * 0.004);
+    place('entrance', 'entrance', 0, A, R * 0.06, R * 0.08, 0);
+    carver.carveRectRoom(B, R * 0.08, R * 0.10, R * 0.004);
+    place('area1', 'area', 1, B, R * 0.08, R * 0.10, 1);
+    carver.carveRectRoom(C, R * 0.08, R * 0.10, R * 0.004);
+    place('area2', 'area', 2, C, R * 0.08, R * 0.10, 2);
+    carver.carveRectRoom(D, R * 0.12, R * 0.14, R * 0.004);
+    place('central', 'central', 0, D, R * 0.12, R * 0.14, 3);
 
-    for (const zone of ZONES) {
-      const hub = placements.get(zone.hub)!;
-      const sw = placements.get(zone.switchId)!;
-      carver.carveRectCorridor(hub.local, sw.local, corridorHalf);
-    }
-
-    const branchHwBase = outerRadius * 0.06;
-    const corridorLen = outerRadius * 0.07;
-    const keepOut = outerRadius * BRANCH_KEEP_OUT_FRACTION;
-    const tryPlaceBranch = (parentIds: string[], id: string, minX: number, maxX: number): string | null => {
+    // --- Per-section internal maze ------------------------------------------
+    const tryPlaceBranch = (parentIds: string[], hubLocal: Vec2, id: string, kind: RoomKind, index: number, section: number): string | null => {
       for (let attempt = 0; attempt < PLACE_RETRIES; attempt++) {
         const parentId = parentIds[random.integer(0, parentIds.length)];
         const parent = placements.get(parentId)!;
         const hw = branchHwBase * random.between(0.85, 1.35);
         const hh = branchHwBase * random.between(0.85, 1.35);
-        const up = random.next() < 0.5;
-        const angle = (up ? -1 : 1) * random.between(Math.PI * 0.20, Math.PI * 0.80);
+        const angle = random.between(0, Math.PI * 2);
         const dist = Math.max(parent.hw, parent.hh) + Math.max(hw, hh) + corridorLen;
-        const local: Vec2 = {
-          x: parent.local.x + Math.cos(angle) * dist,
-          y: parent.local.y + Math.sin(angle) * dist,
-        };
-        if (local.x - hw < minX || local.x + hw > maxX) continue;
-        const farExtent = Math.hypot(local.x, local.y) + Math.max(hw, hh);
-        if (farExtent > keepOut) continue;
+        const local: Vec2 = { x: parent.local.x + Math.cos(angle) * dist, y: parent.local.y + Math.sin(angle) * dist };
+        if (length(sub(local, hubLocal)) + Math.max(hw, hh) > sectionRadius) continue;
+        if (Math.hypot(local.x, local.y) + Math.max(hw, hh) > keepOut) continue;
         if (!carver.fitsRect(local, hw, hh)) continue;
-        carver.carveRectRoom(local, hw, hh, outerRadius * 0.003);
+        carver.carveRectRoom(local, hw, hh, R * 0.003);
         carver.carveRectCorridor(parent.local, local, corridorHalf);
-        place(id, 'extra', 0, local, hw, hh);
+        place(id, kind, index, local, hw, hh, section);
         return id;
       }
       return null;
     };
 
-    for (let z = 0; z < ZONES.length; z++) {
-      const zone = ZONES[z];
-      const minX = zone.minX * outerRadius;
-      const maxX = zone.maxX * outerRadius;
-      const parentIds = [zone.hub, zone.switchId];
-      for (let b = 0; b < BRANCHES_PER_ZONE; b++) {
-        const id = `z${z}b${b}`;
-        const placed = tryPlaceBranch(parentIds, id, minX, maxX);
-        if (placed) parentIds.push(placed);
+    const switchRoomPlacement: (RoomPlacement | null)[] = [null, null, null];
+    for (let s = 0; s < 4; s++) {
+      const hub = sectionRooms[s][0];
+      const parents: string[] = [hub.id];
+      for (let b = 0; b < SECTION_BRANCHES; b++) {
+        const id = `s${s}b${b}`;
+        if (tryPlaceBranch(parents, hub.local, id, 'extra', 0, s)) parents.push(id);
+      }
+      if (s < 3) {
+        const sid = `switch${s + 1}`;
+        if (tryPlaceBranch(parents, hub.local, sid, 'switch', s + 1, s)) {
+          switchRoomPlacement[s] = placements.get(sid)!;
+        }
+      }
+      // Cross-link corridors create loops within the section so corridors lead
+      // between its rooms rather than only dead-ending off the hub.
+      const rooms = sectionRooms[s];
+      if (rooms.length >= 2) {
+        for (let k = 0; k < SECTION_CROSS_LINKS; k++) {
+          const i1 = random.integer(0, rooms.length);
+          let i2 = random.integer(0, rooms.length);
+          if (i2 === i1) i2 = (i2 + 1) % rooms.length;
+          const r1 = rooms[i1];
+          const r2 = rooms[i2];
+          if (length(sub(r1.local, r2.local)) < sectionRadius * 1.8) {
+            carver.carveRectCorridor(r1.local, r2.local, corridorHalf);
+          }
+        }
       }
     }
 
-    const centralMinX = -0.14 * outerRadius;
-    const centralMaxX = 0.14 * outerRadius;
-    const centralParents = ['central'];
-    for (let b = 0; b < CENTRAL_ANNEXES; b++) {
-      const id = `cab${b}`;
-      const placed = tryPlaceBranch(centralParents, id, centralMinX, centralMaxX);
-      if (placed) centralParents.push(placed);
+    // Central annex rooms carry collectibles.
+    const centralParents = [...sectionRooms[3].map((p) => p.id)];
+    for (const id of ['cab0', 'cab1']) {
+      if (tryPlaceBranch(centralParents, D, id, 'extra', 0, 3)) centralParents.push(id);
     }
 
+    // Switches that failed to get a dedicated room fall back into their hub room.
+    for (let s = 0; s < 3; s++) {
+      if (!switchRoomPlacement[s]) switchRoomPlacement[s] = sectionRooms[s][0];
+    }
+
+    // --- Gate corridors (the only inter-section connections) -----------------
     const gateCells: { c: number; r: number }[][] = [[], [], []];
     const gates: StationGate[] = [];
-    for (const corridor of SPINE_CORRIDORS) {
-      if (corridor.gate === null) continue;
-      const from = placements.get(corridor.from)!;
-      const to = placements.get(corridor.to)!;
-      const midLocal: Vec2 = { x: (from.local.x + to.local.x) / 2, y: (from.local.y + to.local.y) / 2 };
-      const dx = to.local.x - from.local.x;
-      const dy = to.local.y - from.local.y;
-      const len = Math.hypot(dx, dy);
-      const perp: Vec2 = { x: -dy / len, y: dx / len };
+    for (let i = 0; i < 3; i++) {
+      const a = anchors[i];
+      const b = anchors[i + 1];
+      carver.carveRectCorridor(a, b, corridorHalf);
+      const mid: Vec2 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      gateCells[i] = this.gateSlabCells(carver, a, b, mid, corridorHalf, wallHalf);
+      const dir = normalize(sub(b, a));
+      const perp: Vec2 = { x: -dir.y, y: dir.x };
       const gateHalf = corridorHalf + wallHalf;
-      const ga: Vec2 = { x: midLocal.x + perp.x * gateHalf, y: midLocal.y + perp.y * gateHalf };
-      const gb: Vec2 = { x: midLocal.x - perp.x * gateHalf, y: midLocal.y - perp.y * gateHalf };
-      const vertical = Math.abs(dx) >= Math.abs(dy);
-      gateCells[corridor.gate - 1] = carver.gateSlice(vertical ? midLocal.x : midLocal.y, vertical);
-      const gaWorld = localToWorld(ga);
-      const gbWorld = localToWorld(gb);
-      const gateMid: Vec2 = { x: (gaWorld.x + gbWorld.x) / 2, y: (gaWorld.y + gbWorld.y) / 2 };
-      const gateAngle = Math.atan2(gbWorld.y - gaWorld.y, gbWorld.x - gaWorld.x);
-      gates.push(new StationGate(corridor.gate, gateMid, gateAngle, gateHalf, wallHalf));
+      const gateAngle = Math.atan2(perp.y, perp.x);
+      gates.push(new StationGate(i + 1, localToWorld(mid), gateAngle, gateHalf, wallHalf));
     }
 
-    const switchPlacements = ['switch1', 'switch2', 'switch3'].map((id) => placements.get(id)!);
-    const switchLocalPositions: Vec2[] = switchPlacements.map((p) => ({
-      x: p.local.x + jitter(p.hw * 0.4),
-      y: p.local.y + jitter(p.hh * 0.4),
-    }));
-    const switches: StationSwitch[] = switchLocalPositions.map((local, i) =>
-      new StationSwitch(i + 1, localToWorld(local), SWITCH_RADIUS));
-    const switchCells = switchLocalPositions.map((local) => carver.localToCell(local));
+    // --- Switches ------------------------------------------------------------
+    const switchCells: { c: number; r: number }[] = [];
+    const switches: StationSwitch[] = [];
+    for (let s = 0; s < 3; s++) {
+      const room = switchRoomPlacement[s]!;
+      const local: Vec2 = { x: room.local.x + jitter(room.hw * 0.4), y: room.local.y + jitter(room.hh * 0.4) };
+      switches.push(new StationSwitch(s + 1, localToWorld(local), SWITCH_RADIUS));
+      switchCells.push(carver.localToCell(local));
+    }
 
-    const entrancePlacement = placements.get('entrance')!;
-    const centralPlacement = placements.get('central')!;
-    const entranceCell = carver.localToCell(entrancePlacement.local);
-    const centralCell = carver.localToCell(centralPlacement.local);
+    const entranceCell = carver.localToCell(A);
+    const centralCell = carver.localToCell(D);
 
-    const machineryRadius = outerRadius * MACHINERY_RADIUS_FRACTION;
+    // Verify the REQ-80 gating invariants hold with no machinery: each section is
+    // reachable only after its gate opens. If a accidental adjacency leaked between
+    // sections, reject this seed and retry.
+    if (!this.preservesReachability(carver, entranceCell, gateCells, switchCells, centralCell, [], 0)) return null;
+
+    // --- Machinery (smaller pillars, never blocking the critical path) -------
+    const machineryRadius = R * MACHINERY_RADIUS_FRACTION;
     const machineryCandidates: Vec2[] = [];
-    const machineryHosts = ['hub0', 'hub1', 'hub2', 'central'];
-    for (const id of machineryHosts) {
-      const p = placements.get(id)!;
+    for (const p of placements.values()) {
+      if (p.kind === 'entrance') continue;
       machineryCandidates.push({ x: p.local.x + jitter(p.hw * 0.25), y: p.local.y + jitter(p.hh * 0.25) });
     }
-    for (const p of placements.values()) {
-      if (p.kind !== 'extra') continue;
-      if (Math.min(p.hw, p.hh) < machineryRadius + SHIP_RADIUS * 2 + MACHINERY_BLOCK_MARGIN) continue;
-      machineryCandidates.push({ x: p.local.x + jitter(p.hw * 0.2), y: p.local.y + jitter(p.hh * 0.2) });
+    for (let i = machineryCandidates.length - 1; i > 0; i--) {
+      const j = random.integer(0, i + 1);
+      [machineryCandidates[i], machineryCandidates[j]] = [machineryCandidates[j], machineryCandidates[i]];
     }
-
     const acceptedMachinery: Vec2[] = [];
     for (const candidate of machineryCandidates) {
       const trial = [...acceptedMachinery, candidate];
@@ -275,18 +246,25 @@ export class StationGenerator {
       }
     }
     const machinery: StationMachinery[] = acceptedMachinery.map((local) =>
-      new StationMachinery(localToWorld(local), machineryRadius, random.between(0, Math.PI * 2), random.integer(0, 3)));
+      new StationMachinery(localToWorld(local), machineryRadius, random.between(0, Math.PI * 2), random.integer(0, 4)));
 
-    const collectibleRooms = ['switch1', 'switch2', 'switch3', 'cab0', 'cab1', 'central'];
+    // --- Collectibles --------------------------------------------------------
+    const sw1 = placements.get('switch1') ?? sectionRooms[0][0];
+    const sw2 = placements.get('switch2') ?? sectionRooms[1][0];
+    const sw3 = placements.get('switch3') ?? sectionRooms[2][0];
+    const cab0 = placements.get('cab0');
+    const cab1 = placements.get('cab1');
+    const centralPlacement = placements.get('central')!;
     const collectibles: StationCollectibleSpec[] = [
-      { position: localToWorld(this.roomJitter(placements.get('switch1')!, jitter)), type: SupplyType.Fuel },
-      { position: localToWorld(this.roomJitter(placements.get('switch2')!, jitter)), type: SupplyType.Ammo },
-      { position: localToWorld(this.roomJitter(placements.get('switch3')!, jitter)), type: SupplyType.Hp },
-      { position: localToWorld(this.roomJitter(placements.get('cab0') ?? centralPlacement, jitter)), type: SupplyType.Ammo },
-      { position: localToWorld(this.roomJitter(placements.get('cab1') ?? centralPlacement, jitter)), type: SupplyType.Fuel },
+      { position: localToWorld(this.roomJitter(sw1, jitter)), type: SupplyType.Fuel },
+      { position: localToWorld(this.roomJitter(sw2, jitter)), type: SupplyType.Ammo },
+      { position: localToWorld(this.roomJitter(sw3, jitter)), type: SupplyType.Hp },
+      { position: localToWorld(this.roomJitter(cab0 ?? centralPlacement, jitter)), type: SupplyType.Ammo },
+      { position: localToWorld(this.roomJitter(cab1 ?? centralPlacement, jitter)), type: SupplyType.Fuel },
       { position: localToWorld({ ...centralPlacement.local }), type: SupplyType.Hp },
     ];
 
+    // --- Walls ---------------------------------------------------------------
     const boundary = carver.traceBoundary();
     const walls: StationWall[] = boundary.map((seg) => this.wallFromSegment(seg, center, entranceAngle, wallHalf, carver));
     const exteriorWalls: StationWall[] = [];
@@ -311,7 +289,7 @@ export class StationGenerator {
       outerRadius,
       entrancePosition: localToWorld({ x: outerRadius, y: 0 }),
       entranceAngle,
-      entranceRadius: entrancePlacement.hh,
+      entranceRadius: placements.get('entrance')!.hh,
       centralCenter: localToWorld(centralPlacement.local),
       centralRadius: centralPlacement.hw,
       exteriorWalls,
@@ -328,6 +306,73 @@ export class StationGenerator {
       entranceCell,
       centralCell,
     };
+  }
+
+  private static sampleSections(random: RandomSequence, A: Vec2, D: Vec2, R: number, keepOut: number): { B: Vec2; C: Vec2 } | null {
+    for (let attempt = 0; attempt < SECTION_SAMPLE_RETRIES; attempt++) {
+      const rB = random.between(0.62, 0.82) * R;
+      const tB = random.between(0, Math.PI * 2);
+      const B: Vec2 = { x: Math.cos(tB) * rB, y: Math.sin(tB) * rB };
+      if (length(sub(B, A)) < 0.72 * R || length(sub(B, A)) > 0.95 * R) continue;
+      const rC = random.between(0.62, 0.82) * R;
+      const tC = random.between(0, Math.PI * 2);
+      const C: Vec2 = { x: Math.cos(tC) * rC, y: Math.sin(tC) * rC };
+      if (length(sub(C, D)) < 0.62 * R || length(sub(C, D)) > 0.82 * R) continue;
+      if (length(sub(C, B)) < 0.72 * R || length(sub(C, B)) > 1.0 * R) continue;
+      if (length(sub(C, A)) < 0.6 * R) continue;
+      if (Math.hypot(C.x, C.y) > keepOut) continue;
+      // The path A->B->C->D must not self-intersect: only A-B and C-D can cross.
+      if (this.segmentsCross(A, B, C, D)) continue;
+      return { B, C };
+    }
+    return null;
+  }
+
+  private static segmentsCross(p1: Vec2, p2: Vec2, p3: Vec2, p4: Vec2): boolean {
+    const d1 = this.cross(p3, p4, p1);
+    const d2 = this.cross(p3, p4, p2);
+    const d3 = this.cross(p1, p2, p3);
+    const d4 = this.cross(p1, p2, p4);
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return true;
+    return false;
+  }
+
+  private static cross(a: Vec2, b: Vec2, c: Vec2): number {
+    return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+  }
+
+  // Cells of the gate corridor's cross-section at its midpoint. A closed gate
+  // blocks exactly these cells, and since the gate corridor is the only carved
+  // connection between two sections, closing it fully separates them (REQ-80).
+  private static gateSlabCells(
+    carver: StationCarver,
+    a: Vec2,
+    b: Vec2,
+    mid: Vec2,
+    corridorHalf: number,
+    wallHalf: number,
+  ): { c: number; r: number }[] {
+    const dir = normalize(sub(b, a));
+    const perp: Vec2 = { x: -dir.y, y: dir.x };
+    const alongHalf = wallHalf + carver.cellSize;
+    const perpHalf = corridorHalf + carver.cellSize;
+    const midCell = carver.localToCell(mid);
+    const range = Math.ceil((alongHalf + perpHalf) / carver.cellSize) + 1;
+    const cells: { c: number; r: number }[] = [];
+    for (let dr = -range; dr <= range; dr++) {
+      for (let dc = -range; dc <= range; dc++) {
+        const c = midCell.c + dc;
+        const r = midCell.r + dr;
+        if (!carver.inBounds(c, r)) continue;
+        if (carver.bitmap[r * carver.gridN + c] !== 1) continue;
+        const cl = carver.cellCenterLocal(c, r);
+        const d: Vec2 = { x: cl.x - mid.x, y: cl.y - mid.y };
+        const along = d.x * dir.x + d.y * dir.y;
+        const perpDist = d.x * perp.x + d.y * perp.y;
+        if (Math.abs(along) <= alongHalf && Math.abs(perpDist) <= perpHalf) cells.push({ c, r });
+      }
+    }
+    return cells;
   }
 
   private static roomJitter(p: { local: Vec2; hw: number; hh: number }, jitter: (n: number) => number): Vec2 {

@@ -150,24 +150,6 @@ export class StationCarver {
     return cells;
   }
 
-  // Returns all carved cells in the columns (or rows) spanning the full grid at
-  // the given local coordinate. Used for gate slices so no path can bypass a
-  // closed gate by looping around it through branch rooms.
-  gateSlice(localCoord: number, vertical: boolean): { c: number; r: number }[] {
-    const cells: { c: number; r: number }[] = [];
-    const index = Math.floor(localCoord / this.cellSize + this.half);
-    const columns = vertical ? [index] : null;
-    const rows = vertical ? null : [index];
-    for (let r = 0; r < this.gridN; r++) {
-      for (let c = 0; c < this.gridN; c++) {
-        if (columns && !columns.includes(c)) continue;
-        if (rows && !rows.includes(r)) continue;
-        if (this.bitmap[this.idx(c, r)] === 1) cells.push({ c, r });
-      }
-    }
-    return cells;
-  }
-
   traceBoundary(): BoundarySegment[] {
     const segments: BoundarySegment[] = [];
     const n = this.gridN;

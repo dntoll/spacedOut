@@ -225,7 +225,18 @@ describe('Station', () => {
     const machineryB: Vec2[] = [];
     a.forEachMachinery((m) => machineryA.push(m.position));
     b.forEachMachinery((m) => machineryB.push(m.position));
-    const differs = machineryA.some((p, i) => length(sub(p, machineryB[i])) > 1);
-    expect(differs).toBe(true);
+    const machineryDiffers = machineryA.some((p, i) => length(sub(p, machineryB[i])) > 1);
+    expect(machineryDiffers).toBe(true);
+
+    // The macro layout — section hub and switch positions — also varies, so two
+    // runs are not the same station with the same room/corridor topology.
+    const areaA = a.rooms.find((r) => r.kind === 'area' && r.index === 1)!.position;
+    const areaB = b.rooms.find((r) => r.kind === 'area' && r.index === 1)!.position;
+    expect(length(sub(areaA, areaB))).toBeGreaterThan(1);
+    const switchA: Vec2[] = [];
+    const switchB: Vec2[] = [];
+    a.forEachSwitch((s) => switchA.push(s.position));
+    b.forEachSwitch((s) => switchB.push(s.position));
+    expect(switchA.some((p, i) => length(sub(p, switchB[i])) > 1)).toBe(true);
   });
 });
