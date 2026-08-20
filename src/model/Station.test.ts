@@ -12,7 +12,7 @@ import { isCapsuleObstacle } from './SweptCircleCollision';
 import { length, sub } from '../math';
 import type { Vec2 } from '../types';
 
-const STATION_RADIUS = 2000;
+const STATION_RADIUS = 3000;
 const placeStation = (entranceAngle = 0, seed = 42): Station => {
   const station = new Station();
   station.placeAt({ x: 0, y: 0 }, STATION_RADIUS, entranceAngle, seed);

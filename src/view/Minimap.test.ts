@@ -237,7 +237,7 @@ describe('Minimap', () => {
   it('REQ-81 shows the abandoned station hull, walls, gates, switches, and collectibles on the minimap', () => {
     const ship = new Model.Ship();
     const station = new Model.Station();
-    station.placeAt({ x: 0, y: 0 }, 2000, 0, 42);
+    station.placeAt({ x: 0, y: 0 }, 3000, 0, 42);
     const model = {
       ship,
       supplyField: new Model.SupplyField({ x: 100000, y: 0 }, undefined, 1),

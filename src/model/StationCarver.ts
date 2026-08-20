@@ -129,27 +129,6 @@ export class StationCarver {
     }
   }
 
-  carveGateSegment(aLocal: Vec2, bLocal: Vec2): { c: number; r: number }[] {
-    const cells: { c: number; r: number }[] = [];
-    const dx = bLocal.x - aLocal.x;
-    const dy = bLocal.y - aLocal.y;
-    const len = Math.hypot(dx, dy);
-    if (len < 0.001) return cells;
-    const steps = Math.ceil(len / this.cellSize) + 1;
-    const seen = new Set<number>();
-    for (let s = 0; s <= steps; s++) {
-      const t = s / steps;
-      const p = { x: aLocal.x + dx * t, y: aLocal.y + dy * t };
-      const cell = this.localToCell(p);
-      if (!this.inBounds(cell.c, cell.r)) continue;
-      const key = this.idx(cell.c, cell.r);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      cells.push(cell);
-    }
-    return cells;
-  }
-
   traceBoundary(): BoundarySegment[] {
     const segments: BoundarySegment[] = [];
     const n = this.gridN;

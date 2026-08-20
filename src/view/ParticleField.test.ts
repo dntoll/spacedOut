@@ -508,7 +508,7 @@ describe('ParticleField', () => {
 
   it('REQ-88 bounces particles off station walls so they do not tunnel through', () => {
     const station = new Station();
-    station.placeAt({ x: 0, y: 0 }, 2000, 0, 42);
+    station.placeAt({ x: 0, y: 0 }, 3000, 0, 42);
     const field = new ParticleField();
     const camera = new Camera();
     const ship = new Ship();

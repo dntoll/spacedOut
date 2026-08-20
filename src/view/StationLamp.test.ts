@@ -9,7 +9,7 @@ import type { Vec2 } from '../types';
 import type { Drawing, Paint } from './Drawing';
 import { StationLamp } from './StationLamp';
 
-const STATION_RADIUS = 2000;
+const STATION_RADIUS = 3000;
 const R = 450;
 
 const placeStation = (seed = 42): Station => {

@@ -249,7 +249,7 @@ describe('Game', () => {
 
   it('REQ-65 enters mission 3 without restarting and clears encounters while preserving the station', () => {
     const game = new Game();
-    game.station.placeAt({ x: 2400, y: 0 }, 2000, 0, 42);
+    game.station.placeAt({ x: 2400, y: 0 }, 3000, 0, 42);
     game.mission.phase = MissionPhase.Mission2Done;
 
     game.advanceMission();
