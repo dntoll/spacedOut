@@ -152,4 +152,27 @@ describe('StationRoof', () => {
     roof.draw(cap.drawing, station, ship.position);
     expect(roofed(cap, switch2Pos)).toBe(true);
   });
+
+  it('REQ-86 reset() re-roofs previously revealed areas so a restart hides the interior again', () => {
+    const station = placeStation();
+    const roof = new StationRoof();
+    const ship = new Ship();
+    const entrance = entranceRoomPosition(station);
+    const switch1Pos = switchPosition(station, 1);
+    const switch1Keys = roomCellKeys(station, 'switch', 1);
+
+    // Reveal the switch-1 room by flying into it.
+    ship.position = { ...switch1Pos };
+    let cap = capture();
+    roof.draw(cap.drawing, station, ship.position);
+    expect(anyCellRoofed(cap, station, switch1Keys)).toBe(false);
+
+    // Reset (restart): the switch-1 room is roofed again even though the station
+    // is placed at the identical center, so the roof does not remember the prior run.
+    roof.reset();
+    ship.position = { ...entrance };
+    cap = capture();
+    roof.draw(cap.drawing, station, ship.position);
+    expect(anyCellRoofed(cap, station, switch1Keys)).toBe(true);
+  });
 });

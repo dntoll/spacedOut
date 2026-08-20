@@ -28,6 +28,17 @@ export class StationRoof {
   private cacheKey = '';
   private cachedPaths: Vec2[][] = [];
 
+  reset(): void {
+    this.stationId = '';
+    this.revealedCells.clear();
+    this.lastCoarseKey = '';
+    this.lastGateKey = '';
+    this.revealedVersion = 0;
+    this.cacheKey = '';
+    this.cachedPaths = [];
+    this.fine = null;
+  }
+
   draw(drawing: Drawing, station: Model.Station, shipPosition: Vec2): void {
     if (!station.isPlaced) return;
     this.ensureStation(station);

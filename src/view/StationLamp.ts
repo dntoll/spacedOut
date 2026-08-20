@@ -14,6 +14,12 @@ export class StationLamp {
   private cachedDimPaths: Vec2[][] = [];
   private polygon: Vec2[] = [];
 
+  reset(): void {
+    this.stationId = '';
+    this.cachedDimPaths = [];
+    this.polygon = [];
+  }
+
   draw(drawing: Drawing, station: Model.Station, shipPosition: Vec2, cameraPosition: Vec2, zoom: number, radius: number): void {
     if (!station.isPlaced || radius <= 0) return;
     this.ensureDimPaths(station);

@@ -15,6 +15,11 @@ export class Station {
   private readonly lamp = new StationLamp();
   private readonly roof = new StationRoof();
 
+  reset(): void {
+    this.lamp.reset();
+    this.roof.reset();
+  }
+
   draw(drawing: Drawing, station: Model.Station, starLight: StarLight, zoom: number, shipPosition: Vec2, cameraPosition: Vec2, lampRadius: number): void {
     if (!station.isPlaced) return;
     this.interior.draw(drawing, station, starLight, zoom);

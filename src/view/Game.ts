@@ -147,6 +147,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.particleField.reset();
     this.nebulaField.reset();
     this.sounds.reset();
+    this.station.reset();
     this.previousMissionPhase = null;
     this.music.resetMission();
   }
