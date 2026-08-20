@@ -4,6 +4,7 @@ import { Collision } from '../model/Collision';
 import { MassiveAsteroid } from '../model/MassiveAsteroid';
 import { Pirate } from '../model/Pirate';
 import { Ship } from '../model/Ship';
+import { Station } from '../model/Station';
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import { Camera } from './Camera';
@@ -22,13 +23,14 @@ function countingDrawing(): { drawing: Drawing; circles: DrawnCircle[] } {
   return { drawing, circles };
 }
 
-function stubModel(ship: Ship, asteroids: Asteroid[] = [], massives: MassiveAsteroid[] = []): Model.Game {
+function stubModel(ship: Ship, asteroids: Asteroid[] = [], massives: MassiveAsteroid[] = [], station: Station = new Station()): Model.Game {
   return {
     ship,
     asteroidBelt: { forEach: (fn: (a: Asteroid) => void) => asteroids.forEach(fn) },
     massiveAsteroidField: { forEachActive: (fn: (a: MassiveAsteroid) => void) => massives.forEach(fn) },
     droneField: { forEach: () => {} },
     pirateField: { forEachPirate: () => {} },
+    station,
   } as unknown as Model.Game;
 }
 
@@ -232,6 +234,7 @@ describe('ParticleField', () => {
       massiveAsteroidField: { forEachActive: () => {} },
       droneField: { forEach: () => {} },
       pirateField: { forEachPirate: (fn: (p: Pirate) => void) => fn(pirate) },
+      station: new Station(),
     } as unknown as Model.Game;
 
     field.update(0.5, model, camera, VIEWPORT);
@@ -501,5 +504,25 @@ describe('ParticleField', () => {
     expect(fresh.length).toBeGreaterThan(0);
     expect(fresh.some((c) => rgbOf(c.color).b < 110)).toBe(true);
     vi.restoreAllMocks();
+  });
+
+  it('REQ-88 bounces particles off station walls so they do not tunnel through', () => {
+    const station = new Station();
+    station.placeAt({ x: 0, y: 0 }, 2000, 0, 42);
+    const field = new ParticleField();
+    const camera = new Camera();
+    const ship = new Ship();
+    const { drawing, circles } = countingDrawing();
+
+    let wallPos: Vec2 | null = null;
+    station.forEachInteriorWall((wall) => { if (!wallPos) wallPos = { ...wall.position }; });
+    camera.update(wallPos!, { x: 0, y: 0 }, 0);
+
+    field.adopt({ ...wallPos! }, { x: 0, y: 0 });
+    field.update(0, stubModel(ship, [], [], station), camera, VIEWPORT);
+    field.draw(drawing);
+
+    const moved = circles.find((c) => Math.hypot(c.x - wallPos!.x, c.y - wallPos!.y) > 5);
+    expect(moved).toBeDefined();
   });
 });

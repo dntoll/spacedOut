@@ -115,7 +115,8 @@ export class ParticleField {
     this.emitDroneExhaust(dt, model);
     this.emitPirateExhaust(dt, model);
     for (const particle of this.particles) particle.update(dt);
-    this.bounce(model);
+    const reach = camera.getVisibleWorldRadius(viewport) + CULL_MARGIN;
+    this.bounce(model, reach);
     this.cull(camera, viewport);
     this.spawn(dt, camera, viewport);
   }
@@ -239,7 +240,7 @@ export class ParticleField {
     );
   }
 
-  private bounce(model: Model.Game): void {
+  private bounce(model: Model.Game, reach: number): void {
     const circles: Circle[] = [
       { position: model.ship.position, radius: model.ship.radius },
     ];
@@ -254,6 +255,17 @@ export class ParticleField {
       cos: Math.cos(asteroid.angle),
       sin: Math.sin(asteroid.angle),
     }));
+    if (model.station.isPlaced) {
+      model.station.forEachObstacleNear(model.ship.position, reach, (obstacle) => {
+        massives.push({
+          position: obstacle.position,
+          radius: obstacle.radius,
+          polygon: this.localPolygon(obstacle),
+          cos: Math.cos(obstacle.angle),
+          sin: Math.sin(obstacle.angle),
+        });
+      });
+    }
 
     for (const particle of this.particles) {
       for (const circle of circles) this.bounceCircle(particle, circle);
@@ -347,10 +359,10 @@ export class ParticleField {
     });
   }
 
-  private localPolygon(asteroid: Model.MassiveAsteroid): Vec2[] {
-    return asteroid.vertices.map((variation, index) => {
-      const angle = (index / asteroid.vertices.length) * Math.PI * 2;
-      return { x: Math.cos(angle) * asteroid.radius * variation, y: Math.sin(angle) * asteroid.radius * variation };
+  private localPolygon(body: { vertices: number[]; radius: number }): Vec2[] {
+    return body.vertices.map((variation, index) => {
+      const angle = (index / body.vertices.length) * Math.PI * 2;
+      return { x: Math.cos(angle) * body.radius * variation, y: Math.sin(angle) * body.radius * variation };
     });
   }
 
