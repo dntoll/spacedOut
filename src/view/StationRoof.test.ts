@@ -9,7 +9,7 @@ import type { Vec2 } from '../types';
 import type { Drawing, Paint } from './Drawing';
 import { StationRoof } from './StationRoof';
 
-const STATION_RADIUS = 1000;
+const STATION_RADIUS = 2000;
 
 const placeStation = (seed = 42): Station => {
   const station = new Station();

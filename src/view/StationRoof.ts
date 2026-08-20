@@ -2,7 +2,7 @@ import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import type { Drawing } from './Drawing';
 
-const ROOF_FILL = '#2e2820';
+const ROOF_FILL = '#000000';
 const RAY_COUNT = 360;
 const SUBDIVISION = 3;
 const STEP_FRACTION = 0.5;

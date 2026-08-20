@@ -5,7 +5,7 @@ import type { Drawing, Paint } from './Drawing';
 import { StationInterior } from './StationInterior';
 import { StarLight } from './StarLight';
 
-const STATION_RADIUS = 1000;
+const STATION_RADIUS = 2000;
 
 const placeStation = (entranceAngle = 0, seed = 42): Station => {
   const station = new Station();

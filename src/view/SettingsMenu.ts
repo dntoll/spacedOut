@@ -7,11 +7,15 @@ const MUSIC_STORAGE_KEY = 'music-level';
 const PARTICLE_STORAGE_KEY = 'particle-visibility';
 const SFX_STORAGE_KEY = 'sfx-settings';
 const ZOOM_STORAGE_KEY = 'default-zoom';
+const LAMP_STORAGE_KEY = 'lamp-radius';
 const DEFAULT_MUSIC_PERCENT = 50;
 const DEFAULT_PARTICLE_PERCENT = 40;
 const DEFAULT_ZOOM = 1.15;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
+const DEFAULT_LAMP_RADIUS = 450;
+const LAMP_MIN = 150;
+const LAMP_MAX = 1200;
 const DEFAULT_TUNING: ControlTuning = { dampening: 2, thrustAccel: 500, maxSpeed: 1000 };
 const DEFAULT_SFX_PERCENTS: Record<SfxChannel, number> = {
   [SfxChannel.Master]: 60,
@@ -55,6 +59,8 @@ export class SettingsMenu {
   private readonly particleValue: HTMLElement | null;
   private readonly zoomSlider: HTMLInputElement | null;
   private readonly zoomValue: HTMLElement | null;
+  private readonly lampSlider: HTMLInputElement | null;
+  private readonly lampValue: HTMLElement | null;
   private readonly sfxSliders = new Map<SfxChannel, HTMLInputElement | null>();
   private readonly sfxValues = new Map<SfxChannel, HTMLElement | null>();
   private readonly devSection: HTMLElement | null;
@@ -75,6 +81,8 @@ export class SettingsMenu {
     this.particleValue = document.querySelector<HTMLElement>('#particle-value');
     this.zoomSlider = document.querySelector<HTMLInputElement>('#zoom-slider');
     this.zoomValue = document.querySelector<HTMLElement>('#zoom-value');
+    this.lampSlider = document.querySelector<HTMLInputElement>('#lamp-slider');
+    this.lampValue = document.querySelector<HTMLElement>('#lamp-value');
     for (const cfg of SFX_SLIDERS) {
       this.sfxSliders.set(cfg.channel, document.querySelector<HTMLInputElement>(`#${cfg.sliderId}`));
       this.sfxValues.set(cfg.channel, document.querySelector<HTMLElement>(`#${cfg.valueId}`));
@@ -88,6 +96,8 @@ export class SettingsMenu {
     if (persistedParticle != null) this.applyParticle(persistedParticle);
     const persistedZoom = this.storage.read<number>(ZOOM_STORAGE_KEY);
     if (persistedZoom != null) this.applyZoom(persistedZoom);
+    const persistedLamp = this.storage.read<number>(LAMP_STORAGE_KEY);
+    if (persistedLamp != null) this.applyLamp(persistedLamp);
     const persistedSfx = this.storage.read<Partial<Record<keyof SfxSettings, number>>>(SFX_STORAGE_KEY) ?? {};
     this.applySfx(persistedSfx);
 
@@ -100,6 +110,7 @@ export class SettingsMenu {
     this.musicSlider?.addEventListener('input', () => this.onMusicChange());
     this.particleSlider?.addEventListener('input', () => this.onParticleChange());
     this.zoomSlider?.addEventListener('input', () => this.onZoomChange());
+    this.lampSlider?.addEventListener('input', () => this.onLampChange());
     for (const cfg of SFX_SLIDERS) {
       this.sfxSliders.get(cfg.channel)?.addEventListener('input', () => this.onSfxChange());
     }
@@ -129,6 +140,12 @@ export class SettingsMenu {
     const raw = Number(this.zoomSlider?.value);
     const value = Number.isFinite(raw) ? raw : DEFAULT_ZOOM;
     return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, value));
+  }
+
+  getLampRadius(): number {
+    const raw = Number(this.lampSlider?.value);
+    const value = Number.isFinite(raw) ? raw : DEFAULT_LAMP_RADIUS;
+    return Math.max(LAMP_MIN, Math.min(LAMP_MAX, value));
   }
 
   getSfxSettings(): SfxSettings {
@@ -173,6 +190,15 @@ export class SettingsMenu {
     if (this.zoomValue) this.zoomValue.textContent = text;
   }
 
+  private applyLamp(value: number): void {
+    let clamped = Number(value);
+    if (!Number.isFinite(clamped)) clamped = DEFAULT_LAMP_RADIUS;
+    clamped = Math.max(LAMP_MIN, Math.min(LAMP_MAX, Math.round(clamped)));
+    const text = String(clamped);
+    if (this.lampSlider) this.lampSlider.value = text;
+    if (this.lampValue) this.lampValue.textContent = text;
+  }
+
   private applySfx(percents: Partial<Record<keyof SfxSettings, number>>): void {
     for (const cfg of SFX_SLIDERS) {
       const fallback = DEFAULT_SFX_PERCENTS[cfg.channel];
@@ -207,6 +233,11 @@ export class SettingsMenu {
   private onZoomChange(): void {
     this.syncLabel(this.zoomValue, this.zoomSlider, 2);
     this.storage.write(ZOOM_STORAGE_KEY, Number(this.zoomSlider?.value));
+  }
+
+  private onLampChange(): void {
+    if (this.lampValue && this.lampSlider) this.lampValue.textContent = this.lampSlider.value;
+    this.storage.write(LAMP_STORAGE_KEY, Number(this.lampSlider?.value));
   }
 
   private onSfxChange(): void {

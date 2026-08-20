@@ -210,7 +210,8 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.shadowVolume.render(this.drawing, casters, this.starLight, this.camera);
     this.drawing.compositeShadowLayer('multiply');
     this.camera.drawWorld(this.drawing, () => {
-      this.station.draw(this.drawing, model.station, this.starLight, this.camera.zoom, model.ship.position);
+      const lampRadius = phase === MissionPhase.Mission3Active ? this.settings.getLampRadius() : 0;
+      this.station.draw(this.drawing, model.station, this.starLight, this.camera.zoom, model.ship.position, this.camera.worldPosition, lampRadius);
       this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera, this.starLight);
       this.nebulaField.draw(this.drawing, this.camera.getVisibleWorldBounds(this.drawing.size));
       this.particleField.draw(this.drawing, this.starLight, casters);
