@@ -35,7 +35,7 @@ export class DroneField {
         const radius = drone.radius * variation;
         return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
       });
-      const localLight = starLight.localDirection(drone.angle);
+      const localLight = starLight.localDirection(drone.angle, drone.position);
       const shadow = starLight.shadowFactor(drone.position, drone.radius, casters);
       const body = starLight.bodyPaint(localLight, drone.radius, '#8accff', '#1c4e7a', shadow);
       drawing.withShadow('#5db8ff', 10, () => {

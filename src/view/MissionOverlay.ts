@@ -29,7 +29,13 @@ export class MissionOverlay {
       this.setText('Mission 3: Enter the abandoned space station and reach its central chamber.', 'Find the switches to open the gates.', 'Click to continue.');
       this.node.classList.remove('hidden');
     } else if (phase === MissionPhase.Mission3Done) {
-      this.setText('Well done', 'You reached the central chamber and found the clues.', 'Click to continue.');
+      this.setText('Well done', 'A shield upgrade was recovered from the central chamber.', 'Click to continue.');
+      this.node.classList.remove('hidden');
+    } else if (phase === MissionPhase.Mission4Intro) {
+      this.setText('Mission 4: Space station computer records show last human entry five years ago travelled to star Omega III.', 'Lets go to see what happened to them...', 'Click to continue.');
+      this.node.classList.remove('hidden');
+    } else if (phase === MissionPhase.Mission4Done) {
+      this.setText('Well done', '', 'Click to continue.');
       this.node.classList.remove('hidden');
     } else {
       this.hide();

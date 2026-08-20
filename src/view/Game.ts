@@ -8,7 +8,9 @@ import { DistanceMeter } from './DistanceMeter';
 import { Drawing } from './Drawing';
 import { DroneField } from './DroneField';
 import { ExplorationMap } from './ExplorationMap';
+import { Freighter } from './Freighter';
 import { Hud } from './Hud';
+import { IceRing } from './IceRing';
 import { LaserField } from './LaserField';
 import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Minimap } from './Minimap';
@@ -27,6 +29,7 @@ import { SignalIndicator } from './SignalIndicator';
 import { SoundGate } from './SoundGate';
 import { SoundSystem } from './SoundSystem';
 import { SpaceBackground } from './SpaceBackground';
+import { Star } from './Star';
 import { StarLight } from './StarLight';
 import { Station } from './Station';
 import { StorageAdapter } from './StorageAdapter';
@@ -50,6 +53,9 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly droneField = new DroneField();
   private readonly pirateField = new PirateField();
   private readonly station = new Station();
+  private readonly star = new Star();
+  private readonly iceRing = new IceRing();
+  private readonly freighter = new Freighter();
   private readonly particleField = new ParticleField();
   private readonly nebulaField = new NebulaField();
   private readonly explorationMap = new ExplorationMap();
@@ -158,6 +164,8 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
       case MissionPhase.Mission2Active: return 2;
       case MissionPhase.Mission3Active: return 3;
       case MissionPhase.Mission3Done: return 3;
+      case MissionPhase.Mission4Active: return 3;
+      case MissionPhase.Mission4Done: return 3;
       default: return null;
     }
   }
@@ -191,6 +199,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
     this.particleField.update(dt, model, this.camera, this.drawing.size);
     this.nebulaField.update(dt, model, this.camera, this.drawing.size);
+    this.iceRing.update(dt);
     const phase = model.mission.phase;
     if (phase !== this.previousMissionPhase) {
       const mission = this.missionNumberFor(phase);
@@ -207,20 +216,26 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.sounds.update();
 
     this.background.draw(this.drawing, this.camera.worldPosition);
-    const casters = new CompositeShadowCasters(model.massiveAsteroidField, model.asteroidBelt);
+    if (model.star.isPlaced) this.starLight.setPointSource(model.star.position);
+    else this.starLight.setPointSource(null);
+    const casters = new CompositeShadowCasters(model.massiveAsteroidField, model.asteroidBelt, model.iceRing, model.freighter);
     this.shadowVolume.render(this.drawing, casters, this.starLight, this.camera);
     this.drawing.compositeShadowLayer('multiply');
     this.camera.drawWorld(this.drawing, () => {
       const lampRadius = phase === MissionPhase.Mission3Active ? this.settings.getLampRadius() : 0;
       this.station.draw(this.drawing, model.station, this.starLight, this.camera.zoom, model.ship.position, this.camera.worldPosition, lampRadius);
+      const visibleRange = Math.hypot(this.drawing.size.width, this.drawing.size.height) / this.camera.zoom * 0.7;
+      this.star.draw(this.drawing, model.star, this.camera.worldPosition, visibleRange);
       this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera, this.starLight);
       this.nebulaField.draw(this.drawing, this.camera.getVisibleWorldBounds(this.drawing.size));
       this.particleField.draw(this.drawing, this.starLight, casters);
       this.supplyField.draw(this.drawing, model.supplyField, this.starLight, casters);
       this.asteroidBelt.draw(this.drawing, model.asteroidBelt, model.ship.position, this.camera, this.starLight, casters);
+      this.iceRing.draw(this.drawing, model.iceRing, model.star, model.ship.position, this.camera, this.starLight, casters);
       this.droneField.draw(this.drawing, model.droneField, model.ship, this.camera, this.starLight, casters);
       this.pirateField.draw(this.drawing, model.pirateField, model.ship, this.camera, this.starLight, casters);
       this.laserField.draw(this.drawing, model.laserField);
+      this.freighter.draw(this.drawing, model.freighter, this.camera.worldPosition, visibleRange, this.starLight, casters, this.camera.zoom);
       if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship, this.starLight, casters);
     });
     this.background.drawVignette(this.drawing);
@@ -228,6 +243,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.signalIndicator.draw(this.drawing, model, this.camera);
     this.hud.updateSpeed(model.speed, model.damageSpeedThreshold);
     this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);
+    this.hud.updateShield(model.ship.shield, model.ship.hasShield);
     this.distanceMeter.update(model.mission);
     this.missionGoals.update(model.mission.currentGoals);
     if (model.isGameOver) {

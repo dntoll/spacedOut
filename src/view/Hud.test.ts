@@ -14,7 +14,7 @@ const stubHudNodes = (): Map<string, StubNode> => {
     style: { width: '' },
     classList: { add: vi.fn(), toggle: vi.fn() },
   });
-  for (const selector of ['#speed', '#hint', '#fuel-value', '#hp-value', '#ammo-value', '#fuel-fill', '#hp-fill', '#ammo-fill', '.speed']) {
+  for (const selector of ['#speed', '#hint', '#fuel-value', '#hp-value', '#ammo-value', '#fuel-fill', '#hp-fill', '#ammo-fill', '.speed', '#shield', '#shield-value', '#shield-fill']) {
     nodes.set(selector, make());
   }
   vi.stubGlobal('document', { querySelector: (selector: string) => nodes.get(selector) });
@@ -52,6 +52,20 @@ describe('Hud', () => {
 
     expect(nodes.get('#ammo-value')?.textContent).toBe('49');
     expect(nodes.get('#ammo-fill')?.style.width).toBe('48.6%');
+  });
+
+  it('REQ-90 shows the shield meter only once the upgrade is installed', () => {
+    const nodes = stubHudNodes();
+    const hud = new Hud();
+
+    hud.updateShield(0, false);
+    expect(nodes.get('#shield')?.classList.toggle).toHaveBeenCalledWith('hidden', true);
+    expect(nodes.get('#shield-value')?.textContent).toBe('');
+
+    hud.updateShield(63.4, true);
+    expect(nodes.get('#shield')?.classList.toggle).toHaveBeenCalledWith('hidden', false);
+    expect(nodes.get('#shield-value')?.textContent).toBe('63');
+    expect(nodes.get('#shield-fill')?.style.width).toBe('63.4%');
   });
 
   it('REQ-70 shows the speed in red with a warning when above the damage threshold', () => {

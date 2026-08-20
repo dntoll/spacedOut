@@ -133,4 +133,17 @@ describe('StarLight', () => {
     expect(shadowed).toBeLessThan(lit);
     expect(shadowed).toBeGreaterThan(0);
   });
+
+  it('REQ-94 casts shadows radially away from a point star', () => {
+    const star = new StarLight(LIGHT, 2400);
+    star.setPointSource({ x: 0, y: 0 });
+    const occluder = singleCaster({ x: 200, y: 0 }, 40);
+    const outward = star.shadowFactor({ x: 280, y: 0 }, 10, occluder);
+    const inward = star.shadowFactor({ x: 120, y: 0 }, 10, occluder);
+    expect(outward).toBeGreaterThan(0.3);
+    expect(inward).toBe(0);
+    const dir = star.directionAt({ x: 200, y: 0 });
+    expect(dir.x).toBeGreaterThan(0.9);
+    expect(Math.abs(dir.y)).toBeLessThan(0.1);
+  });
 });

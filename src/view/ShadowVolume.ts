@@ -17,12 +17,12 @@ export class ShadowVolume {
     const { width, height } = drawing.size;
     const zoom = camera.zoom;
     const visibleRange = Math.hypot(width, height) / zoom * 0.7;
-    const lightDir = starLight.direction;
     const viewCenter = camera.worldPosition;
     drawing.beginShadowLayer();
     camera.drawWorld(drawing, () => {
       casters.forEachOutlinedCaster((occluder) => {
         if (occluder.radius * zoom < SCREEN_RADIUS_CULL) return;
+        const lightDir = starLight.directionAt(occluder.position);
         const len = starLight.shadowLengthFor(occluder.radius);
         if (len <= 0) return;
         if (length(sub(occluder.position, viewCenter)) > visibleRange + occluder.radius + len + CULL_MARGIN) return;

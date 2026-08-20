@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { Asteroid } from './Asteroid';
 import { AsteroidBelt } from './AsteroidBelt';
 import { Drone } from './Drone';
@@ -8,7 +8,11 @@ import { MassiveAsteroidField } from './MassiveAsteroidField';
 import { Mission, MissionGoalKind, MissionPhase, SpawnMode } from './Mission';
 import { Ship } from './Ship';
 import { Station } from './Station';
+import { Star } from './Star';
+import { IceRing } from './IceRing';
+import { Freighter } from './Freighter';
 import { VisitedMap } from './VisitedMap';
+import { DiscoveredMap } from './DiscoveredMap';
 import { length, sub } from '../math';
 
 const emptyDroneField = () => new DroneField();
@@ -378,6 +382,116 @@ describe('Mission', () => {
       MissionGoalKind.ReachCentralChamber,
     ]);
     expect(mission.currentGoals.every((g) => !g.complete)).toBe(true);
+  });
+
+  it('REQ-91 awards the shield upgrade when the central chamber is reached', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    const station = emptyStation();
+    const ship = new Ship();
+    mission.jumpToMission3Briefing(ship, station);
+    mission.advance(visited);
+    expect(ship.hasShield).toBe(false);
+    vi.spyOn(station, 'isCentralReached').mockReturnValue(true);
+
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), station, visited, SCREEN_RADIUS);
+
+    expect(ship.hasShield).toBe(true);
+    expect(mission.phase).toBe(MissionPhase.Mission3Done);
+  });
+
+  it('REQ-76 proceeds from mission 3 completion to the mission 4 briefing', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    const station = emptyStation();
+    const ship = new Ship();
+    mission.jumpToMission3Briefing(ship, station);
+    mission.advance(visited);
+    vi.spyOn(station, 'isCentralReached').mockReturnValue(true);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), station, visited, SCREEN_RADIUS);
+
+    mission.advance(visited);
+
+    expect(mission.phase).toBe(MissionPhase.Mission4Intro);
+    expect(mission.isPaused).toBe(true);
+  });
+
+  it('REQ-66 jumps straight to the mission 4 briefing with an unexplored signal', () => {
+    const mission = new Mission();
+    const ship = new Ship();
+    const discovered = new DiscoveredMap();
+
+    mission.jumpToMission4Briefing(ship, discovered);
+
+    expect(mission.phase).toBe(MissionPhase.Mission4Intro);
+    expect(mission.isPaused).toBe(true);
+    expect(mission.signalDirection).not.toBeNull();
+    expect(length(mission.signalDirection!)).toBeCloseTo(1, 6);
+  });
+
+  it('REQ-92 starts mission 4 travel toward Omega III and the moving freighter', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    const discovered = new DiscoveredMap();
+    const star = new Star();
+    const iceRing = new IceRing();
+    const freighter = new Freighter();
+    const ship = new Ship();
+    mission.jumpToMission4Briefing(ship, discovered);
+    mission.advance(visited);
+
+    expect(mission.phase).toBe(MissionPhase.Mission4Active);
+    expect(mission.isTraversal).toBe(true);
+    expect(mission.spawnMode).toBe(SpawnMode.Mission2Travel);
+    expect(mission.currentGoals.map((g) => g.kind)).toEqual([
+      MissionGoalKind.ReachOmegaIII,
+      MissionGoalKind.ReachFreighter,
+    ]);
+
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), emptyStation(), visited, SCREEN_RADIUS, discovered, star, iceRing, freighter);
+
+    expect(star.isPlaced).toBe(true);
+    expect(iceRing.isPlaced).toBe(true);
+    expect(freighter.isPlaced).toBe(true);
+    expect(mission.destinationPosition).toEqual(freighter.position);
+    expect(mission.initialTravelDistance).toBeGreaterThan(15000);
+    expect(mission.initialTravelDistance).toBeLessThan(40000);
+  });
+
+  it('REQ-93 picks a signal that avoids already discovered space', () => {
+    const mission = new Mission();
+    const ship = new Ship();
+    const discovered = new DiscoveredMap();
+    discovered.record({ left: -20000, top: -20000, right: 0, bottom: 20000 });
+
+    mission.jumpToMission4Briefing(ship, discovered);
+
+    expect(mission.signalDirection).not.toBeNull();
+    expect(mission.signalDirection!.x).toBeGreaterThan(0);
+  });
+
+  it('REQ-74 lists Omega III and freighter goals during mission 4', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    const discovered = new DiscoveredMap();
+    const star = new Star();
+    const iceRing = new IceRing();
+    const freighter = new Freighter();
+    const ship = new Ship();
+    mission.jumpToMission4Briefing(ship, discovered);
+    mission.advance(visited);
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), emptyStation(), visited, SCREEN_RADIUS, discovered, star, iceRing, freighter);
+
+    expect(mission.currentGoals.every((g) => !g.complete)).toBe(true);
+
+    ship.position = { ...star.position };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), emptyStation(), visited, SCREEN_RADIUS, discovered, star, iceRing, freighter);
+    expect(mission.currentGoals[0].complete).toBe(true);
+
+    ship.position = { ...freighter.position };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), emptyStation(), visited, SCREEN_RADIUS, discovered, star, iceRing, freighter);
+    expect(mission.currentGoals[1].complete).toBe(true);
+    expect(mission.phase).toBe(MissionPhase.Mission4Done);
   });
 
   it('REQ-74 lists the fuel, hull, ammo, and drone goals during mission 1', () => {

@@ -9,6 +9,10 @@ const MAX_AMMO = 100;
 const EMERGENCY_RELOAD_INTERVAL = 2;
 const EMERGENCY_RELOAD_AMOUNT = 1;
 const MAX_WEAPON_LEVEL = 2;
+const MAX_SHIELD = 100;
+const SHIELD_PER_FUEL = 5;
+const SHIELD_CHARGE_RATE = 25;
+const SHIELD_RECHARGE_DELAY = 1.5;
 const FREE_THRUST_SPEED = 100;
 const BRAKE_SPEED_THRESHOLD = 30;
 const BRAKE_IDLE_DELAY = 2;
@@ -30,6 +34,10 @@ export class Ship extends PhysicsBody {
   private hpLevel: number;
   private ammoLevel: number;
   private weaponLevelValue = 0;
+  private shieldInstalled = false;
+  private shieldLevelValue = 0;
+  private shieldHitAgeValue = SHIELD_RECHARGE_DELAY;
+  private fuelDepleted = false;
   private ammoReloadTimer = 0;
   private fuelReloadTimer = 0;
   private invulnerableTime = 0;
@@ -66,6 +74,11 @@ export class Ship extends PhysicsBody {
   get hp(): number { return this.hpLevel; }
   get ammo(): number { return this.ammoLevel; }
   get weaponLevel(): number { return this.weaponLevelValue; }
+  get hasShield(): boolean { return this.shieldInstalled; }
+  get shield(): number { return this.shieldLevelValue; }
+  get shieldCapacity(): number { return MAX_SHIELD; }
+  get shieldFraction(): number { return this.shieldLevelValue / MAX_SHIELD; }
+  get shieldHitAge(): number { return this.shieldHitAgeValue; }
   get isInvulnerable(): boolean { return this.invulnerableTime > 0; }
   get isAlive(): boolean { return this.alive; }
   get turnRate(): number { return this.turningRate; }
@@ -96,17 +109,30 @@ export class Ship extends PhysicsBody {
   }
 
   stopThrust(): void { this.throttle = 0; }
-  collectFuel(amount: number): void { this.fuelLevel = clamp(this.fuelLevel + amount, 0, 100); }
+  collectFuel(amount: number): void {
+    this.fuelLevel = clamp(this.fuelLevel + amount, 0, 100);
+    if (this.fuelLevel > 0) this.fuelDepleted = false;
+  }
   collectAmmo(amount: number): void { this.ammoLevel = clamp(this.ammoLevel + amount, 0, MAX_AMMO); }
   upgradeWeapon(): void { this.weaponLevelValue = Math.min(MAX_WEAPON_LEVEL, this.weaponLevelValue + 1); }
+  installShield(): void { this.shieldInstalled = true; }
   consumeAmmo(amount: number): boolean {
     if (this.ammoLevel < amount) return false;
     this.ammoLevel -= amount;
     return true;
   }
   takeDamage(amount: number): void {
-    this.hpLevel = Math.max(0, this.hpLevel - amount);
-    if (this.hpLevel === 0) this.alive = false;
+    let remaining = amount;
+    if (this.shieldLevelValue > 0) {
+      const absorbed = Math.min(this.shieldLevelValue, remaining);
+      this.shieldLevelValue -= absorbed;
+      remaining -= absorbed;
+      this.shieldHitAgeValue = 0;
+    }
+    if (remaining > 0) {
+      this.hpLevel = Math.max(0, this.hpLevel - remaining);
+      if (this.hpLevel === 0) this.alive = false;
+    }
     this.invulnerableTime = 0.5;
   }
   repair(amount: number): void {
@@ -116,6 +142,23 @@ export class Ship extends PhysicsBody {
 
   updateInvulnerability(dt: number): void {
     this.invulnerableTime = Math.max(0, this.invulnerableTime - dt);
+  }
+
+  updateShieldCharge(dt: number): void {
+    if (!this.shieldInstalled) return;
+    this.shieldHitAgeValue = Math.min(SHIELD_RECHARGE_DELAY, this.shieldHitAgeValue + dt);
+    if (this.isThrusting) return;
+    if (this.shieldHitAgeValue < SHIELD_RECHARGE_DELAY) return;
+    if (this.fuelDepleted || this.fuelLevel <= 0) return;
+    const wanted = Math.min(SHIELD_CHARGE_RATE * dt, MAX_SHIELD - this.shieldLevelValue);
+    if (wanted <= 0) return;
+    const fuelSpent = Math.min(wanted / SHIELD_PER_FUEL, this.fuelLevel);
+    this.fuelLevel -= fuelSpent;
+    this.shieldLevelValue = Math.min(MAX_SHIELD, this.shieldLevelValue + fuelSpent * SHIELD_PER_FUEL);
+    if (this.fuelLevel <= 0) {
+      this.fuelLevel = 0;
+      this.fuelDepleted = true;
+    }
   }
 
   updateEmergencyReload(dt: number): void {
@@ -201,6 +244,7 @@ export class Ship extends PhysicsBody {
     this.fuelLevel = Math.max(0, this.fuelLevel - fuelCost);
     this.freeThrustValue = free;
     if (this.fuelLevel <= 0) {
+      this.fuelDepleted = true;
       this.throttle = 0;
       this.directionalLevel = 0;
       this.directionalVec = null;

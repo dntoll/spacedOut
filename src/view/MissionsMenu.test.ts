@@ -9,7 +9,7 @@ type StubNode = {
 
 const stubNodes = (): Map<string, StubNode> => {
   const nodes = new Map<string, StubNode>();
-  for (const selector of ['#missions-panel', '#missions-toggle', '#mission-1', '#mission-2', '#mission-3']) {
+  for (const selector of ['#missions-panel', '#missions-toggle', '#mission-1', '#mission-2', '#mission-3', '#mission-4']) {
     nodes.set(selector, {
       classList: { add: vi.fn(), remove: vi.fn(), toggle: vi.fn() },
       addEventListener: vi.fn(),
@@ -85,5 +85,20 @@ describe('MissionsMenu', () => {
     expect(nodes.get('#mission-1')?.classList.toggle).toHaveBeenCalledWith('active', false);
     expect(nodes.get('#mission-2')?.classList.toggle).toHaveBeenCalledWith('active', false);
     expect(nodes.get('#mission-3')?.classList.toggle).toHaveBeenCalledWith('active', true);
+    expect(nodes.get('#mission-4')?.classList.toggle).toHaveBeenCalledWith('active', false);
+
+    menu.setCurrentMissionFrom(MissionPhase.Mission4Active);
+    expect(nodes.get('#mission-3')?.classList.toggle).toHaveBeenCalledWith('active', false);
+    expect(nodes.get('#mission-4')?.classList.toggle).toHaveBeenCalledWith('active', true);
+  });
+
+  it('REQ-66 exposes a mission 4 cheat selection', () => {
+    const nodes = stubNodes();
+    const menu = new MissionsMenu();
+    const pickMission4 = nodes.get('#mission-4')!.addEventListener.mock.calls[0][1] as () => void;
+
+    pickMission4();
+
+    expect(menu.consumeSelection()).toBe(4);
   });
 });

@@ -107,6 +107,38 @@ describe('Ship view', () => {
     expect(circles).toHaveLength(0);
   });
 
+  it('REQ-90 draws a glowing field outside the hull edges that lights up when damaged', () => {
+    const strokes: Array<{ points: Array<{ x: number; y: number }>; stroke?: string; lineWidth?: number }> = [];
+    const drawing = {
+      withTransform: (_position: unknown, _angle: number, draw: () => void) => draw(),
+      withShadow: (_color: string, _blur: number, draw: () => void) => draw(),
+      polygon: (points: Array<{ x: number; y: number }>, _fill: unknown, stroke?: string, lineWidth?: number) =>
+        strokes.push({ points, stroke, lineWidth }),
+      circle: vi.fn(),
+    } as unknown as Drawing;
+
+    const bare = new ModelShip();
+    new Ship().draw(drawing, bare, new StarLight(), null);
+    expect(strokes.filter((s) => s.points.some((p) => p.x > 22))).toHaveLength(0);
+
+    const shielded = new ModelShip();
+    shielded.installShield();
+    shielded.updateShieldCharge(4);
+    expect(shielded.shield).toBe(100);
+    strokes.length = 0;
+    new Ship().draw(drawing, shielded, new StarLight(), null);
+    const field = strokes.find((s) => s.points.some((p) => p.x > 22));
+    expect(field).toBeDefined();
+    expect(field?.points).toHaveLength(3);
+    const settledWidth = field!.lineWidth!;
+
+    shielded.takeDamage(30);
+    strokes.length = 0;
+    new Ship().draw(drawing, shielded, new StarLight(), null);
+    const flared = strokes.find((s) => s.points.some((p) => p.x > 22));
+    expect(flared!.lineWidth).toBeGreaterThan(settledWidth);
+  });
+
   it('REQ-82 REQ-84 uses a cooler nozzle glow when thrust is free', () => {
     const paints: RadialPaint[] = [];
     const drawing = {

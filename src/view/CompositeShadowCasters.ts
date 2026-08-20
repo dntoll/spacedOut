@@ -16,11 +16,15 @@ export class CompositeShadowCasters implements OutlinedShadowCasters {
   constructor(
     massive: Model.MassiveAsteroidField | null,
     belt: Model.AsteroidBelt | null,
+    iceRing?: Model.IceRing | null,
+    freighter?: Model.Freighter | null,
   ) {
     const bodies: OutlinedBody[] = [];
     const casters: ShadowCaster[] = [];
     massive?.forEachActive((asteroid) => bodies.push(asteroid));
     belt?.forEach((asteroid) => bodies.push(asteroid));
+    iceRing?.forEach((block) => bodies.push(block));
+    if (freighter?.isPlaced) bodies.push(freighter);
     for (const body of bodies) casters.push({ position: body.position, radius: body.radius });
     this.bodies = bodies;
     this.casters = casters;

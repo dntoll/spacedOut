@@ -1,7 +1,11 @@
 import type { AsteroidBelt } from './AsteroidBelt';
+import { DiscoveredMap } from './DiscoveredMap';
 import type { DroneField } from './DroneField';
+import type { Freighter } from './Freighter';
+import type { IceRing } from './IceRing';
 import type { MassiveAsteroidField } from './MassiveAsteroidField';
 import type { Station } from './Station';
+import type { Star } from './Star';
 import type { Ship } from './Ship';
 import type { Vec2 } from '../types';
 import { length, random, sub } from '../math';
@@ -18,6 +22,9 @@ export enum MissionPhase {
   Mission3Intro,
   Mission3Active,
   Mission3Done,
+  Mission4Intro,
+  Mission4Active,
+  Mission4Done,
 }
 
 export enum SpawnMode {
@@ -38,6 +45,8 @@ export enum MissionGoalKind {
   OpenGate2,
   OpenGate3,
   ReachCentralChamber,
+  ReachOmegaIII,
+  ReachFreighter,
 }
 
 export interface MissionGoal {
@@ -46,11 +55,14 @@ export interface MissionGoal {
 }
 
 const TRAVEL_DISTANCE = 80000;
+const MISSION4_TRAVEL_DISTANCE = TRAVEL_DISTANCE / 3;
 const STATION_RADIUS = 2000;
 const REQUIRED_WEAPON_LEVEL = 2;
 const ENCOUNTER_SPAWN_START_FRACTION = 0.1;
 const ENCOUNTER_SPAWN_END_FRACTION = 0.9;
 const MISSION3_STATION_CLEARANCE = 200;
+const SIGNAL_PROBE_DISTANCE = 5000;
+const SIGNAL_PROBE_RADIUS = 1000;
 
 export class Mission {
   phase: MissionPhase = MissionPhase.Mission1Intro;
@@ -71,6 +83,8 @@ export class Mission {
   private gate2Opened = false;
   private gate3Opened = false;
   private centralReached = false;
+  private omegaReached = false;
+  private freighterReached = false;
 
   get isPaused(): boolean {
     return this.phase === MissionPhase.Mission1Intro
@@ -78,16 +92,20 @@ export class Mission {
       || this.phase === MissionPhase.Mission2Intro
       || this.phase === MissionPhase.Mission2Done
       || this.phase === MissionPhase.Mission3Intro
-      || this.phase === MissionPhase.Mission3Done;
+      || this.phase === MissionPhase.Mission3Done
+      || this.phase === MissionPhase.Mission4Intro
+      || this.phase === MissionPhase.Mission4Done;
   }
 
   get spawnMode(): SpawnMode {
     if (this.phase === MissionPhase.Transition || this.phase === MissionPhase.Mission3Active) return SpawnMode.Suppressed;
-    if (this.phase === MissionPhase.Mission2Active) return SpawnMode.Mission2Travel;
+    if (this.phase === MissionPhase.Mission2Active || this.phase === MissionPhase.Mission4Active) return SpawnMode.Mission2Travel;
     return SpawnMode.Normal;
   }
 
-  get isTraversal(): boolean { return this.phase === MissionPhase.Mission2Active; }
+  get isTraversal(): boolean {
+    return this.phase === MissionPhase.Mission2Active || this.phase === MissionPhase.Mission4Active;
+  }
 
   get destinationPosition(): Vec2 | null { return this.destination; }
   get destinationRadiusValue(): number { return this.destinationRadius; }
@@ -137,6 +155,16 @@ export class Mission {
         { kind: MissionGoalKind.ReachCentralChamber, complete: this.centralReached },
       ];
     }
+    if (
+      this.phase === MissionPhase.Mission4Intro
+      || this.phase === MissionPhase.Mission4Active
+      || this.phase === MissionPhase.Mission4Done
+    ) {
+      return [
+        { kind: MissionGoalKind.ReachOmegaIII, complete: this.omegaReached },
+        { kind: MissionGoalKind.ReachFreighter, complete: this.freighterReached },
+      ];
+    }
     return [];
   }
 
@@ -152,6 +180,10 @@ export class Mission {
       this.phase = MissionPhase.Mission3Intro;
     } else if (this.phase === MissionPhase.Mission3Intro) {
       this.phase = MissionPhase.Mission3Active;
+    } else if (this.phase === MissionPhase.Mission3Done) {
+      this.phase = MissionPhase.Mission4Intro;
+    } else if (this.phase === MissionPhase.Mission4Intro) {
+      this.phase = MissionPhase.Mission4Active;
     }
   }
 
@@ -173,9 +205,30 @@ export class Mission {
     this.phase = MissionPhase.Mission3Intro;
   }
 
+  jumpToMission4Briefing(ship: Ship, discovered: DiscoveredMap): void {
+    this.randomizeUnexploredSignal(ship.position, discovered);
+    this.phase = MissionPhase.Mission4Intro;
+  }
+
   private randomizeSignal(): void {
     const angle = random(0, Math.PI * 2);
     this.signalDirection = { x: Math.cos(angle), y: Math.sin(angle) };
+  }
+
+  private randomizeUnexploredSignal(from: Vec2, discovered: DiscoveredMap): void {
+    for (let attempt = 0; attempt < 24; attempt++) {
+      const angle = random(0, Math.PI * 2);
+      const direction = { x: Math.cos(angle), y: Math.sin(angle) };
+      const probe = {
+        x: from.x + direction.x * SIGNAL_PROBE_DISTANCE,
+        y: from.y + direction.y * SIGNAL_PROBE_DISTANCE,
+      };
+      if (!discovered.isCircleDiscovered(probe, SIGNAL_PROBE_RADIUS)) {
+        this.signalDirection = direction;
+        return;
+      }
+    }
+    this.randomizeSignal();
   }
 
   update(
@@ -187,6 +240,10 @@ export class Mission {
     station: Station,
     visited: VisitedMap,
     screenRadius: number,
+    discovered: DiscoveredMap = new DiscoveredMap(),
+    star: Star | null = null,
+    iceRing: IceRing | null = null,
+    freighter: Freighter | null = null,
   ): void {
     if (this.phase === MissionPhase.Mission1Active) {
       this.fuelRefilled = ship.fuel > 90;
@@ -219,7 +276,23 @@ export class Mission {
       this.gate2Opened = station.isGateOpen(2);
       this.gate3Opened = station.isGateOpen(3);
       this.centralReached = station.isCentralReached(ship);
-      if (this.centralReached) this.phase = MissionPhase.Mission3Done;
+      if (this.centralReached) {
+        ship.installShield();
+        this.phase = MissionPhase.Mission3Done;
+      }
+    } else if (this.phase === MissionPhase.Mission4Active && star && iceRing && freighter) {
+      this.beginMission4IfNeeded(ship, discovered, star, iceRing, freighter);
+      if (freighter.isPlaced) {
+        this.destination = { ...freighter.position };
+        this.destinationRadius = freighter.radius;
+      }
+      this.cachedRemaining = this.computeRemaining(ship, station);
+      this.omegaReached = star.isPlaced
+        && length(sub(star.position, ship.position)) <= iceRing.outerRadius + ship.radius;
+      this.freighterReached = freighter.reachedBy(ship.position, ship.radius);
+      if (this.destination && this.freighterReached) {
+        this.phase = MissionPhase.Mission4Done;
+      }
     }
   }
 
@@ -242,5 +315,28 @@ export class Mission {
     this.destination = station.entrancePosition ? { ...station.entrancePosition } : null;
     this.destinationRadius = station.entranceRadius;
     this.initialDistance = Math.max(0, TRAVEL_DISTANCE - STATION_RADIUS - this.destinationRadius);
+  }
+
+  private beginMission4IfNeeded(
+    ship: Ship,
+    discovered: DiscoveredMap,
+    star: Star,
+    iceRing: IceRing,
+    freighter: Freighter,
+  ): void {
+    if (star.isPlaced) return;
+    if (!this.signalDirection) this.randomizeUnexploredSignal(ship.position, discovered);
+    if (!this.signalDirection) return;
+    const center: Vec2 = {
+      x: ship.position.x + this.signalDirection.x * MISSION4_TRAVEL_DISTANCE,
+      y: ship.position.y + this.signalDirection.y * MISSION4_TRAVEL_DISTANCE,
+    };
+    star.placeAt(center);
+    iceRing.placeAround(star);
+    freighter.placeAround(star);
+    this.destination = { ...freighter.position };
+    this.destinationRadius = freighter.radius;
+    this.initialDistance = Math.max(0, length(sub(this.destination, ship.position)) - this.destinationRadius - ship.radius);
+    this.cachedRemaining = this.initialDistance;
   }
 }

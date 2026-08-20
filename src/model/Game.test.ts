@@ -292,4 +292,16 @@ describe('Game', () => {
     expect(active).toHaveLength(0);
     expect(known).toHaveLength(0);
   });
+
+  it('REQ-66 starts the mission 4 cheat with shield, wing guns, and a signal toward Omega III', () => {
+    const game = new Game({ startingMission: 4 });
+
+    expect(game.mission.phase).toBe(MissionPhase.Mission4Intro);
+    expect(game.ship.fuel).toBe(100);
+    expect(game.ship.hp).toBe(100);
+    expect(game.ship.ammo).toBe(100);
+    expect(game.ship.weaponLevel).toBe(2);
+    expect(game.ship.hasShield).toBe(true);
+    expect(game.mission.signalDirection).not.toBeNull();
+  });
 });
