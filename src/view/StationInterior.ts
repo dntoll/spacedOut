@@ -1,7 +1,9 @@
 import type * as Model from '../model';
+import type { Vec2 } from '../types';
 import type { Drawing } from './Drawing';
 import type { StarLight } from './StarLight';
 
+const FLOOR_FILL = '#1a1208';
 const FLOOR_TINT = 'rgba(40,28,18,.22)';
 const INTERIOR_WALL_FILL = '#3a2418';
 const INTERIOR_WALL_FACE = '#5a3a22';
@@ -15,6 +17,8 @@ export class StationInterior {
     if (!station.isPlaced) return;
     const rotation = station.entranceAngle;
     const lineWidth = Math.max(1, 2 / zoom);
+
+    this.drawFloor(drawing, station);
 
     for (const room of station.rooms) {
       if (room.kind === 'entrance') continue;
@@ -59,5 +63,28 @@ export class StationInterior {
         );
       });
     });
+  }
+
+  private drawFloor(drawing: Drawing, station: Model.Station): void {
+    const carver = station.carver;
+    if (!carver) return;
+    const center = station.center!;
+    const rotation = station.entranceAngle;
+    const half = carver.cellSize / 2 + 0.5;
+    const paths: Vec2[][] = [];
+    for (let r = 0; r < carver.gridN; r++) {
+      for (let c = 0; c < carver.gridN; c++) {
+        if (carver.bitmap[r * carver.gridN + c] !== 1) continue;
+        const local = carver.cellCenterLocal(c, r);
+        const corners: Vec2[] = [
+          { x: local.x - half, y: local.y - half },
+          { x: local.x + half, y: local.y - half },
+          { x: local.x + half, y: local.y + half },
+          { x: local.x - half, y: local.y + half },
+        ];
+        paths.push(corners.map((p) => carver.localToWorld(p, center, rotation)));
+      }
+    }
+    if (paths.length > 0) drawing.fillPolygons(paths, FLOOR_FILL);
   }
 }
