@@ -1,11 +1,14 @@
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
-import type { Drawing } from './Drawing';
 
-const ROOF_FILL = '#000000';
 const RAY_COUNT = 360;
 const SUBDIVISION = 3;
 const STEP_FRACTION = 0.5;
+
+export interface DarknessPaths {
+  black: Vec2[][];
+  dim: Vec2[][];
+}
 
 interface FineGrid {
   size: number;
@@ -18,6 +21,11 @@ interface FineGrid {
   inBounds: (fc: number, fr: number) => boolean;
 }
 
+// Tracks which interior fine cells the ship has revealed by line of sight (REQ-86)
+// and provides the darkness geometry for the lamp's unified offscreen pass:
+// unrevealed carved cells become near-black, revealed cells become dim. Rendering
+// itself lives in StationLamp so darkness and light share one multiply composite
+// and diagonal gates get smooth darkness instead of coarse black squares.
 export class StationRoof {
   private stationId = '';
   private fine: FineGrid | null = null;
@@ -25,8 +33,8 @@ export class StationRoof {
   private lastCoarseKey = '';
   private lastGateKey = '';
   private revealedVersion = 0;
-  private cacheKey = '';
-  private cachedPaths: Vec2[][] = [];
+  private darknessCacheKey = '';
+  private cachedDarkness: DarknessPaths = { black: [], dim: [] };
 
   reset(): void {
     this.stationId = '';
@@ -34,21 +42,37 @@ export class StationRoof {
     this.lastCoarseKey = '';
     this.lastGateKey = '';
     this.revealedVersion = 0;
-    this.cacheKey = '';
-    this.cachedPaths = [];
+    this.darknessCacheKey = '';
+    this.cachedDarkness = { black: [], dim: [] };
     this.fine = null;
   }
 
-  draw(drawing: Drawing, station: Model.Station, shipPosition: Vec2): void {
+  // Advance reveal tracking for the ship's current position. Call once per frame
+  // before reading darkness paths or reveal state.
+  update(station: Model.Station, shipPosition: Vec2): void {
     if (!station.isPlaced) return;
     this.ensureStation(station);
     this.updateRevealed(station, shipPosition);
+  }
+
+  isRevealedAt(station: Model.Station, worldPoint: Vec2): boolean {
+    const fine = this.fine;
+    const carver = station.carver;
+    if (!fine || !carver) return false;
+    const local = carver.worldToLocal(worldPoint, station.center!, station.entranceAngle);
+    const cell = fine.toCell(local);
+    if (!fine.inBounds(cell.fc, cell.fr)) return false;
+    return this.revealedCells.has(fine.key(cell.fc, cell.fr));
+  }
+
+  // World-space fine-cell quads split into unrevealed (black) and revealed (dim),
+  // cached per reveal version so it is only rebuilt when the ship reveals new area.
+  computeDarknessPaths(station: Model.Station): DarknessPaths {
     const key = `${this.stationId}:${this.revealedVersion}`;
-    if (key !== this.cacheKey) {
-      this.cacheKey = key;
-      this.cachedPaths = this.computeRoofPaths(station);
-    }
-    if (this.cachedPaths.length > 0) drawing.fillPolygons(this.cachedPaths, ROOF_FILL);
+    if (key === this.darknessCacheKey) return this.cachedDarkness;
+    this.darknessCacheKey = key;
+    this.cachedDarkness = this.buildDarknessPaths(station);
+    return this.cachedDarkness;
   }
 
   private ensureStation(station: Model.Station): void {
@@ -60,8 +84,8 @@ export class StationRoof {
     this.lastCoarseKey = '';
     this.lastGateKey = '';
     this.revealedVersion = 0;
-    this.cacheKey = '';
-    this.cachedPaths = [];
+    this.darknessCacheKey = '';
+    this.cachedDarkness = { black: [], dim: [] };
     this.fine = this.buildFineGrid(station);
     for (const k of this.roomFineCells(station, 'entrance')) this.revealedCells.add(k);
     this.revealedVersion++;
@@ -152,7 +176,7 @@ export class StationRoof {
     }
   }
 
-  private computeRoofPaths(station: Model.Station): Vec2[][] {
+  private buildDarknessPaths(station: Model.Station): DarknessPaths {
     const fine = this.fine!;
     const carver = station.carver!;
     const center = station.center!;
@@ -161,7 +185,11 @@ export class StationRoof {
     const n = carver.gridN;
     const coarseHalf = carver.cellSize / 2 + 0.5;
     const fineHalf = fine.size / 2 + 0.25;
-    const paths: Vec2[][] = [];
+    const black: Vec2[][] = [];
+    const dim: Vec2[][] = [];
+    // Iterate coarse cells (~10k, not ~90k fine cells): emit one big quad for
+    // fully-uniform coarse cells, and only fall back to fine sub-cells for the
+    // partial frontier. Keeps fillPolygons subpath count low for performance.
     for (let cr = 0; cr < n; cr++) {
       for (let cc = 0; cc < n; cc++) {
         if (carver.bitmap[cr * n + cc] !== 1) continue;
@@ -171,7 +199,7 @@ export class StationRoof {
             if (this.revealedCells.has(fine.key(cc * sub + sc, cr * sub + sr))) revealedCount++;
           }
         }
-        if (revealedCount === sub * sub) continue;
+        const total = sub * sub;
         if (revealedCount === 0) {
           const local = carver.cellCenterLocal(cc, cr);
           const corners: Vec2[] = [
@@ -180,27 +208,37 @@ export class StationRoof {
             { x: local.x + coarseHalf, y: local.y + coarseHalf },
             { x: local.x - coarseHalf, y: local.y + coarseHalf },
           ];
-          paths.push(corners.map((p) => carver.localToWorld(p, center, rotation)));
-          continue;
-        }
-        for (let sr = 0; sr < sub; sr++) {
-          for (let sc = 0; sc < sub; sc++) {
-            if (this.revealedCells.has(fine.key(cc * sub + sc, cr * sub + sr))) continue;
-            const fc = cc * sub + sc;
-            const fr = cr * sub + sr;
-            const local = fine.centerLocal(fc, fr);
-            const corners: Vec2[] = [
-              { x: local.x - fineHalf, y: local.y - fineHalf },
-              { x: local.x + fineHalf, y: local.y - fineHalf },
-              { x: local.x + fineHalf, y: local.y + fineHalf },
-              { x: local.x - fineHalf, y: local.y + fineHalf },
-            ];
-            paths.push(corners.map((p) => carver.localToWorld(p, center, rotation)));
+          black.push(corners.map((p) => carver.localToWorld(p, center, rotation)));
+        } else if (revealedCount === total) {
+          const local = carver.cellCenterLocal(cc, cr);
+          const corners: Vec2[] = [
+            { x: local.x - coarseHalf, y: local.y - coarseHalf },
+            { x: local.x + coarseHalf, y: local.y - coarseHalf },
+            { x: local.x + coarseHalf, y: local.y + coarseHalf },
+            { x: local.x - coarseHalf, y: local.y + coarseHalf },
+          ];
+          dim.push(corners.map((p) => carver.localToWorld(p, center, rotation)));
+        } else {
+          for (let sr = 0; sr < sub; sr++) {
+            for (let sc = 0; sc < sub; sc++) {
+              const fc = cc * sub + sc;
+              const fr = cr * sub + sr;
+              const local = fine.centerLocal(fc, fr);
+              const corners: Vec2[] = [
+                { x: local.x - fineHalf, y: local.y - fineHalf },
+                { x: local.x + fineHalf, y: local.y - fineHalf },
+                { x: local.x + fineHalf, y: local.y + fineHalf },
+                { x: local.x - fineHalf, y: local.y + fineHalf },
+              ];
+              const world = corners.map((p) => carver.localToWorld(p, center, rotation));
+              if (this.revealedCells.has(fine.key(fc, fr))) dim.push(world);
+              else black.push(world);
+            }
           }
         }
       }
     }
-    return paths;
+    return { black, dim };
   }
 
   private roomFineCells(station: Model.Station, kind: string): string[] {

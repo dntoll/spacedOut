@@ -8,9 +8,10 @@ import { Station } from '../model/Station';
 import type { Vec2 } from '../types';
 import type { Drawing, Paint } from './Drawing';
 import { StationLamp } from './StationLamp';
+import { StationRoof } from './StationRoof';
 
 const STATION_RADIUS = 3000;
-const R = 450;
+const R = 320;
 
 const placeStation = (seed = 42): Station => {
   const station = new Station();
@@ -32,7 +33,7 @@ const pointInPolygon = (p: Vec2, poly: Vec2[]): boolean => {
 
 interface Capture {
   drawing: Drawing;
-  dimPaths: Vec2[][];
+  darkPaths: Vec2[][];
   litPolygon: Vec2[];
   beginShadow: number;
   endShadow: number;
@@ -41,7 +42,7 @@ interface Capture {
 const capture = (): Capture => {
   const cap: Capture = {
     drawing: null as unknown as Drawing,
-    dimPaths: [],
+    darkPaths: [],
     litPolygon: [],
     beginShadow: 0,
     endShadow: 0,
@@ -52,7 +53,7 @@ const capture = (): Capture => {
     endShadowLayer: () => { cap.endShadow++; },
     compositeShadowLayer: () => { cap.composite++; },
     withCamera: (_position: unknown, _zoom: number, draw: () => void) => draw(),
-    fillPolygons: (paths: Vec2[][], _fill: Paint) => { cap.dimPaths.push(...paths); },
+    fillPolygons: (paths: Vec2[][], _fill: Paint) => { cap.darkPaths.push(...paths); },
     polygon: (points: Vec2[], _fill: Paint) => { cap.litPolygon = points; },
   } as unknown as Drawing;
   return cap;
@@ -72,8 +73,8 @@ const carveableCellCenters = (station: Station): Vec2[] => {
   return out;
 };
 
-const dimCovers = (cap: Capture, point: Vec2): boolean =>
-  cap.dimPaths.some((quad) => pointInPolygon(point, quad));
+const darkCovers = (cap: Capture, point: Vec2): boolean =>
+  cap.darkPaths.some((quad) => pointInPolygon(point, quad));
 
 const roomCenter = (station: Station, kind: string, index: number): Vec2 => {
   const room = station.rooms.find((r) => r.kind === kind && r.index === index);
@@ -95,41 +96,41 @@ const openGate = (station: Station, index: number): void => {
 };
 
 describe('StationLamp', () => {
-  it('REQ-87 dims the entire carved interior as the memory base and leaves space outside the station unaffected', () => {
+  it('REQ-87 darkens the entire carved interior (dim or black) and leaves space outside the station unaffected', () => {
     const station = placeStation();
     const lamp = new StationLamp();
+    const roof = new StationRoof();
     const ship = new Ship();
     ship.position = roomCenter(station, 'entrance', 0);
     const cap = capture();
 
-    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, R);
+    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, R, roof);
 
     expect(cap.beginShadow).toBe(1);
     expect(cap.endShadow).toBe(1);
     expect(cap.composite).toBe(1);
-    // The dim layer covers every carved interior cell.
+    // Every carved interior cell is darkened (dim if revealed, black if not).
     for (const cell of carveableCellCenters(station)) {
-      expect(dimCovers(cap, cell)).toBe(true);
+      expect(darkCovers(cap, cell)).toBe(true);
     }
-    // Space well outside the station is not dimmed.
+    // Space well outside the station is unaffected.
     const outside: Vec2 = { x: station.outerRadius * 2.5, y: station.outerRadius * 2.5 };
-    expect(dimCovers(cap, outside)).toBe(false);
+    expect(darkCovers(cap, outside)).toBe(false);
   });
 
   it('REQ-87 lights the ship vicinity within radius and line of sight; a point beyond the radius is not lit', () => {
     const station = placeStation();
     const lamp = new StationLamp();
+    const roof = new StationRoof();
     const ship = new Ship();
     const entrance = roomCenter(station, 'entrance', 0);
     ship.position = entrance;
     const cap = capture();
 
-    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, R);
+    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, R, roof);
 
     expect(cap.litPolygon.length).toBeGreaterThanOrEqual(3);
-    // The ship itself is lit.
     expect(pointInPolygon(entrance, cap.litPolygon)).toBe(true);
-    // A point beyond the lamp radius (in the open entrance direction) is not lit.
     const beyond: Vec2 = { x: entrance.x + R + 120, y: entrance.y };
     expect(pointInPolygon(beyond, cap.litPolygon)).toBe(false);
   });
@@ -137,14 +138,14 @@ describe('StationLamp', () => {
   it('REQ-87 is blocked by line of sight — carved cells within radius but around a wall stay dark while the ship cell is lit', () => {
     const station = placeStation();
     const lamp = new StationLamp();
+    const roof = new StationRoof();
     const ship = new Ship();
     ship.position = roomCenter(station, 'area', 1);
     const cap = capture();
 
-    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, R);
+    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, R, roof);
 
     expect(pointInPolygon(ship.position, cap.litPolygon)).toBe(true);
-    // Among carved cells within radius, walls block line of sight to at least some.
     const carver = station.carver!;
     const center = station.center!;
     const rotation = station.entranceAngle;
@@ -171,43 +172,42 @@ describe('StationLamp', () => {
     const entrance = roomCenter(station, 'entrance', 0);
     const area1 = roomCenter(station, 'area', 1);
     const gate = gatePosition(station, 1);
-    // Gate 1 sits on the corridor between the entrance and section B (area 1).
     const dir = { x: area1.x - entrance.x, y: area1.y - entrance.y };
     const dl = Math.hypot(dir.x, dir.y);
     const ux = dir.x / dl;
     const uy = dir.y / dl;
-    // Ship just before the gate (entrance side), probe just past the gate (area-1 side), within radius.
-    const shipPos: Vec2 = { x: gate.x - ux * 160, y: gate.y - uy * 160 };
-    const probe: Vec2 = { x: gate.x + ux * 160, y: gate.y + uy * 160 };
+    const shipPos: Vec2 = { x: gate.x - ux * 120, y: gate.y - uy * 120 };
+    const probe: Vec2 = { x: gate.x + ux * 120, y: gate.y + uy * 120 };
     expect(Math.hypot(probe.x - shipPos.x, probe.y - shipPos.y)).toBeLessThan(R);
 
-    // Gate closed: the probe behind the closed gate is not lit.
     expect(station.isGateOpen(1)).toBe(false);
     let cap = capture();
-    lamp.draw(cap.drawing, station, shipPos, { x: 0, y: 0 }, 1, R);
+    lamp.draw(cap.drawing, station, shipPos, { x: 0, y: 0 }, 1, R, new StationRoof());
     expect(pointInPolygon(shipPos, cap.litPolygon)).toBe(true);
     expect(pointInPolygon(probe, cap.litPolygon)).toBe(false);
 
-    // Open gate 1: the lamp now reaches the probe through the open passage.
     openGate(station, 1);
     expect(station.isGateOpen(1)).toBe(true);
     cap = capture();
-    lamp.draw(cap.drawing, station, shipPos, { x: 0, y: 0 }, 1, R);
+    lamp.draw(cap.drawing, station, shipPos, { x: 0, y: 0 }, 1, R, new StationRoof());
     expect(pointInPolygon(probe, cap.litPolygon)).toBe(true);
   });
 
-  it('REQ-87 is inactive when the lamp radius is zero, producing no lighting pass', () => {
+  it('REQ-87 with zero lamp radius renders darkness (concealment) but no lamp light', () => {
     const station = placeStation();
     const lamp = new StationLamp();
+    const roof = new StationRoof();
     const ship = new Ship();
     ship.position = roomCenter(station, 'entrance', 0);
     const cap = capture();
 
-    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, 0);
+    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, 0, roof);
 
-    expect(cap.beginShadow).toBe(0);
-    expect(cap.composite).toBe(0);
-    expect(cap.dimPaths.length).toBe(0);
+    // Darkness still renders (conceals unrevealed interior).
+    expect(cap.beginShadow).toBe(1);
+    expect(cap.composite).toBe(1);
+    expect(cap.darkPaths.length).toBeGreaterThan(0);
+    // No lamp light polygon.
     expect(cap.litPolygon.length).toBe(0);
   });
 });

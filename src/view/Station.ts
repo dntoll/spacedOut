@@ -23,9 +23,8 @@ export class Station {
   draw(drawing: Drawing, station: Model.Station, starLight: StarLight, zoom: number, shipPosition: Vec2, cameraPosition: Vec2, lampRadius: number): void {
     if (!station.isPlaced) return;
     this.interior.draw(drawing, station, starLight, zoom);
-    this.lamp.draw(drawing, station, shipPosition, cameraPosition, zoom, lampRadius);
+    this.lamp.draw(drawing, station, shipPosition, cameraPosition, zoom, lampRadius, this.roof);
     this.fixtures.draw(drawing, station, starLight, zoom);
-    this.roof.draw(drawing, station, shipPosition);
     this.hull.draw(drawing, station, starLight, zoom);
   }
 }

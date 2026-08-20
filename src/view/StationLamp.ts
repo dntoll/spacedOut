@@ -1,77 +1,52 @@
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import type { Drawing, RadialPaint } from './Drawing';
+import type { StationRoof } from './StationRoof';
 
-const DIM_ALPHA = 0.62;
+// Darkness levels for the unified offscreen multiply pass. The lamp owns the
+// single darkness composite: revealed-but-unlit cells are dim, unrevealed cells
+// are near-black (concealed, per REQ-86), and the lamp's radial light lifts lit
+// cells to bright. Paint order on the offscreen layer is dim -> lamp -> black so
+// the lamp can brighten revealed areas but unrevealed black always conceals.
+const DIM_ALPHA = 0.85;
+const BLACK_ALPHA = 1.0;
 const RAY_COUNT = 180;
 
 interface Segment { ax: number; ay: number; bx: number; by: number }
 
 export class StationLamp {
-  private stationId = '';
-  private cachedDimPaths: Vec2[][] = [];
   private polygon: Vec2[] = [];
 
   reset(): void {
-    this.stationId = '';
-    this.cachedDimPaths = [];
     this.polygon = [];
   }
 
-  draw(drawing: Drawing, station: Model.Station, shipPosition: Vec2, cameraPosition: Vec2, zoom: number, radius: number): void {
-    if (!station.isPlaced || radius <= 0) return;
-    this.ensureDimPaths(station);
-    this.polygon = this.computeVisibility(station, shipPosition, radius);
+  draw(drawing: Drawing, station: Model.Station, shipPosition: Vec2, cameraPosition: Vec2, zoom: number, radius: number, roof: StationRoof): void {
+    if (!station.isPlaced) return;
+    roof.update(station, shipPosition);
+    this.polygon = radius > 0 ? this.computeVisibility(station, shipPosition, radius) : [];
+    const { black, dim } = roof.computeDarknessPaths(station);
 
     drawing.beginShadowLayer();
     drawing.withCamera(cameraPosition, zoom, () => {
-      if (this.cachedDimPaths.length > 0) drawing.fillPolygons(this.cachedDimPaths, `rgba(0,0,0,${DIM_ALPHA})`);
+      if (dim.length > 0) drawing.fillPolygons(dim, `rgba(0,0,0,${DIM_ALPHA})`);
       if (this.polygon.length >= 3) {
         const paint: RadialPaint = {
           from: { ...shipPosition }, fromRadius: 0,
           to: { ...shipPosition }, toRadius: radius,
           stops: [
             { offset: 0, color: 'rgba(255,255,255,1)' },
-            { offset: 0.55, color: 'rgba(255,255,255,0.92)' },
+            { offset: 0.35, color: 'rgba(255,255,255,0.98)' },
+            { offset: 0.7, color: 'rgba(255,255,255,0.5)' },
             { offset: 1, color: 'rgba(255,255,255,0)' },
           ],
         };
         drawing.polygon(this.polygon, paint);
       }
+      if (black.length > 0) drawing.fillPolygons(black, `rgba(0,0,0,${BLACK_ALPHA})`);
     });
     drawing.endShadowLayer();
     drawing.compositeShadowLayer('multiply');
-  }
-
-  private ensureDimPaths(station: Model.Station): void {
-    const center = station.center!;
-    const id = `${center.x}:${center.y}:${station.outerRadius}:${station.entranceAngle}`;
-    if (id === this.stationId) return;
-    this.stationId = id;
-    this.cachedDimPaths = this.buildCarvedCellPaths(station);
-  }
-
-  private buildCarvedCellPaths(station: Model.Station): Vec2[][] {
-    const carver = station.carver;
-    if (!carver) return [];
-    const center = station.center!;
-    const rotation = station.entranceAngle;
-    const half = carver.cellSize / 2 + 0.5;
-    const paths: Vec2[][] = [];
-    for (let r = 0; r < carver.gridN; r++) {
-      for (let c = 0; c < carver.gridN; c++) {
-        if (carver.bitmap[r * carver.gridN + c] !== 1) continue;
-        const local = carver.cellCenterLocal(c, r);
-        const corners: Vec2[] = [
-          { x: local.x - half, y: local.y - half },
-          { x: local.x + half, y: local.y - half },
-          { x: local.x + half, y: local.y + half },
-          { x: local.x - half, y: local.y + half },
-        ];
-        paths.push(corners.map((p) => carver.localToWorld(p, center, rotation)));
-      }
-    }
-    return paths;
   }
 
   private computeVisibility(station: Model.Station, origin: Vec2, radius: number): Vec2[] {

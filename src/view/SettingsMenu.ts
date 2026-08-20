@@ -13,9 +13,9 @@ const DEFAULT_PARTICLE_PERCENT = 40;
 const DEFAULT_ZOOM = 1.15;
 const ZOOM_MIN = 0.5;
 const ZOOM_MAX = 2;
-const DEFAULT_LAMP_RADIUS = 450;
-const LAMP_MIN = 150;
-const LAMP_MAX = 1200;
+const DEFAULT_LAMP_RADIUS = 320;
+const LAMP_MIN = 120;
+const LAMP_MAX = 900;
 const DEFAULT_TUNING: ControlTuning = { dampening: 2, thrustAccel: 500, maxSpeed: 1000 };
 const DEFAULT_SFX_PERCENTS: Record<SfxChannel, number> = {
   [SfxChannel.Master]: 60,

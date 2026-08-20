@@ -3,8 +3,8 @@ import type { Vec2 } from '../types';
 import type { Drawing } from './Drawing';
 import type { StarLight } from './StarLight';
 
-const FLOOR_FILL = '#1a1208';
-const FLOOR_TINT = 'rgba(40,28,18,.22)';
+const FLOOR_FILL = '#4a3620';
+const FLOOR_TINT = 'rgba(90,66,40,.22)';
 const INTERIOR_WALL_FILL = '#3a2418';
 const INTERIOR_WALL_FACE = '#5a3a22';
 const INTERIOR_WALL_EDGE = 'rgba(150,96,56,.4)';
