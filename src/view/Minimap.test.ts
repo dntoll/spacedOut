@@ -49,7 +49,7 @@ describe('Minimap', () => {
     const camera = new Camera();
     camera.update(ship.position, { x: 0, y: 0 }, 1);
 
-    new Minimap().draw(drawing, exploration, model, camera);
+    new Minimap().draw(drawing, exploration, model, camera, undefined);
 
     expect(polygon).toHaveBeenCalledWith(
       expect.arrayContaining([expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) })]),
@@ -69,7 +69,7 @@ describe('Minimap', () => {
     exploration.observe(camera.getVisibleWorldBounds(drawing.size));
     circle.mockClear();
     withTransform.mockClear();
-    new Minimap().draw(drawing, exploration, model, camera);
+    new Minimap().draw(drawing, exploration, model, camera, undefined);
 
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#ffc35c');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 2.2, '#c98bff');
@@ -106,7 +106,7 @@ describe('Minimap', () => {
     const camera = new Camera();
     camera.update(ship.position, { x: 0, y: 0 }, 1);
 
-    new Minimap().draw(drawing, exploration, model, camera);
+    new Minimap().draw(drawing, exploration, model, camera, undefined);
 
     expect(dashedLine).toHaveBeenCalledTimes(1);
     const [from, to, color] = dashedLine.mock.calls[0];
@@ -151,11 +151,11 @@ describe('Minimap', () => {
       withTransform: vi.fn((_position, _angle, draw: () => void) => draw()),
     } as unknown as Drawing;
 
-    new Minimap().draw(drawing, exploration, buildModel(false), camera);
+    new Minimap().draw(drawing, exploration, buildModel(false), camera, undefined);
     expect(drawing.circle).not.toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
 
     (drawing.circle as ReturnType<typeof vi.fn>).mockClear();
-    new Minimap().draw(drawing, exploration, buildModel(true), camera);
+    new Minimap().draw(drawing, exploration, buildModel(true), camera, undefined);
     expect(drawing.circle).toHaveBeenCalledWith(expect.any(Object), 1.6, 'rgba(146,164,186,.72)');
   });
 
@@ -186,12 +186,12 @@ describe('Minimap', () => {
       withTransform: vi.fn((_position: unknown, _angle: unknown, draw: () => void) => draw()),
     } as unknown as Drawing;
 
-    new Minimap().draw(drawing, exploration, model, camera);
+    new Minimap().draw(drawing, exploration, model, camera, undefined);
     expect(drawing.circle).not.toHaveBeenCalledWith(expect.any(Object), 2.6, '#ff6a4a');
 
     exploration.observe({ left: -250, top: -250, right: 250, bottom: 250 });
     (drawing.circle as ReturnType<typeof vi.fn>).mockClear();
-    new Minimap().draw(drawing, exploration, model, camera);
+    new Minimap().draw(drawing, exploration, model, camera, undefined);
     expect(drawing.circle).toHaveBeenCalledWith(expect.any(Object), 2.6, '#ff6a4a');
   });
 
@@ -227,7 +227,7 @@ describe('Minimap', () => {
     const camera = new Camera();
     camera.update(ship.position, { x: 0, y: 0 }, 1);
 
-    new Minimap().draw(drawing, exploration, model, camera);
+    new Minimap().draw(drawing, exploration, model, camera, undefined);
 
     const drewMassiveOutline = polygon.mock.calls.some((call) =>
       call[1] === 'rgba(90,112,132,.74)' && call[2] === 'rgba(157,203,220,.82)');
@@ -256,7 +256,7 @@ describe('Minimap', () => {
     const line = vi.fn();
     const fillPolygons = vi.fn();
     const drawing = {
-      size: { width: 1000, height: 700 },
+      size: { width: 10000, height: 10000 },
       rectangle: vi.fn(),
       circle,
       polygon,
@@ -270,7 +270,7 @@ describe('Minimap', () => {
     const camera = new Camera();
     camera.update(ship.position, { x: 0, y: 0 }, 1);
 
-    new Minimap().draw(drawing, exploration, model, camera);
+    new Minimap().draw(drawing, exploration, model, camera, undefined);
 
     const hullDrawn = circle.mock.calls.some((call) => call[2] === '#0c0c0e');
     expect(hullDrawn).toBe(true);

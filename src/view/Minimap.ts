@@ -40,7 +40,7 @@ export class Minimap {
       this.drawSupplies(drawing, exploration, model.supplyField, center, position, size, span);
       this.drawDrones(drawing, exploration, model.droneField, center, position, size, span);
       this.drawPirates(drawing, exploration, model.pirateField, center, position, size, span);
-      this.drawStation(drawing, exploration, stationRoof, model, center, position, size, span);
+      this.drawStation(drawing, exploration, stationRoof, model, camera, center, position, size, span);
       this.drawShip(drawing, model.ship.angle, position, size);
       this.drawSignal(drawing, model, position, size, center);
     });
@@ -175,6 +175,7 @@ export class Minimap {
     exploration: ExplorationMap,
     roof: StationRoof | undefined,
     model: Model.Game,
+    camera: Camera,
     worldCenter: Vec2,
     position: Vec2,
     size: Size,
@@ -195,10 +196,19 @@ export class Minimap {
 
     // Use the roof's line-of-sight reveal state (not the coarse camera-bounds
     // exploration) for station interior elements, so walls and floor only show
-    // where the ship has actually seen them.
+    // where the ship has actually seen them. Constrain to the camera's visible
+    // range so distant revealed areas don't show on the minimap.
     const cellSize = station.carver?.cellSize ?? 60;
+    const camRadius = camera.getVisibleWorldRadius(drawing.size);
+    const camPos = camera.worldPosition;
+    const inCameraRange = (p: Vec2): boolean => {
+      const dx = p.x - camPos.x;
+      const dy = p.y - camPos.y;
+      return dx * dx + dy * dy <= camRadius * camRadius;
+    };
     const revealed = (worldPoint: Vec2): boolean =>
-      roof ? roof.isAreaRevealed(station, worldPoint, cellSize) : exploration.isExplored(worldPoint);
+      inCameraRange(worldPoint) &&
+      (roof ? roof.isAreaRevealed(station, worldPoint, cellSize) : exploration.isExplored(worldPoint));
 
     // Draw revealed carved floor cells only — rock between walls stays dark.
     const carver = station.carver;
