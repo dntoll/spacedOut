@@ -263,8 +263,26 @@ export class StationGenerator {
     // sections, reject this seed and retry.
     if (!this.preservesReachability(carver, entranceCell, gateCells, switchCells, centralCell, [], 0)) return null;
 
-    // --- Machinery (skipped while wall geometry is reworked; restored later) --
-    const machinery: StationMachinery[] = [];
+    // --- Machinery (smaller pillars, never blocking the critical path) -------
+    const machineryRadius = R * MACHINERY_RADIUS_FRACTION;
+    const machineryCandidates: Vec2[] = [];
+    for (const p of placements.values()) {
+      if (p.kind === 'entrance') continue;
+      machineryCandidates.push({ x: p.local.x + jitter(p.hw * 0.25), y: p.local.y + jitter(p.hh * 0.25) });
+    }
+    for (let i = machineryCandidates.length - 1; i > 0; i--) {
+      const j = random.integer(0, i + 1);
+      [machineryCandidates[i], machineryCandidates[j]] = [machineryCandidates[j], machineryCandidates[i]];
+    }
+    const acceptedMachinery: Vec2[] = [];
+    for (const candidate of machineryCandidates) {
+      const trial = [...acceptedMachinery, candidate];
+      if (this.preservesReachability(carver, entranceCell, gateCells, switchCells, centralCell, trial, machineryRadius)) {
+        acceptedMachinery.push(candidate);
+      }
+    }
+    const machinery: StationMachinery[] = acceptedMachinery.map((local) =>
+      new StationMachinery(localToWorld(local), machineryRadius, random.between(0, Math.PI * 2), random.integer(0, 4)));
 
     // --- Collectibles --------------------------------------------------------
     const sw1 = switchRoomPlacement[0]!;

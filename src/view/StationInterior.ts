@@ -4,13 +4,14 @@ import type { Drawing } from './Drawing';
 import type { StarLight } from './StarLight';
 import { drawWallChain } from './StationOutline';
 
-const FLOOR_FILL = '#4a3620';
-const FLOOR_TINT = 'rgba(90,66,40,.22)';
-const INTERIOR_WALL_FILL = '#3a2418';
-const INTERIOR_WALL_FACE = '#5a3a22';
-const CENTRAL_FLOOR = 'rgba(70,52,34,.28)';
-const CENTRAL_RING = 'rgba(180,120,72,.35)';
-const CENTRAL_DOME = 'rgba(120,84,52,.16)';
+const ROOF_FILL = '#15151a';
+const FLOOR_FILL = '#3a3a40';
+const FLOOR_TINT = 'rgba(120,120,130,.18)';
+const INTERIOR_WALL_FILL = '#2a2a30';
+const INTERIOR_WALL_FACE = '#4a4a52';
+const CENTRAL_FLOOR = 'rgba(90,90,100,.24)';
+const CENTRAL_RING = 'rgba(170,170,180,.30)';
+const CENTRAL_DOME = 'rgba(110,110,120,.14)';
 
 export class StationInterior {
   draw(drawing: Drawing, station: Model.Station, starLight: StarLight, zoom: number): void {
@@ -18,6 +19,7 @@ export class StationInterior {
     const rotation = station.entranceAngle;
     const lineWidth = Math.max(1, 2 / zoom);
 
+    this.drawRoof(drawing, station);
     this.drawFloor(drawing, station);
 
     for (const room of station.rooms) {
@@ -55,6 +57,13 @@ export class StationInterior {
       const lineWidth = Math.max(2, wall.wallRadius * 2);
       drawWallChain(drawing, wall, INTERIOR_WALL_FILL, INTERIOR_WALL_FACE, lineWidth);
     });
+  }
+
+  private drawRoof(drawing: Drawing, station: Model.Station): void {
+    // The rock disc is one filled circle of the station radius; the floor pass
+    // overdraws the carved rooms and corridors on top. One fill instead of
+    // thousands of per-cell quads.
+    drawing.circle(station.center!, station.outerRadius, ROOF_FILL);
   }
 
   private drawFloor(drawing: Drawing, station: Model.Station): void {

@@ -112,11 +112,11 @@ export class Station {
 
   forEachObstacleNear(position: Vec2, radius: number, visitor: (obstacle: ShipObstacle) => void): void {
     if (!this.layout) return;
-    const reachSq = (radius + this.layout.outerRadius) * (radius + this.layout.outerRadius);
     this.forEachObstacle((obstacle) => {
       const dx = obstacle.position.x - position.x;
       const dy = obstacle.position.y - position.y;
-      if (dx * dx + dy * dy <= reachSq + obstacle.radius * obstacle.radius) visitor(obstacle);
+      const reach = radius + obstacle.radius;
+      if (dx * dx + dy * dy <= reach * reach) visitor(obstacle);
     });
   }
 

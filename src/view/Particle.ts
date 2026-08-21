@@ -2,6 +2,8 @@ import { add, scale } from '../math';
 import type { Vec2 } from '../types';
 
 export class Particle {
+  bounces = 0;
+
   constructor(
     public position: Vec2,
     public velocity: Vec2,

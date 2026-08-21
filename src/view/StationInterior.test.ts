@@ -49,8 +49,8 @@ describe('StationInterior', () => {
 
     new StationInterior().draw(drawing, station, new StarLight(), 1);
 
-    const floor = fills.find((f) => isOpaque(f.fill));
-    expect(floor).toBeDefined();
+    const opaqueFills = fills.filter((f) => isOpaque(f.fill));
+    expect(opaqueFills.length).toBeGreaterThan(0);
 
     const carver = station.carver!;
     const center = station.center!;
@@ -61,7 +61,7 @@ describe('StationInterior', () => {
       for (let c = 0; c < carver.gridN; c++) {
         if (carver.bitmap[r * carver.gridN + c] !== 1) continue;
         const world = carver.localToWorld(carver.cellCenterLocal(c, r), center, rotation);
-        if (!floor!.paths.some((quad) => pointInPolygon(world, quad))) uncovered++;
+        if (!opaqueFills.some((f) => f.paths.some((quad) => pointInPolygon(world, quad)))) uncovered++;
         // Confirm a corridor cell (adjacent to two carved neighbours along an axis)
         // is covered, not just the named rooms.
         const left = c > 0 && carver.bitmap[r * carver.gridN + (c - 1)] === 1;

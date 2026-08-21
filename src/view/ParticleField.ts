@@ -19,6 +19,7 @@ const TARGET_POPULATION = 240;
 const MAX_POPULATION = 600;
 const DUST_RADIUS = 1.2;
 const BOUNCE_DAMPING = 0.85;
+const MAX_BOUNCES = 2;
 const CULL_MARGIN = 500;
 
 const DUST_COLOR = { r: 120, g: 200, b: 235 };
@@ -272,9 +273,11 @@ export class ParticleField {
       });
     }
 
-    for (const particle of this.particles) {
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const particle = this.particles[i];
       for (const circle of circles) this.bounceCircle(particle, circle);
       for (const asteroid of massives) this.bounceMassive(particle, asteroid);
+      if (particle.bounces > MAX_BOUNCES) this.particles.splice(i, 1);
     }
   }
 
@@ -290,7 +293,10 @@ export class ParticleField {
     const normal = { x: dx / dist, y: dy / dist };
     particle.position = add(circle.position, scale(normal, minDist));
     const vn = dot(particle.velocity, normal);
-    if (vn < 0) particle.velocity = sub(particle.velocity, scale(normal, (1 + BOUNCE_DAMPING) * vn));
+    if (vn < 0) {
+      particle.velocity = sub(particle.velocity, scale(normal, (1 + BOUNCE_DAMPING) * vn));
+      particle.bounces++;
+    }
   }
 
   private bounceMassive(particle: Particle, collider: MassiveCollider): void {
@@ -330,6 +336,7 @@ export class ParticleField {
           x: bounced.x * collider.cos - bounced.y * collider.sin,
           y: bounced.x * collider.sin + bounced.y * collider.cos,
         };
+        particle.bounces++;
       }
       return;
     }
@@ -357,6 +364,7 @@ export class ParticleField {
         x: bounced.x * collider.cos - bounced.y * collider.sin,
         y: bounced.x * collider.sin + bounced.y * collider.cos,
       };
+      particle.bounces++;
     }
   }
 

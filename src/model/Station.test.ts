@@ -63,7 +63,7 @@ const reachable = (station: Station, target: { c: number; r: number }, openGates
 };
 
 describe('Station', () => {
-  it('REQ-79 builds a maze-scale station with an entrance, central chamber, walls, and collectibles', () => {
+  it('REQ-79 builds a maze-scale station with an entrance, central chamber, walls, machinery, and collectibles', () => {
     const ship = new Ship();
     const station = placeStation();
     expect(station.isPlaced).toBe(true);
@@ -73,10 +73,13 @@ describe('Station', () => {
     expect(station.centralRadius).toBeGreaterThan(0);
 
     let wallCount = 0;
+    let machineryCount = 0;
     let collectibleCount = 0;
     station.forEachWall(() => wallCount++);
+    station.forEachMachinery(() => machineryCount++);
     station.forEachCollectible(() => collectibleCount++);
     expect(wallCount).toBeGreaterThan(1);
+    expect(machineryCount).toBeGreaterThan(0);
     expect(collectibleCount).toBeGreaterThan(0);
   });
 
