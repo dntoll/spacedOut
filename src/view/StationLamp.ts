@@ -6,11 +6,12 @@ import { isWallChain } from '../model/SweptCircleCollision';
 import { wallChainWorldVertices } from '../model/WallChainCollision';
 
 // Darkness levels for the unified offscreen multiply pass. The lamp owns the
-// single darkness composite: revealed-but-unlit cells are dim, unrevealed cells
-// are near-black (concealed, per REQ-86), and the lamp's radial light lifts lit
-// cells to bright. Paint order on the offscreen layer is dim -> lamp -> black so
-// the lamp can brighten revealed areas but unrevealed black always conceals.
-const DIM_ALPHA = 0.85;
+// single darkness composite: every unlit carved cell — revealed or not — is
+// full black, matching the roof between walls so dark areas read as one tone.
+// The lamp's radial light lifts lit cells to bright. Paint order on the offscreen
+// layer is dim -> lamp -> black so the lamp can brighten revealed areas but
+// unrevealed black always conceals.
+const DIM_ALPHA = 1.0;
 const BLACK_ALPHA = 1.0;
 const RAY_COUNT = 180;
 

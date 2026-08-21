@@ -4,7 +4,7 @@ import type { Drawing } from './Drawing';
 import type { StarLight } from './StarLight';
 import { drawWallChain } from './StationOutline';
 
-const ROOF_FILL = '#15151a';
+const ROOF_FILL = '#000000';
 const FLOOR_FILL = '#3a3a40';
 const FLOOR_TINT = 'rgba(120,120,130,.18)';
 const INTERIOR_WALL_FILL = '#2a2a30';
