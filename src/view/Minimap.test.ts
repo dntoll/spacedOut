@@ -254,12 +254,14 @@ describe('Minimap', () => {
     const circle = vi.fn();
     const polygon = vi.fn();
     const line = vi.fn();
+    const fillPolygons = vi.fn();
     const drawing = {
       size: { width: 1000, height: 700 },
       rectangle: vi.fn(),
       circle,
       polygon,
       line,
+      fillPolygons,
       dashedLine: vi.fn(),
       arc: vi.fn(),
       withClipRectangle: vi.fn((_position: unknown, _size: unknown, draw: () => void) => draw()),
@@ -270,9 +272,9 @@ describe('Minimap', () => {
 
     new Minimap().draw(drawing, exploration, model, camera);
 
-    const hullDrawn = circle.mock.calls.some((call) => call[2] === 'rgba(40,24,12,.4)');
+    const hullDrawn = circle.mock.calls.some((call) => call[2] === '#0c0c0e');
     expect(hullDrawn).toBe(true);
-    const wallDrawn = line.mock.calls.some((call) => call[2] === 'rgba(58,36,24,.5)');
+    const wallDrawn = line.mock.calls.some((call) => call[2] === 'rgba(58,58,64,.5)');
     expect(wallDrawn).toBe(true);
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.8, '#5de0ff');
     expect(circle).toHaveBeenCalledWith(expect.any(Object), 1.6, '#e8923a');

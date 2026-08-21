@@ -240,7 +240,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
       if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship, this.starLight, casters);
     });
     this.background.drawVignette(this.drawing);
-    this.minimap.draw(this.drawing, this.explorationMap, model, this.camera);
+    this.minimap.draw(this.drawing, this.explorationMap, model, this.camera, this.station.roof);
     this.signalIndicator.draw(this.drawing, model, this.camera);
     this.hud.updateSpeed(model.speed, model.damageSpeedThreshold);
     this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);

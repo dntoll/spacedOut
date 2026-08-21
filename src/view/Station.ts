@@ -13,7 +13,7 @@ export class Station {
   private readonly interior = new StationInterior();
   private readonly fixtures = new StationFixtures();
   private readonly lamp = new StationLamp();
-  private readonly roof = new StationRoof();
+  readonly roof = new StationRoof();
 
   reset(): void {
     this.lamp.reset();
@@ -22,6 +22,9 @@ export class Station {
 
   draw(drawing: Drawing, station: Model.Station, starLight: StarLight, zoom: number, shipPosition: Vec2, cameraPosition: Vec2, lampRadius: number, bare = false): void {
     if (!station.isPlaced) return;
+    // Update the roof's line-of-sight reveal tracking every frame so the
+    // minimap can query it regardless of whether the lamp renders.
+    this.roof.update(station, shipPosition);
     this.interior.draw(drawing, station, starLight, zoom);
     // Crates and doors render before the darkness composite so they are hidden
     // until the lamp lights them; switches and supply containers glow on top.

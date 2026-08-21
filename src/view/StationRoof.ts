@@ -65,6 +65,32 @@ export class StationRoof {
     return this.revealedCells.has(fine.key(cell.fc, cell.fr));
   }
 
+  // True if any revealed fine cell is within `radius` of `worldPoint`. Used for
+  // wall visibility on the minimap: wall vertices sit on cell boundaries (rock
+  // side), so isRevealedAt returns false for them even when the adjacent floor
+  // is revealed. This checks a neighborhood instead.
+  isAreaRevealed(station: Model.Station, worldPoint: Vec2, radius: number): boolean {
+    const fine = this.fine;
+    const carver = station.carver;
+    if (!fine || !carver) return false;
+    const local = carver.worldToLocal(worldPoint, station.center!, station.entranceAngle);
+    const center = fine.toCell(local);
+    const cellRange = Math.ceil(radius / fine.size);
+    for (let dr = -cellRange; dr <= cellRange; dr++) {
+      for (let dc = -cellRange; dc <= cellRange; dc++) {
+        const fc = center.fc + dc;
+        const fr = center.fr + dr;
+        if (!fine.inBounds(fc, fr)) continue;
+        if (!this.revealedCells.has(fine.key(fc, fr))) continue;
+        const cl = fine.centerLocal(fc, fr);
+        const dx = cl.x - local.x;
+        const dy = cl.y - local.y;
+        if (dx * dx + dy * dy <= radius * radius) return true;
+      }
+    }
+    return false;
+  }
+
   // World-space fine-cell quads split into unrevealed (black) and revealed (dim),
   // cached per reveal version so it is only rebuilt when the ship reveals new area.
   computeDarknessPaths(station: Model.Station): DarknessPaths {

@@ -4,6 +4,7 @@ import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
 import type { Drawing, Size } from './Drawing';
 import { ExplorationMap } from './ExplorationMap';
+import type { StationRoof } from './StationRoof';
 
 const DEFAULT_WORLD_SPAN = 8000;
 const TRAVEL_WORLD_SPAN = 16000;
@@ -16,6 +17,7 @@ export class Minimap {
     exploration: ExplorationMap,
     model: Model.Game,
     camera: Camera,
+    stationRoof?: StationRoof,
   ): void {
     const span = model.mission.isTraversal ? TRAVEL_WORLD_SPAN : DEFAULT_WORLD_SPAN;
     const compact = drawing.size.width <= 520;
@@ -38,7 +40,7 @@ export class Minimap {
       this.drawSupplies(drawing, exploration, model.supplyField, center, position, size, span);
       this.drawDrones(drawing, exploration, model.droneField, center, position, size, span);
       this.drawPirates(drawing, exploration, model.pirateField, center, position, size, span);
-      this.drawStation(drawing, exploration, model, center, position, size, span);
+      this.drawStation(drawing, exploration, stationRoof, model, center, position, size, span);
       this.drawShip(drawing, model.ship.angle, position, size);
       this.drawSignal(drawing, model, position, size, center);
     });
@@ -171,6 +173,7 @@ export class Minimap {
   private drawStation(
     drawing: Drawing,
     exploration: ExplorationMap,
+    roof: StationRoof | undefined,
     model: Model.Game,
     worldCenter: Vec2,
     position: Vec2,
@@ -184,22 +187,62 @@ export class Minimap {
     const mapCenter = this.toMap(stationCenter, worldCenter, position, size, span);
     const scale = size.width / span;
     const hullRadius = station.outerRadius * scale;
-    if (hullRadius >= 1.5 && exploration.isExplored(stationCenter)) {
-      drawing.circle(mapCenter, hullRadius, 'rgba(40,24,12,.4)', 'rgba(150,96,56,.6)', 1);
+
+    // Opaque dark disc covers the coarse exploration tint inside the station.
+    if (hullRadius >= 1.5) {
+      drawing.circle(mapCenter, hullRadius, '#0c0c0e', 'rgba(150,150,160,.6)', 1);
     }
-    if (exploration.isExplored(station.centralCenter!, station.centralRadius)) {
-      drawing.circle(this.toMap(station.centralCenter!, worldCenter, position, size, span), station.centralRadius * scale, 'rgba(70,52,34,.35)', 'rgba(180,120,72,.4)', 0.5);
+
+    // Use the roof's line-of-sight reveal state (not the coarse camera-bounds
+    // exploration) for station interior elements, so walls and floor only show
+    // where the ship has actually seen them.
+    const cellSize = station.carver?.cellSize ?? 60;
+    const revealed = (worldPoint: Vec2): boolean =>
+      roof ? roof.isAreaRevealed(station, worldPoint, cellSize) : exploration.isExplored(worldPoint);
+
+    // Draw revealed carved floor cells only — rock between walls stays dark.
+    const carver = station.carver;
+    if (carver && hullRadius >= 1.5) {
+      const center = station.center!;
+      const rotation = station.entranceAngle;
+      const halfCell = carver.cellSize / 2;
+      const floorPaths: Vec2[][] = [];
+      for (let r = 0; r < carver.gridN; r++) {
+        for (let c = 0; c < carver.gridN; c++) {
+          if (carver.bitmap[r * carver.gridN + c] !== 1) continue;
+          const local = carver.cellCenterLocal(c, r);
+          const world = carver.localToWorld(local, center, rotation);
+          if (!revealed(world)) continue;
+          const corners: Vec2[] = [
+            { x: local.x - halfCell, y: local.y - halfCell },
+            { x: local.x + halfCell, y: local.y - halfCell },
+            { x: local.x + halfCell, y: local.y + halfCell },
+            { x: local.x - halfCell, y: local.y + halfCell },
+          ];
+          floorPaths.push(corners.map((p) => {
+            const w = carver.localToWorld(p, center, rotation);
+            return this.toMap(w, worldCenter, position, size, span);
+          }));
+        }
+      }
+      if (floorPaths.length > 0) drawing.fillPolygons(floorPaths, 'rgba(70,70,78,.45)');
     }
-    const drawChain = (wall: Model.StationContour, fill: string, stroke: string): void => {
-      if (!exploration.isCircleExplored(wall.position, wall.radius)) return;
+
+    if (revealed(station.centralCenter!)) {
+      drawing.circle(this.toMap(station.centralCenter!, worldCenter, position, size, span), station.centralRadius * scale, 'rgba(90,90,100,.3)', 'rgba(170,170,180,.4)', 0.5);
+    }
+    const drawChain = (wall: Model.StationContour, fill: string, stroke: string, alwaysVisible = false): void => {
+      // A wall is visible if any of its vertices has been revealed, or if it is
+      // the exterior hull (visible from outside the station).
+      const cos = Math.cos(wall.angle);
+      const sin = Math.sin(wall.angle);
+      const worldVerts = wall.localVertices.map((v) => ({
+        x: wall.position.x + v.x * cos - v.y * sin,
+        y: wall.position.y + v.x * sin + v.y * cos,
+      }));
+      if (!alwaysVisible && !worldVerts.some((v) => revealed(v))) return;
       if (!this.intersectsMap(wall.position, wall.radius, worldCenter, span)) return;
-      const pts = wall.localVertices.map((v) => {
-        const cos = Math.cos(wall.angle);
-        const sin = Math.sin(wall.angle);
-        const wx = wall.position.x + v.x * cos - v.y * sin;
-        const wy = wall.position.y + v.x * sin + v.y * cos;
-        return this.toMap({ x: wx, y: wy }, worldCenter, position, size, span);
-      });
+      const pts = worldVerts.map((v) => this.toMap(v, worldCenter, position, size, span));
       const n = pts.length;
       const edgeCount = wall.closed ? n : n - 1;
       for (let i = 0; i < edgeCount; i++) {
@@ -209,20 +252,22 @@ export class Minimap {
         drawing.line(pts[i], pts[(i + 1) % n], stroke, 0.5);
       }
     };
-    station.forEachHullWall((wall) => drawChain(wall, 'rgba(58,36,24,.5)', 'rgba(150,96,56,.6)'));
-    station.forEachInteriorWall((wall) => drawChain(wall, 'rgba(58,36,24,.35)', 'rgba(120,68,42,.4)'));
+    // The outer hull is visible from outside the station, so always draw it once
+    // the station is on the minimap. Interior walls require line-of-sight reveal.
+    station.forEachHullWall((wall) => drawChain(wall, 'rgba(58,58,64,.5)', 'rgba(150,150,160,.6)', true));
+    station.forEachInteriorWall((wall) => drawChain(wall, 'rgba(58,58,64,.35)', 'rgba(120,120,130,.4)', false));
     station.forEachGate((gate) => {
-      if (!exploration.isExplored(gate.position)) return;
+      if (!revealed(gate.position)) return;
       const p = this.toMap(gate.position, worldCenter, position, size, span);
       drawing.circle(p, 1.6, gate.open ? 'rgba(86,200,140,.6)' : '#e8923a');
     });
     station.forEachSwitch((sw) => {
-      if (!exploration.isExplored(sw.position)) return;
+      if (!revealed(sw.position)) return;
       const p = this.toMap(sw.position, worldCenter, position, size, span);
       drawing.circle(p, 1.8, sw.activated ? '#5dff9a' : '#5de0ff');
     });
     station.forEachCollectible((container) => {
-      if (!exploration.isExplored(container.position)) return;
+      if (!revealed(container.position)) return;
       const p = this.toMap(container.position, worldCenter, position, size, span);
       drawing.circle(p, 1.6, container instanceof Model.HpContainer ? '#5dff9a' : container instanceof Model.AmmoContainer ? '#c98bff' : '#ffc35c');
     });
