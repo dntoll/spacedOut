@@ -50,4 +50,29 @@ describe('StationContourTracer', () => {
     expect(contours[0].closed).toBe(false);
     expect(contours[0].points).toHaveLength(3);
   });
+
+  it('collapses a diagonal staircase into straight diagonal edges', () => {
+    // A 2-wide diagonal corridor: cells form a staircase pattern, so the traced
+    // boundary staircases. The simplification should collapse those into diagonal
+    // edges, reducing the vertex count and producing non-axis-aligned edges.
+    const { isCarved, isRock } = grid(
+      [[1, 1], [2, 1], [2, 2], [3, 2], [3, 3], [4, 3]],
+      6,
+    );
+    const contours = traceContours(6, 1, 3, isCarved, isRock);
+    expect(contours).toHaveLength(1);
+    expect(contours[0].closed).toBe(true);
+    const pts = contours[0].points;
+    // Without simplification this would have ~12+ vertices; the diagonal
+    // collapse should reduce it substantially.
+    expect(pts.length).toBeLessThan(10);
+    // At least one edge should be diagonal (both dx and dy nonzero).
+    let hasDiagonal = false;
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      if (Math.abs(b.x - a.x) > 0.01 && Math.abs(b.y - a.y) > 0.01) { hasDiagonal = true; break; }
+    }
+    expect(hasDiagonal).toBe(true);
+  });
 });

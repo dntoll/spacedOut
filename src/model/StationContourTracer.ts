@@ -93,7 +93,7 @@ export function traceContours(
       pts.push(toLocal(next.ax, next.ay));
       cur = next;
     }
-    contours.push({ points: mergeCollinear(pts, closed), closed });
+    contours.push({ points: mergeCollinear(simplifyStaircases(pts, closed), closed), closed });
   }
   return contours;
 }
@@ -125,4 +125,68 @@ const mergeCollinear = (pts: Vec2[], closed: boolean): Vec2[] => {
     out.push(pts[i]);
   }
   return out;
+};
+
+// Detect staircase runs (alternating perpendicular axis-aligned edges of equal
+// length, 6+ edges — long enough to be a diagonal corridor, not an L-corner) and
+// collapse each into a single diagonal edge from the first point to the last.
+const simplifyStaircases = (pts: Vec2[], closed: boolean): Vec2[] => {
+  const n = pts.length;
+  if (n < 5) return pts;
+  const edgeCount = closed ? n : n - 1;
+
+  type QE = { sx: number; sy: number; len: number } | null;
+  const edges: QE[] = [];
+  for (let i = 0; i < edgeCount; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % n];
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) { edges.push(null); continue; }
+    if (Math.abs(dy) < 1e-9) edges.push({ sx: Math.sign(dx), sy: 0, len: Math.abs(dx) });
+    else if (Math.abs(dx) < 1e-9) edges.push({ sx: 0, sy: Math.sign(dy), len: Math.abs(dy) });
+    else edges.push(null);
+  }
+
+  const keep = new Array(n).fill(true);
+
+  const runLength = (start: number): number => {
+    const e0 = edges[start];
+    if (!e0) return 0;
+    const len = e0.len;
+    let hSign = 0;
+    let vSign = 0;
+    let lastH = e0.sx !== 0;
+    if (lastH) hSign = e0.sx; else vSign = e0.sy;
+    let end = start + 1;
+    while (end < edgeCount) {
+      const e = edges[end];
+      if (!e || e.len !== len) break;
+      const isH = e.sx !== 0;
+      if (isH === lastH) break;
+      if (isH) {
+        if (hSign === 0) hSign = e.sx;
+        else if (e.sx !== hSign) break;
+      } else {
+        if (vSign === 0) vSign = e.sy;
+        else if (e.sy !== vSign) break;
+      }
+      lastH = isH;
+      end++;
+    }
+    return end - start;
+  };
+
+  let i = 0;
+  while (i < edgeCount) {
+    const run = runLength(i);
+    if (run >= 6) {
+      for (let k = i + 1; k < i + run; k++) keep[k % n] = false;
+      i += run;
+    } else {
+      i++;
+    }
+  }
+
+  return pts.filter((_, idx) => keep[idx]);
 };
