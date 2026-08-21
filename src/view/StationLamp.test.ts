@@ -34,6 +34,7 @@ const pointInPolygon = (p: Vec2, poly: Vec2[]): boolean => {
 interface Capture {
   drawing: Drawing;
   darkPaths: Vec2[][];
+  darkCircle: { center: Vec2; radius: number } | null;
   litPolygon: Vec2[];
   beginShadow: number;
   endShadow: number;
@@ -43,6 +44,7 @@ const capture = (): Capture => {
   const cap: Capture = {
     drawing: null as unknown as Drawing,
     darkPaths: [],
+    darkCircle: null,
     litPolygon: [],
     beginShadow: 0,
     endShadow: 0,
@@ -55,6 +57,7 @@ const capture = (): Capture => {
     withCamera: (_position: unknown, _zoom: number, draw: () => void) => draw(),
     fillPolygons: (paths: Vec2[][], _fill: Paint) => { cap.darkPaths.push(...paths); },
     polygon: (points: Vec2[], _fill: Paint) => { cap.litPolygon = points; },
+    circle: (center: Vec2, radius: number, _fill: Paint) => { cap.darkCircle = { center: { ...center }, radius }; },
   } as unknown as Drawing;
   return cap;
 };
@@ -73,8 +76,15 @@ const carveableCellCenters = (station: Station): Vec2[] => {
   return out;
 };
 
-const darkCovers = (cap: Capture, point: Vec2): boolean =>
-  cap.darkPaths.some((quad) => pointInPolygon(point, quad));
+const darkCovers = (cap: Capture, point: Vec2): boolean => {
+  if (cap.darkPaths.some((quad) => pointInPolygon(point, quad))) return true;
+  if (cap.darkCircle) {
+    const dx = point.x - cap.darkCircle.center.x;
+    const dy = point.y - cap.darkCircle.center.y;
+    if (dx * dx + dy * dy <= cap.darkCircle.radius * cap.darkCircle.radius) return true;
+  }
+  return false;
+};
 
 const roomCenter = (station: Station, kind: string, index: number): Vec2 => {
   const room = station.rooms.find((r) => r.kind === kind && r.index === index);
@@ -204,10 +214,10 @@ describe('StationLamp', () => {
 
     lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, 0, roof);
 
-    // Darkness still renders (conceals unrevealed interior).
+    // Darkness still renders (conceals interior).
     expect(cap.beginShadow).toBe(1);
     expect(cap.composite).toBe(1);
-    expect(cap.darkPaths.length).toBeGreaterThan(0);
+    expect(cap.darkCircle).not.toBeNull();
     // No lamp light polygon.
     expect(cap.litPolygon.length).toBe(0);
   });

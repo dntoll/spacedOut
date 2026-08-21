@@ -250,7 +250,7 @@ describe('Minimap', () => {
       elapsed: 0,
     } as unknown as Model.Game;
     const exploration = new ExplorationMap();
-    exploration.observe({ left: -1200, top: -1200, right: 1200, bottom: 1200 });
+    exploration.observe({ left: -3500, top: -3500, right: 3500, bottom: 3500 });
     const circle = vi.fn();
     const polygon = vi.fn();
     const line = vi.fn();

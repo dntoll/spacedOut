@@ -5,15 +5,13 @@ import type { StationRoof } from './StationRoof';
 import { isWallChain } from '../model/SweptCircleCollision';
 import { wallChainWorldVertices } from '../model/WallChainCollision';
 
-// Darkness levels for the unified offscreen multiply pass. The lamp owns the
-// single darkness composite: every unlit carved cell — revealed or not — is
-// full black, matching the roof between walls so dark areas read as one tone.
-// The lamp's radial light lifts lit cells to bright. Paint order on the offscreen
-// layer is dim -> lamp -> black so the lamp can brighten revealed areas but
-// unrevealed black always conceals.
-const DIM_ALPHA = 1.0;
+// The lamp owns a single multiply-composite pass: a black disc covers the entire
+// station (so everything starts dark — roof, floor, and walls alike), then the
+// lamp's visibility polygon lifts lit cells to bright. Visibility is wall-accurate
+// (raycast against wall segments including diagonal edges), not cell-approximate,
+// so nothing beyond a wall or closed door is visible regardless of bitmap state.
 const BLACK_ALPHA = 1.0;
-const RAY_COUNT = 180;
+const RAY_COUNT = 360;
 
 interface Segment { ax: number; ay: number; bx: number; by: number }
 
@@ -28,11 +26,12 @@ export class StationLamp {
     if (!station.isPlaced) return;
     roof.update(station, shipPosition);
     this.polygon = radius > 0 ? this.computeVisibility(station, shipPosition, radius) : [];
-    const { black, dim } = roof.computeDarknessPaths(station);
 
     drawing.beginShadowLayer();
     drawing.withCamera(cameraPosition, zoom, () => {
-      if (dim.length > 0) drawing.fillPolygons(dim, `rgba(0,0,0,${DIM_ALPHA})`);
+      // Black disc over the entire station: everything starts dark (roof, floor,
+      // walls), so nothing beyond a wall is visible regardless of bitmap state.
+      drawing.circle(station.center!, station.outerRadius, `rgba(0,0,0,${BLACK_ALPHA})`);
       if (this.polygon.length >= 3) {
         const paint: RadialPaint = {
           from: { ...shipPosition }, fromRadius: 0,
@@ -46,7 +45,6 @@ export class StationLamp {
         };
         drawing.polygon(this.polygon, paint);
       }
-      if (black.length > 0) drawing.fillPolygons(black, `rgba(0,0,0,${BLACK_ALPHA})`);
     });
     drawing.endShadowLayer();
     drawing.compositeShadowLayer('multiply');

@@ -38,7 +38,7 @@ export class Minimap {
       this.drawSupplies(drawing, exploration, model.supplyField, center, position, size, span);
       this.drawDrones(drawing, exploration, model.droneField, center, position, size, span);
       this.drawPirates(drawing, exploration, model.pirateField, center, position, size, span);
-      this.drawStation(drawing, model, center, position, size, span);
+      this.drawStation(drawing, exploration, model, center, position, size, span);
       this.drawShip(drawing, model.ship.angle, position, size);
       this.drawSignal(drawing, model, position, size, center);
     });
@@ -170,6 +170,7 @@ export class Minimap {
 
   private drawStation(
     drawing: Drawing,
+    exploration: ExplorationMap,
     model: Model.Game,
     worldCenter: Vec2,
     position: Vec2,
@@ -183,9 +184,14 @@ export class Minimap {
     const mapCenter = this.toMap(stationCenter, worldCenter, position, size, span);
     const scale = size.width / span;
     const hullRadius = station.outerRadius * scale;
-    if (hullRadius >= 1.5) drawing.circle(mapCenter, hullRadius, 'rgba(40,24,12,.4)', 'rgba(150,96,56,.6)', 1);
-    drawing.circle(this.toMap(station.centralCenter!, worldCenter, position, size, span), station.centralRadius * scale, 'rgba(70,52,34,.35)', 'rgba(180,120,72,.4)', 0.5);
+    if (hullRadius >= 1.5 && exploration.isExplored(stationCenter)) {
+      drawing.circle(mapCenter, hullRadius, 'rgba(40,24,12,.4)', 'rgba(150,96,56,.6)', 1);
+    }
+    if (exploration.isExplored(station.centralCenter!, station.centralRadius)) {
+      drawing.circle(this.toMap(station.centralCenter!, worldCenter, position, size, span), station.centralRadius * scale, 'rgba(70,52,34,.35)', 'rgba(180,120,72,.4)', 0.5);
+    }
     const drawChain = (wall: Model.StationContour, fill: string, stroke: string): void => {
+      if (!exploration.isCircleExplored(wall.position, wall.radius)) return;
       if (!this.intersectsMap(wall.position, wall.radius, worldCenter, span)) return;
       const pts = wall.localVertices.map((v) => {
         const cos = Math.cos(wall.angle);
@@ -206,14 +212,17 @@ export class Minimap {
     station.forEachHullWall((wall) => drawChain(wall, 'rgba(58,36,24,.5)', 'rgba(150,96,56,.6)'));
     station.forEachInteriorWall((wall) => drawChain(wall, 'rgba(58,36,24,.35)', 'rgba(120,68,42,.4)'));
     station.forEachGate((gate) => {
+      if (!exploration.isExplored(gate.position)) return;
       const p = this.toMap(gate.position, worldCenter, position, size, span);
       drawing.circle(p, 1.6, gate.open ? 'rgba(86,200,140,.6)' : '#e8923a');
     });
     station.forEachSwitch((sw) => {
+      if (!exploration.isExplored(sw.position)) return;
       const p = this.toMap(sw.position, worldCenter, position, size, span);
       drawing.circle(p, 1.8, sw.activated ? '#5dff9a' : '#5de0ff');
     });
     station.forEachCollectible((container) => {
+      if (!exploration.isExplored(container.position)) return;
       const p = this.toMap(container.position, worldCenter, position, size, span);
       drawing.circle(p, 1.6, container instanceof Model.HpContainer ? '#5dff9a' : container instanceof Model.AmmoContainer ? '#c98bff' : '#ffc35c');
     });

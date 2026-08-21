@@ -23,10 +23,13 @@ export class Station {
   draw(drawing: Drawing, station: Model.Station, starLight: StarLight, zoom: number, shipPosition: Vec2, cameraPosition: Vec2, lampRadius: number, bare = false): void {
     if (!station.isPlaced) return;
     this.interior.draw(drawing, station, starLight, zoom);
+    // Crates and doors render before the darkness composite so they are hidden
+    // until the lamp lights them; switches and supply containers glow on top.
+    if (!bare) this.fixtures.drawDarkened(drawing, station, starLight, zoom);
     if (!bare) {
       this.lamp.draw(drawing, station, shipPosition, cameraPosition, zoom, lampRadius, this.roof);
+      this.fixtures.drawGlowing(drawing, station, starLight, zoom, shipPosition, lampRadius);
     }
-    this.fixtures.draw(drawing, station, starLight, zoom);
     this.hull.draw(drawing, station, starLight, zoom);
   }
 }
