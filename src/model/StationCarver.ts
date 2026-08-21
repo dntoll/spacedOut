@@ -1,4 +1,5 @@
 import type { Vec2 } from '../types';
+import { traceContours, type Contour } from './StationContourTracer';
 
 export interface BoundarySegment {
   a: Vec2;
@@ -66,6 +67,16 @@ export class StationCarver {
 
   isSpace(c: number, r: number): boolean {
     return this.inBounds(c, r) && this.bitmap[this.idx(c, r)] === 1;
+  }
+
+  // Trace the carved void's boundaries against solid rock into merged contours
+  // (rooms become closed loops; the entrance room, which reaches the rim, is an
+  // open chain). Edges facing space (non-carveable) are not traced, so only the
+  // hull arc owns the exterior. Vertices are in local space.
+  traceInteriorContours(): Contour[] {
+    const isCarved = (c: number, r: number): boolean => this.inBounds(c, r) && this.bitmap[this.idx(c, r)] === 1;
+    const isRock = (c: number, r: number): boolean => this.isCarveable(c, r) && this.bitmap[this.idx(c, r)] !== 1;
+    return traceContours(this.gridN, this.cellSize, this.half, isCarved, isRock);
   }
 
   fitsRect(centerLocal: Vec2, halfW: number, halfH: number): boolean {

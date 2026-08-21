@@ -50,6 +50,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly droneField = new DroneField();
   private readonly pirateField = new PirateField();
   private readonly station = new Station();
+  private readonly bare = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('bare');
   private readonly particleField = new ParticleField();
   private readonly nebulaField = new NebulaField();
   private readonly explorationMap = new ExplorationMap();
@@ -212,7 +213,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.drawing.compositeShadowLayer('multiply');
     this.camera.drawWorld(this.drawing, () => {
       const lampRadius = phase === MissionPhase.Mission3Active ? this.settings.getLampRadius() : 0;
-      this.station.draw(this.drawing, model.station, this.starLight, this.camera.zoom, model.ship.position, this.camera.worldPosition, lampRadius);
+      this.station.draw(this.drawing, model.station, this.starLight, this.camera.zoom, model.ship.position, this.camera.worldPosition, lampRadius, this.bare);
       this.massiveAsteroidField.draw(this.drawing, model.massiveAsteroidField, model.ship.position, this.camera, this.starLight);
       this.nebulaField.draw(this.drawing, this.camera.getVisibleWorldBounds(this.drawing.size));
       this.particleField.draw(this.drawing, this.starLight, casters);

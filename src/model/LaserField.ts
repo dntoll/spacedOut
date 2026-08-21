@@ -15,10 +15,12 @@ import type { MassiveAsteroidField } from './MassiveAsteroidField';
 import type { Pirate } from './Pirate';
 import type { PirateField } from './PirateField';
 import type { Ship } from './Ship';
-import type { PolygonObstacle } from './SweptCircleCollision';
+import type { PolygonObstacle, ShipObstacle, WallChain } from './SweptCircleCollision';
+import { isWallChain } from './SweptCircleCollision';
+import { wallChainHit } from './WallChainCollision';
 
 export interface StationObstacleSource {
-  forEachObstacle(visitor: (obstacle: PolygonObstacle) => void): void;
+  forEachObstacle(visitor: (obstacle: ShipObstacle) => void): void;
 }
 
 const NOSE_OFFSET = 22;
@@ -135,11 +137,15 @@ export class LaserField {
     }
   }
 
-  private stationHit(laser: Laser, station: StationObstacleSource): PolygonObstacle | null {
-    let hit: PolygonObstacle | null = null;
+  private stationHit(laser: Laser, station: StationObstacleSource): ShipObstacle | null {
+    let hit: ShipObstacle | null = null;
     station.forEachObstacle((obstacle) => {
       if (hit) return;
-      const boundary = boundaryRadiusAt(obstacle, laser.position);
+      if (isWallChain(obstacle)) {
+        if (wallChainHit(laser.position, laser.radius, obstacle as WallChain)) hit = obstacle;
+        return;
+      }
+      const boundary = boundaryRadiusAt(obstacle as PolygonObstacle, laser.position);
       if (length(sub(obstacle.position, laser.position)) <= boundary + laser.radius) hit = obstacle;
     });
     return hit;

@@ -5,6 +5,7 @@ import { MassiveAsteroid } from '../model/MassiveAsteroid';
 import { Pirate } from '../model/Pirate';
 import { Ship } from '../model/Ship';
 import { Station } from '../model/Station';
+import { wallChainWorldVertices } from '../model/WallChainCollision';
 import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import { Camera } from './Camera';
@@ -515,7 +516,13 @@ describe('ParticleField', () => {
     const { drawing, circles } = countingDrawing();
 
     let wallPos: Vec2 | null = null;
-    station.forEachInteriorWall((wall) => { if (!wallPos) wallPos = { ...wall.position }; });
+    station.forEachInteriorWall((wall) => {
+      if (!wallPos) {
+        const verts = wallChainWorldVertices(wall);
+        if (verts.length > 0) wallPos = { ...verts[0] };
+      }
+    });
+    expect(wallPos).not.toBeNull();
     camera.update(wallPos!, { x: 0, y: 0 }, 0);
 
     field.adopt({ ...wallPos! }, { x: 0, y: 0 });

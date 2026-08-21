@@ -185,36 +185,26 @@ export class Minimap {
     const hullRadius = station.outerRadius * scale;
     if (hullRadius >= 1.5) drawing.circle(mapCenter, hullRadius, 'rgba(40,24,12,.4)', 'rgba(150,96,56,.6)', 1);
     drawing.circle(this.toMap(station.centralCenter!, worldCenter, position, size, span), station.centralRadius * scale, 'rgba(70,52,34,.35)', 'rgba(180,120,72,.4)', 0.5);
-    station.forEachHullWall((wall) => {
+    const drawChain = (wall: Model.StationContour, fill: string, stroke: string): void => {
       if (!this.intersectsMap(wall.position, wall.radius, worldCenter, span)) return;
-      const p = this.toMap(wall.position, worldCenter, position, size, span);
-      const hl = wall.halfLength * scale;
-      const hw = wall.halfWidth * scale;
-      if (hl < 0.4 && hw < 0.4) return;
-      drawing.withTransform(p, wall.angle, () => {
-        drawing.polygon(
-          [{ x: hl, y: -hw }, { x: hl, y: hw }, { x: -hl, y: hw }, { x: -hl, y: -hw }],
-          'rgba(58,36,24,.5)',
-          'rgba(150,96,56,.6)',
-          0.5,
-        );
+      const pts = wall.localVertices.map((v) => {
+        const cos = Math.cos(wall.angle);
+        const sin = Math.sin(wall.angle);
+        const wx = wall.position.x + v.x * cos - v.y * sin;
+        const wy = wall.position.y + v.x * sin + v.y * cos;
+        return this.toMap({ x: wx, y: wy }, worldCenter, position, size, span);
       });
-    });
-    station.forEachInteriorWall((wall) => {
-      if (!this.intersectsMap(wall.position, wall.radius, worldCenter, span)) return;
-      const p = this.toMap(wall.position, worldCenter, position, size, span);
-      const hl = wall.halfLength * scale;
-      const hw = wall.halfWidth * scale;
-      if (hl < 0.4 && hw < 0.4) return;
-      drawing.withTransform(p, wall.angle, () => {
-        drawing.polygon(
-          [{ x: hl, y: -hw }, { x: hl, y: hw }, { x: -hl, y: hw }, { x: -hl, y: -hw }],
-          'rgba(58,36,24,.35)',
-          'rgba(120,68,42,.4)',
-          0.5,
-        );
-      });
-    });
+      const n = pts.length;
+      const edgeCount = wall.closed ? n : n - 1;
+      for (let i = 0; i < edgeCount; i++) {
+        drawing.line(pts[i], pts[(i + 1) % n], fill, Math.max(0.5, wall.wallRadius * 2 * scale));
+      }
+      for (let i = 0; i < edgeCount; i++) {
+        drawing.line(pts[i], pts[(i + 1) % n], stroke, 0.5);
+      }
+    };
+    station.forEachHullWall((wall) => drawChain(wall, 'rgba(58,36,24,.5)', 'rgba(150,96,56,.6)'));
+    station.forEachInteriorWall((wall) => drawChain(wall, 'rgba(58,36,24,.35)', 'rgba(120,68,42,.4)'));
     station.forEachGate((gate) => {
       const p = this.toMap(gate.position, worldCenter, position, size, span);
       drawing.circle(p, 1.6, gate.open ? 'rgba(86,200,140,.6)' : '#e8923a');

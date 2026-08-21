@@ -2,6 +2,8 @@ import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import type { Drawing, RadialPaint } from './Drawing';
 import type { StationRoof } from './StationRoof';
+import { isWallChain } from '../model/SweptCircleCollision';
+import { wallChainWorldVertices } from '../model/WallChainCollision';
 
 // Darkness levels for the unified offscreen multiply pass. The lamp owns the
 // single darkness composite: revealed-but-unlit cells are dim, unrevealed cells
@@ -77,7 +79,9 @@ export class StationLamp {
       const reach = radius + obstacle.radius;
       if (dx * dx + dy * dy > reach * reach) return;
       const outline = obstacleOutline(obstacle);
-      for (let i = 0; i < outline.length; i++) {
+      const closed = isWallChain(obstacle) ? (obstacle as { closed: boolean }).closed : true;
+      const edgeCount = closed ? outline.length : outline.length - 1;
+      for (let i = 0; i < edgeCount; i++) {
         const a = outline[i];
         const b = outline[(i + 1) % outline.length];
         segments.push({ ax: a.x, ay: a.y, bx: b.x, by: b.y });
@@ -87,19 +91,11 @@ export class StationLamp {
   }
 }
 
-const obstacleOutline = (body: { position: Vec2; angle: number; radius: number; vertices: number[] }): Vec2[] => {
-  const wall = body as { position: Vec2; angle: number; halfLength?: number; halfWidth?: number };
-  if (wall.halfLength !== undefined && wall.halfWidth !== undefined) {
-    const cos = Math.cos(body.angle);
-    const sin = Math.sin(body.angle);
-    const hl = wall.halfLength;
-    const hw = wall.halfWidth;
-    const local: Array<[number, number]> = [[hl, hw], [hl, -hw], [-hl, -hw], [-hl, hw]];
-    return local.map(([lx, ly]) => ({ x: body.position.x + lx * cos - ly * sin, y: body.position.y + lx * sin + ly * cos }));
-  }
-  const cos = Math.cos(body.angle);
-  const sin = Math.sin(body.angle);
-  const { position, radius, vertices } = body;
+const obstacleOutline = (obstacle: Model.ShipObstacle): Vec2[] => {
+  if (isWallChain(obstacle)) return wallChainWorldVertices(obstacle as Model.WallChain);
+  const cos = Math.cos(obstacle.angle);
+  const sin = Math.sin(obstacle.angle);
+  const { position, radius, vertices } = obstacle as Model.PolygonObstacle;
   const out: Vec2[] = [];
   for (let i = 0; i < vertices.length; i++) {
     const a = (i / vertices.length) * Math.PI * 2;

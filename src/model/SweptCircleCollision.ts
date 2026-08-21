@@ -12,10 +12,24 @@ export interface CapsuleObstacle extends PhysicsBody {
   wallRadius: number;
 }
 
-export type ShipObstacle = PolygonObstacle | CapsuleObstacle;
+// A wall built from traced bitmap contours: an explicit polyline of local-space
+// vertices (collinear runs already merged) with a wall thickness. `closed` loops
+// surround rooms; open chains form the hull arc and the entrance opening. The
+// swept test iterates each edge as a capsule of radius `wallRadius`, so a long
+// merged wall is one continuous edge rather than a stack of rounded squares.
+export interface WallChain extends PhysicsBody {
+  localVertices: Vec2[];
+  closed: boolean;
+  wallRadius: number;
+}
+
+export type ShipObstacle = PolygonObstacle | CapsuleObstacle | WallChain;
 
 export const isCapsuleObstacle = (obstacle: ShipObstacle): obstacle is CapsuleObstacle =>
-  'a' in obstacle && 'b' in obstacle && 'wallRadius' in obstacle;
+  'a' in obstacle && 'b' in obstacle && 'wallRadius' in obstacle && !('localVertices' in obstacle);
+
+export const isWallChain = (obstacle: ShipObstacle): obstacle is WallChain =>
+  'localVertices' in obstacle && 'wallRadius' in obstacle;
 
 export interface SweepHit {
   time: number;
@@ -26,19 +40,31 @@ export interface SweepHit {
 interface LocalHit { time: number; normal: Vec2 }
 
 export class SweptCircleCollision {
-  static find(start: Vec2, end: Vec2, radius: number, obstacle: PolygonObstacle): SweepHit | undefined {
+  static find(start: Vec2, end: Vec2, radius: number, obstacle: ShipObstacle): SweepHit | undefined {
     const localStart = this.toLocal(start, obstacle);
     const localEnd = this.toLocal(end, obstacle);
-    const polygon = obstacle.vertices.map((variation, index) => {
-      const angle = index / obstacle.vertices.length * Math.PI * 2;
-      return { x: Math.cos(angle) * obstacle.radius * variation, y: Math.sin(angle) * obstacle.radius * variation };
-    });
+    let polygon: Vec2[];
+    let edgeRadius: number;
+    let edgeCount: number;
+    if (isWallChain(obstacle)) {
+      polygon = obstacle.localVertices;
+      edgeRadius = radius + obstacle.wallRadius;
+      edgeCount = obstacle.closed ? polygon.length : polygon.length - 1;
+    } else {
+      const poly = obstacle as PolygonObstacle;
+      polygon = poly.vertices.map((variation, index) => {
+        const angle = index / poly.vertices.length * Math.PI * 2;
+        return { x: Math.cos(angle) * poly.radius * variation, y: Math.sin(angle) * poly.radius * variation };
+      });
+      edgeRadius = radius;
+      edgeCount = polygon.length;
+    }
     const hits: LocalHit[] = [];
 
-    for (let i = 0; i < polygon.length; i++) {
+    for (let i = 0; i < edgeCount; i++) {
       const edgeStart = polygon[i];
       const edgeEnd = polygon[(i + 1) % polygon.length];
-      hits.push(...this.edgeCapsuleHits(localStart, localEnd, edgeStart, edgeEnd, radius));
+      hits.push(...this.edgeCapsuleHits(localStart, localEnd, edgeStart, edgeEnd, edgeRadius));
     }
 
     if (hits.length === 0) return undefined;

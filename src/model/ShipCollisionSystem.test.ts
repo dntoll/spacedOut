@@ -63,9 +63,29 @@ describe('ShipCollisionSystem', () => {
 
     system.resolve(ship, [first, second], 1);
 
-    expect(collisions).toHaveLength(2);
+    // A corner hit resolves as a single combined-normal contact (one impulse),
+    // so restitution is applied once rather than summed across both faces.
+    expect(collisions).toHaveLength(1);
     expect(ship.position.x).toBeCloseTo(ship.position.y, 3);
     expect(Number.isFinite(ship.position.x)).toBe(true);
+  });
+
+  it('REQ-82 does not add speed when the ship bounces into a 90 degree corner', () => {
+    // Two perpendicular walls meeting at the origin form a corner. The ship is
+    // driven diagonally into it; a summed-impulse corner would boost the speed
+    // (restitution applied per face). A single combined impulse must not.
+    const horizontal = new StationWall({ x: 250, y: 0 }, 0, 250, 26);
+    const vertical = new StationWall({ x: 0, y: 250 }, Math.PI / 2, 250, 26);
+    const ship = new Ship();
+    ship.previousPosition = { x: 300, y: 300 };
+    ship.position = { x: 40, y: 40 };
+    ship.velocity = { x: -260, y: -260 };
+    const incomingSpeed = Math.hypot(ship.velocity.x, ship.velocity.y);
+
+    new ShipCollisionSystem().resolve(ship, [horizontal, vertical], 1);
+
+    const outgoingSpeed = Math.hypot(ship.velocity.x, ship.velocity.y);
+    expect(outgoingSpeed).toBeLessThanOrEqual(incomingSpeed + 1);
   });
 
   it('REQ-33 does not damage the ship below the violent impact threshold', () => {

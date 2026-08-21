@@ -2,12 +2,12 @@ import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import type { Drawing } from './Drawing';
 import type { StarLight } from './StarLight';
+import { drawWallChain } from './StationOutline';
 
 const FLOOR_FILL = '#4a3620';
 const FLOOR_TINT = 'rgba(90,66,40,.22)';
 const INTERIOR_WALL_FILL = '#3a2418';
 const INTERIOR_WALL_FACE = '#5a3a22';
-const INTERIOR_WALL_EDGE = 'rgba(150,96,56,.4)';
 const CENTRAL_FLOOR = 'rgba(70,52,34,.28)';
 const CENTRAL_RING = 'rgba(180,120,72,.35)';
 const CENTRAL_DOME = 'rgba(120,84,52,.16)';
@@ -52,16 +52,8 @@ export class StationInterior {
     );
 
     station.forEachInteriorWall((wall) => {
-      const hl = wall.halfLength;
-      const hw = wall.halfWidth;
-      drawing.withTransform(wall.position, wall.angle, () => {
-        drawing.polygon(
-          [{ x: hl, y: -hw }, { x: hl, y: hw }, { x: -hl, y: hw }, { x: -hl, y: -hw }],
-          INTERIOR_WALL_FILL,
-          INTERIOR_WALL_FACE,
-          Math.max(1, 1.5 / zoom),
-        );
-      });
+      const lineWidth = Math.max(2, wall.wallRadius * 2);
+      drawWallChain(drawing, wall, INTERIOR_WALL_FILL, INTERIOR_WALL_FACE, lineWidth);
     });
   }
 

@@ -8,7 +8,8 @@ import { PirateField } from './PirateField';
 import { Ship } from './Ship';
 import { Station } from './Station';
 import { pointOnCircle } from './StationGeometry';
-import { isCapsuleObstacle } from './SweptCircleCollision';
+import { isCapsuleObstacle, isWallChain } from './SweptCircleCollision';
+import { wallChainHit } from './WallChainCollision';
 import { length, sub } from '../math';
 import type { Vec2 } from '../types';
 
@@ -17,6 +18,22 @@ const placeStation = (entranceAngle = 0, seed = 42): Station => {
   const station = new Station();
   station.placeAt({ x: 0, y: 0 }, STATION_RADIUS, entranceAngle, seed);
   return station;
+};
+
+// True if `point` (just outside or on the hull) is blocked by any station
+// obstacle — wall chains by edge distance, radial obstacles by their boundary.
+const blockedAt = (station: Station, point: Vec2, expand: number): boolean => {
+  let blocked = false;
+  station.forEachObstacle((obstacle) => {
+    if (blocked) return;
+    if (isWallChain(obstacle)) {
+      if (wallChainHit(point, expand, obstacle)) blocked = true;
+      return;
+    }
+    const boundary = boundaryRadiusAt(obstacle as never, point);
+    if (length(sub(obstacle.position, point)) <= boundary + expand) blocked = true;
+  });
+  return blocked;
 };
 
 const reachable = (station: Station, target: { c: number; r: number }, openGates: ReadonlySet<number>): boolean => {
@@ -46,7 +63,7 @@ const reachable = (station: Station, target: { c: number; r: number }, openGates
 };
 
 describe('Station', () => {
-  it('REQ-79 builds a maze-scale station with an entrance, central chamber, walls, machinery, and collectibles', () => {
+  it('REQ-79 builds a maze-scale station with an entrance, central chamber, walls, and collectibles', () => {
     const ship = new Ship();
     const station = placeStation();
     expect(station.isPlaced).toBe(true);
@@ -56,17 +73,14 @@ describe('Station', () => {
     expect(station.centralRadius).toBeGreaterThan(0);
 
     let wallCount = 0;
-    let machineryCount = 0;
     let collectibleCount = 0;
     station.forEachWall(() => wallCount++);
-    station.forEachMachinery(() => machineryCount++);
     station.forEachCollectible(() => collectibleCount++);
-    expect(wallCount).toBeGreaterThan(20);
-    expect(machineryCount).toBeGreaterThan(0);
+    expect(wallCount).toBeGreaterThan(1);
     expect(collectibleCount).toBeGreaterThan(0);
   });
 
-  it('REQ-79 walls are immovable squared polygon obstacles and machinery are immovable massive-asteroid-tier obstacles', () => {
+  it('REQ-79 walls are immovable traced-contour wall chains (merged vertices, wall thickness)', () => {
     const station = placeStation();
     let wallSeen = false;
     station.forEachWall((wall) => {
@@ -74,18 +88,12 @@ describe('Station', () => {
       expect(wall.mass).toBe(Number.POSITIVE_INFINITY);
       expect(wall.velocity).toEqual({ x: 0, y: 0 });
       expect(wall.massive).toBe(true);
+      expect(isWallChain(wall)).toBe(true);
       expect(isCapsuleObstacle(wall)).toBe(false);
-      expect(wall.vertices.length).toBeGreaterThan(0);
-      expect(wall.halfLength).toBeGreaterThan(0);
-      expect(wall.halfWidth).toBeGreaterThan(0);
+      expect(wall.localVertices.length).toBeGreaterThan(0);
+      expect(wall.wallRadius).toBeGreaterThan(0);
     });
     expect(wallSeen).toBe(true);
-    station.forEachMachinery((m) => {
-      expect(m.mass).toBe(Number.POSITIVE_INFINITY);
-      expect(m.velocity).toEqual({ x: 0, y: 0 });
-      expect(m.massive).toBe(true);
-      expect(isCapsuleObstacle(m)).toBe(false);
-    });
   });
 
   it('REQ-79 has a single exterior entrance gap the ship can fly through', () => {
@@ -94,14 +102,27 @@ describe('Station', () => {
     const ship = new Ship();
     const entrance = station.entrancePosition!;
     expect(length(entrance)).toBeGreaterThan(0);
+    expect(blockedAt(station, entrance, ship.radius)).toBe(false);
 
-    let blocked = false;
-    station.forEachObstacle((obstacle) => {
-      if (blocked) return;
-      const boundary = boundaryRadiusAt(obstacle, entrance);
-      if (length(sub(obstacle.position, entrance)) <= boundary + ship.radius) blocked = true;
-    });
-    expect(blocked).toBe(false);
+    // Sample the hull perimeter and count distinct flyable gaps. The entrance
+    // itself is open, so a single gap means that gap is the entrance.
+    const center = station.center!;
+    const R = station.outerRadius;
+    const samples = 144;
+    let gaps = 0;
+    let inGap = false;
+    for (let i = 0; i < samples; i++) {
+      const a = (i / samples) * Math.PI * 2;
+      const p: Vec2 = { x: center.x + Math.cos(a) * R, y: center.y + Math.sin(a) * R };
+      const open = !blockedAt(station, p, 1);
+      if (open && !inGap) {
+        inGap = true;
+        gaps++;
+      } else if (!open && inGap) {
+        inGap = false;
+      }
+    }
+    expect(gaps).toBe(1);
   });
 
   it('REQ-80 has three gates and three switches, all initially closed and inactive', () => {
@@ -221,12 +242,13 @@ describe('Station', () => {
   it('REQ-79 the maze layout varies between seeds', () => {
     const a = placeStation(0, 1);
     const b = placeStation(0, 999);
-    const machineryA: Vec2[] = [];
-    const machineryB: Vec2[] = [];
-    a.forEachMachinery((m) => machineryA.push(m.position));
-    b.forEachMachinery((m) => machineryB.push(m.position));
-    const machineryDiffers = machineryA.some((p, i) => length(sub(p, machineryB[i])) > 1);
-    expect(machineryDiffers).toBe(true);
+    const wallsA: Vec2[] = [];
+    const wallsB: Vec2[] = [];
+    a.forEachInteriorWall((w) => wallsA.push(w.localVertices[0]));
+    b.forEachInteriorWall((w) => wallsB.push(w.localVertices[0]));
+    const layoutDiffers = wallsA.length !== wallsB.length
+      || wallsA.some((p, i) => !wallsB[i] || length(sub(p, wallsB[i])) > 1);
+    expect(layoutDiffers).toBe(true);
 
     // The macro layout — section hub and switch positions — also varies, so two
     // runs are not the same station with the same room/corridor topology.

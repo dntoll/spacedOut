@@ -142,8 +142,9 @@ describe('StationLamp', () => {
     const ship = new Ship();
     ship.position = roomCenter(station, 'area', 1);
     const cap = capture();
+    const lampR = STATION_RADIUS * 0.6;
 
-    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, R, roof);
+    lamp.draw(cap.drawing, station, ship.position, { x: 0, y: 0 }, 1, lampR, roof);
 
     expect(pointInPolygon(ship.position, cap.litPolygon)).toBe(true);
     const carver = station.carver!;
@@ -157,7 +158,7 @@ describe('StationLamp', () => {
         const world = carver.localToWorld(carver.cellCenterLocal(c, r), center, rotation);
         const dx = world.x - ship.position.x;
         const dy = world.y - ship.position.y;
-        if (dx * dx + dy * dy > R * R) continue;
+        if (dx * dx + dy * dy > lampR * lampR) continue;
         if (pointInPolygon(world, cap.litPolygon)) litWithin++;
         else darkWithin++;
       }

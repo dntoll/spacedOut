@@ -1,5 +1,6 @@
 import { add, dot, length, random, scale, sub } from '../math';
 import type * as Model from '../model';
+import { isWallChain } from '../model/SweptCircleCollision';
 import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
 import type { Drawing, Size } from './Drawing';
@@ -11,6 +12,7 @@ interface MassiveCollider extends Circle {
   polygon: Vec2[];
   cos: number;
   sin: number;
+  wallRadius: number;
 }
 
 const TARGET_POPULATION = 240;
@@ -254,15 +256,18 @@ export class ParticleField {
       polygon: this.localPolygon(asteroid),
       cos: Math.cos(asteroid.angle),
       sin: Math.sin(asteroid.angle),
+      wallRadius: 0,
     }));
     if (model.station.isPlaced) {
       model.station.forEachObstacleNear(model.ship.position, reach, (obstacle) => {
+        const chain = isWallChain(obstacle);
         massives.push({
           position: obstacle.position,
           radius: obstacle.radius,
-          polygon: this.localPolygon(obstacle),
+          polygon: chain ? (obstacle as Model.WallChain).localVertices : this.localPolygon(obstacle as Model.PolygonObstacle),
           cos: Math.cos(obstacle.angle),
           sin: Math.sin(obstacle.angle),
+          wallRadius: chain ? (obstacle as Model.WallChain).wallRadius : 0,
         });
       });
     }
@@ -298,6 +303,36 @@ export class ParticleField {
       x: dx * collider.cos + dy * collider.sin,
       y: -dx * collider.sin + dy * collider.cos,
     };
+    // Wall chains are thin outlines: bounce any dust within wallRadius of an
+    // edge (distance-based), rather than treating the room interior as solid.
+    if (collider.wallRadius > 0) {
+      const nearest = this.nearestEdge(local, collider.polygon);
+      if (!nearest) return;
+      const ox = local.x - nearest.point.x;
+      const oy = local.y - nearest.point.y;
+      const dist = Math.hypot(ox, oy);
+      const reach = collider.wallRadius + DUST_RADIUS;
+      if (dist > reach) return;
+      const outward = dist > 1e-6 ? { x: ox / dist, y: oy / dist } : { x: 1, y: 0 };
+      const pushedLocal = add(nearest.point, scale(outward, reach));
+      particle.position = {
+        x: collider.position.x + pushedLocal.x * collider.cos - pushedLocal.y * collider.sin,
+        y: collider.position.y + pushedLocal.x * collider.sin + pushedLocal.y * collider.cos,
+      };
+      const localVel = {
+        x: particle.velocity.x * collider.cos + particle.velocity.y * collider.sin,
+        y: -particle.velocity.x * collider.sin + particle.velocity.y * collider.cos,
+      };
+      const vn = dot(localVel, outward);
+      if (vn < 0) {
+        const bounced = sub(localVel, scale(outward, (1 + BOUNCE_DAMPING) * vn));
+        particle.velocity = {
+          x: bounced.x * collider.cos - bounced.y * collider.sin,
+          y: bounced.x * collider.sin + bounced.y * collider.cos,
+        };
+      }
+      return;
+    }
     if (!this.pointInPolygon(local, collider.polygon)) return;
     const nearest = this.nearestEdge(local, collider.polygon);
     if (!nearest) return;

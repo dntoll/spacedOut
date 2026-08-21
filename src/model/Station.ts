@@ -17,12 +17,15 @@ import { StationGate } from './StationGate';
 import { StationMachinery } from './StationMachinery';
 import { StationGenerator, type StationLayout, type StationRoomInstance } from './StationGenerator';
 import type { StationCarver } from './StationCarver';
+import { StationContour } from './StationContour';
 import { StationSwitch } from './StationSwitch';
-import { StationWall } from './StationWall';
-import type { PolygonObstacle } from './SweptCircleCollision';
+import type { ShipObstacle, WallChain, PolygonObstacle } from './SweptCircleCollision';
+import { isWallChain } from './SweptCircleCollision';
+import { resolveWallChainBody, wallChainHit } from './WallChainCollision';
 import { SupplyType } from './SupplyChooser';
 import type { SupplyContainer } from './SupplyContainer';
 import type { SupplyField } from './SupplyField';
+import type { PhysicsBody } from './PhysicsBody';
 
 const CENTRAL_REACH_MARGIN = 1.05;
 
@@ -78,20 +81,20 @@ export class Station {
     return length(sub(ship.position, this.layout.centralCenter)) <= this.layout.centralRadius * CENTRAL_REACH_MARGIN;
   }
 
-  forEachHullWall(visitor: (wall: StationWall) => void): void {
+  forEachHullWall(visitor: (wall: StationContour) => void): void {
     if (!this.layout) return;
-    this.layout.exteriorWalls.forEach(visitor);
+    visitor(this.layout.hullContour);
   }
 
-  forEachInteriorWall(visitor: (wall: StationWall) => void): void {
+  forEachInteriorWall(visitor: (wall: StationContour) => void): void {
     if (!this.layout) return;
-    this.layout.interiorWalls.forEach(visitor);
+    this.layout.interiorContours.forEach(visitor);
   }
 
-  forEachWall(visitor: (wall: StationWall) => void): void {
+  forEachWall(visitor: (wall: StationContour) => void): void {
     if (!this.layout) return;
-    this.layout.exteriorWalls.forEach(visitor);
-    this.layout.interiorWalls.forEach(visitor);
+    visitor(this.layout.hullContour);
+    this.layout.interiorContours.forEach(visitor);
   }
 
   forEachGate(visitor: (gate: StationGate) => void): void { this.layout?.gates.forEach(visitor); }
@@ -99,15 +102,15 @@ export class Station {
   forEachMachinery(visitor: (m: StationMachinery) => void): void { this.layout?.machinery.forEach(visitor); }
   forEachCollectible(visitor: (c: SupplyContainer) => void): void { this.collectibleContainers.forEach(visitor); }
 
-  forEachObstacle(visitor: (obstacle: PolygonObstacle) => void): void {
+  forEachObstacle(visitor: (obstacle: ShipObstacle) => void): void {
     if (!this.layout) return;
-    this.layout.exteriorWalls.forEach(visitor);
-    this.layout.interiorWalls.forEach(visitor);
+    visitor(this.layout.hullContour);
+    this.layout.interiorContours.forEach(visitor);
     for (const gate of this.layout.gates) if (!gate.open) visitor(gate);
     this.layout.machinery.forEach(visitor);
   }
 
-  forEachObstacleNear(position: Vec2, radius: number, visitor: (obstacle: PolygonObstacle) => void): void {
+  forEachObstacleNear(position: Vec2, radius: number, visitor: (obstacle: ShipObstacle) => void): void {
     if (!this.layout) return;
     const reachSq = (radius + this.layout.outerRadius) * (radius + this.layout.outerRadius);
     this.forEachObstacle((obstacle) => {
@@ -119,14 +122,15 @@ export class Station {
 
   resolveBodyCollisions(asteroidBelt: AsteroidBelt, supplyField: SupplyField): void {
     if (!this.layout) return;
+    const resolve = (body: PhysicsBody, obstacle: ShipObstacle): void => {
+      const collision = isWallChain(obstacle)
+        ? resolveWallChainBody(body, obstacle as WallChain)
+        : CollisionResolver.resolveAgainstStaticBoundary(body, obstacle.position, boundaryRadiusAt(obstacle as PolygonObstacle, body.position));
+      if (collision) for (const observer of this.collisionObservers) observer.onCollision(collision);
+    };
     this.forEachObstacle((obstacle) => {
-      const resolve = (body: import('./PhysicsBody').PhysicsBody): void => {
-        const boundary = boundaryRadiusAt(obstacle, body.position);
-        const collision = CollisionResolver.resolveAgainstStaticBoundary(body, obstacle.position, boundary);
-        if (collision) for (const observer of this.collisionObservers) observer.onCollision(collision);
-      };
-      asteroidBelt.forEach((asteroid) => resolve(asteroid));
-      supplyField.forEachActive((container) => resolve(container));
+      asteroidBelt.forEach((asteroid) => resolve(asteroid, obstacle));
+      supplyField.forEachActive((container) => resolve(container, obstacle));
     });
   }
 
@@ -216,8 +220,12 @@ export class Station {
       const dx = obstacle.position.x - container.position.x;
       const dy = obstacle.position.y - container.position.y;
       if (dx * dx + dy * dy > (reach + obstacle.radius) * (reach + obstacle.radius)) return;
-      const boundary = boundaryRadiusAt(obstacle, container.position);
-      CollisionResolver.resolveAgainstStaticBoundary(container, obstacle.position, boundary);
+      if (isWallChain(obstacle)) {
+        resolveWallChainBody(container, obstacle as WallChain);
+      } else {
+        const boundary = boundaryRadiusAt(obstacle as PolygonObstacle, container.position);
+        CollisionResolver.resolveAgainstStaticBoundary(container, obstacle.position, boundary);
+      }
     });
   }
 

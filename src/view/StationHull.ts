@@ -2,38 +2,20 @@ import type * as Model from '../model';
 import type { Vec2 } from '../types';
 import type { Drawing } from './Drawing';
 import type { StarLight } from './StarLight';
+import { drawWallChain } from './StationOutline';
 
 const HULL_PLATE = '#4a2c18';
 const HULL_PLATE_DARK = '#241608';
-const HULL_HIGHLIGHT = '#7a4e2c';
 const ENTRANCE_GLOW = '#ffb24a';
 
 export class StationHull {
   draw(drawing: Drawing, station: Model.Station, starLight: StarLight, zoom: number): void {
     if (!station.isPlaced) return;
-    const light = starLight.direction;
-
+    void starLight;
     station.forEachHullWall((wall) => {
-      const hl = wall.halfLength;
-      const hw = wall.halfWidth;
-      drawing.withTransform(wall.position, wall.angle, () => {
-        drawing.polygon(
-          [{ x: hl, y: -hw }, { x: hl, y: hw }, { x: -hl, y: hw }, { x: -hl, y: -hw }],
-          HULL_PLATE_DARK,
-          HULL_PLATE,
-          Math.max(1, 1.5 / zoom),
-        );
-        const perp: Vec2 = { x: -Math.sin(wall.angle), y: Math.cos(wall.angle) };
-        const lit = perp.x * light.x + perp.y * light.y >= 0 ? 1 : -1;
-        drawing.line(
-          { x: hl, y: lit * hw },
-          { x: -hl, y: lit * hw },
-          HULL_HIGHLIGHT,
-          Math.max(1, hw * 0.4),
-        );
-      });
+      const lineWidth = Math.max(2, wall.wallRadius * 2);
+      drawWallChain(drawing, wall, HULL_PLATE, HULL_PLATE_DARK, lineWidth);
     });
-
     this.drawEntranceBeacons(drawing, station, zoom);
   }
 

@@ -1,11 +1,11 @@
-import { closestPointOnSegment, dot, length, normalize, sub } from '../math';
+import { dot, length, normalize, sub } from '../math';
 import type { Vec2 } from '../types';
 import { RandomSequence } from './RandomSequence';
-import { StationCarver, type BoundarySegment } from './StationCarver';
+import { StationCarver } from './StationCarver';
+import { StationContour } from './StationContour';
 import { StationGate } from './StationGate';
 import { StationMachinery } from './StationMachinery';
 import { StationSwitch } from './StationSwitch';
-import { StationWall } from './StationWall';
 import { SupplyType } from './SupplyChooser';
 
 export interface StationCollectibleSpec {
@@ -32,8 +32,8 @@ export interface StationLayout {
   entranceRadius: number;
   centralCenter: Vec2;
   centralRadius: number;
-  exteriorWalls: StationWall[];
-  interiorWalls: StationWall[];
+  hullContour: StationContour;
+  interiorContours: StationContour[];
   gates: StationGate[];
   switches: StationSwitch[];
   machinery: StationMachinery[];
@@ -105,7 +105,6 @@ export class StationGenerator {
 
     const placements = new Map<string, RoomPlacement>();
     const sectionRooms: RoomPlacement[][] = [[], [], [], []];
-    const corridors: { a: Vec2; b: Vec2; hw: number }[] = [];
     const place = (id: string, kind: RoomKind, index: number, local: Vec2, hw: number, hh: number, section: number): RoomPlacement => {
       const p: RoomPlacement = { id, kind, index, local: { ...local }, hw, hh };
       placements.set(id, p);
@@ -114,7 +113,6 @@ export class StationGenerator {
     };
     const carveCorridor = (a: Vec2, b: Vec2, hw: number): void => {
       carver.carveRectCorridor(a, b, hw);
-      corridors.push({ a: { ...a }, b: { ...b }, hw });
     };
 
     // --- Section anchors -----------------------------------------------------
@@ -265,26 +263,8 @@ export class StationGenerator {
     // sections, reject this seed and retry.
     if (!this.preservesReachability(carver, entranceCell, gateCells, switchCells, centralCell, [], 0)) return null;
 
-    // --- Machinery (smaller pillars, never blocking the critical path) -------
-    const machineryRadius = R * MACHINERY_RADIUS_FRACTION;
-    const machineryCandidates: Vec2[] = [];
-    for (const p of placements.values()) {
-      if (p.kind === 'entrance') continue;
-      machineryCandidates.push({ x: p.local.x + jitter(p.hw * 0.25), y: p.local.y + jitter(p.hh * 0.25) });
-    }
-    for (let i = machineryCandidates.length - 1; i > 0; i--) {
-      const j = random.integer(0, i + 1);
-      [machineryCandidates[i], machineryCandidates[j]] = [machineryCandidates[j], machineryCandidates[i]];
-    }
-    const acceptedMachinery: Vec2[] = [];
-    for (const candidate of machineryCandidates) {
-      const trial = [...acceptedMachinery, candidate];
-      if (this.preservesReachability(carver, entranceCell, gateCells, switchCells, centralCell, trial, machineryRadius)) {
-        acceptedMachinery.push(candidate);
-      }
-    }
-    const machinery: StationMachinery[] = acceptedMachinery.map((local) =>
-      new StationMachinery(localToWorld(local), machineryRadius, random.between(0, Math.PI * 2), random.integer(0, 4)));
+    // --- Machinery (skipped while wall geometry is reworked; restored later) --
+    const machinery: StationMachinery[] = [];
 
     // --- Collectibles --------------------------------------------------------
     const sw1 = switchRoomPlacement[0]!;
@@ -303,29 +283,15 @@ export class StationGenerator {
     ];
 
     // --- Walls ---------------------------------------------------------------
-    // Exterior hull: traced bitmap boundary segments in the outer ring (staircased,
-    // befitting a rusty derelict). Interior walls: traced cell-edge boundaries for
-    // room-vs-rock faces (axis-aligned, correct) EXCEPT near corridors where they
-    // would staircase a diagonal passage, plus smooth vector walls along corridor
-    // parallel offsets (diagonal where the corridor is diagonal). This avoids the
-    // axis-aligned fragments that otherwise tack onto diagonal corridor walls.
-    const boundary = carver.traceBoundary();
-    const nearCorridorThreshold = corridorHalf + wallHalf + carver.cellSize;
-    const exteriorWalls: StationWall[] = [];
-    const tracedInteriorSegs: BoundarySegment[] = [];
-    for (const seg of boundary) {
-      const mid: Vec2 = { x: (seg.a.x + seg.b.x) / 2, y: (seg.a.y + seg.b.y) / 2 };
-      const world = localToWorld(mid);
-      const isExterior = Math.hypot(world.x - center.x, world.y - center.y) > outerRadius * 0.7;
-      if (isExterior) {
-        exteriorWalls.push(this.wallFromSegment(seg, center, entranceAngle, wallHalf, carver));
-      } else if (!this.nearCorridor(mid, corridors, nearCorridorThreshold)) {
-        tracedInteriorSegs.push(seg);
-      }
-    }
-    const corridorSegs = this.generateCorridorWallSegments(carver, corridors, wallHalf);
-    const interiorWalls: StationWall[] = [...tracedInteriorSegs, ...corridorSegs].map((seg) =>
-      this.wallFromSegment(seg, center, entranceAngle, wallHalf, carver));
+    // Interior walls are the traced boundaries of carved rooms and corridors
+    // against solid rock: merged polygon contours with few vertices, and the
+    // entrance room is left open where it reaches the rim. The outer hull is a
+    // ring arc along the station radius with a single gap at the entrance, so the
+    // only opening to space is the flyable entrance (REQ-79).
+    const entranceHalfHeight = placements.get('entrance')!.hh;
+    const interiorContours = carver.traceInteriorContours().map((c) =>
+      new StationContour(center, entranceAngle, c.points, c.closed, wallHalf));
+    const hullContour = this.buildHullArc(center, entranceAngle, R, entranceHalfHeight, wallHalf);
 
     const rooms: StationRoomInstance[] = [...placements.values()].map((p) => ({
       id: p.id,
@@ -344,8 +310,8 @@ export class StationGenerator {
       entranceRadius: placements.get('entrance')!.hh,
       centralCenter: localToWorld(centralPlacement.local),
       centralRadius: centralPlacement.hw,
-      exteriorWalls,
-      interiorWalls,
+      hullContour,
+      interiorContours,
       gates,
       switches,
       machinery,
@@ -358,6 +324,23 @@ export class StationGenerator {
       entranceCell,
       centralCell,
     };
+  }
+
+  // The outer hull as an open arc along the station radius, with a single gap at
+  // the entrance direction (local +x, world entranceAngle) wide enough to fly
+  // through. Everything else around the rim is a wall, so the station has exactly
+  // one exterior opening.
+  private static buildHullArc(center: Vec2, entranceAngle: number, R: number, entranceHalfHeight: number, wallHalf: number): StationContour {
+    const gapHalf = (entranceHalfHeight + SHIP_RADIUS * 2) / R;
+    const step = Math.PI / 24;
+    const start = gapHalf;
+    const end = Math.PI * 2 - gapHalf;
+    const pts: Vec2[] = [{ x: Math.cos(start) * R, y: Math.sin(start) * R }];
+    for (let a = start + step; a < end - step; a += step) {
+      pts.push({ x: Math.cos(a) * R, y: Math.sin(a) * R });
+    }
+    pts.push({ x: Math.cos(end) * R, y: Math.sin(end) * R });
+    return new StationContour(center, entranceAngle, pts, false, wallHalf);
   }
 
   private static sampleSections(random: RandomSequence, A: Vec2, D: Vec2, R: number, keepOut: number): { B: Vec2; C: Vec2 } | null {
@@ -498,100 +481,5 @@ export class StationGenerator {
       }
     }
     return visited;
-  }
-
-  // True if a local point lies within threshold of any corridor centerline, so
-  // traced cell-edge boundaries there would duplicate (and staircase) a corridor's
-  // smooth vector walls and should be suppressed.
-  private static nearCorridor(local: Vec2, corridors: { a: Vec2; b: Vec2; hw: number }[], threshold: number): boolean {
-    for (const c of corridors) {
-      const cp = closestPointOnSegment(local, c.a, c.b);
-      if (length(sub(local, cp)) <= threshold + c.hw) return true;
-    }
-    return false;
-  }
-
-  // Vector walls along corridor parallel offsets (diagonal where the corridor is
-  // diagonal), with openings at junctions carved out by sampling the bitmap on the
-  // outside of each offset. Room-edge walls are intentionally NOT generated here —
-  // room-vs-rock faces come from traceBoundary (filtered to skip corridor zones) —
-  // so no axis-aligned fragments tack onto diagonal corridor walls at junctions.
-  private static generateCorridorWallSegments(
-    carver: StationCarver,
-    corridors: { a: Vec2; b: Vec2; hw: number }[],
-    wallHalf: number,
-  ): BoundarySegment[] {
-    const candidates: { a: Vec2; b: Vec2; outside: Vec2 }[] = [];
-    for (const c of corridors) {
-      const dir = normalize(sub(c.b, c.a));
-      const perp: Vec2 = { x: -dir.y, y: dir.x };
-      candidates.push({ a: { x: c.a.x + perp.x * c.hw, y: c.a.y + perp.y * c.hw }, b: { x: c.b.x + perp.x * c.hw, y: c.b.y + perp.y * c.hw }, outside: perp });
-      candidates.push({ a: { x: c.a.x - perp.x * c.hw, y: c.a.y - perp.y * c.hw }, b: { x: c.b.x - perp.x * c.hw, y: c.b.y - perp.y * c.hw }, outside: { x: -perp.x, y: -perp.y } });
-    }
-
-    const segments: BoundarySegment[] = [];
-    const step = carver.cellSize / 2;
-    const sampleOffset = wallHalf + carver.cellSize * 0.25;
-    const extend = wallHalf;
-    for (const cand of candidates) {
-      const ex = cand.b.x - cand.a.x;
-      const ey = cand.b.y - cand.a.y;
-      const segLen = Math.hypot(ex, ey);
-      if (segLen < 1) continue;
-      const ux = ex / segLen;
-      const uy = ey / segLen;
-      const count = Math.max(2, Math.floor(segLen / step));
-      const samples: boolean[] = [];
-      for (let i = 0; i <= count; i++) {
-        const t = (i / count) * segLen;
-        const px = cand.a.x + ux * t + cand.outside.x * sampleOffset;
-        const py = cand.a.y + uy * t + cand.outside.y * sampleOffset;
-        samples.push(this.isInteriorRock(carver, { x: px, y: py }));
-      }
-      let start = -1;
-      for (let i = 0; i < samples.length; i++) {
-        if (samples[i]) {
-          if (start < 0) start = i;
-        } else if (start >= 0) {
-          this.emitWallRun(cand, ux, uy, segLen, step, count, start, i - 1, extend, segments);
-          start = -1;
-        }
-      }
-      if (start >= 0) this.emitWallRun(cand, ux, uy, segLen, step, count, start, samples.length - 1, extend, segments);
-    }
-    return segments;
-  }
-
-  private static emitWallRun(
-    cand: { a: Vec2; b: Vec2; outside: Vec2 },
-    ux: number, uy: number, segLen: number, step: number, count: number,
-    startIdx: number, endIdx: number, extend: number,
-    out: BoundarySegment[],
-  ): void {
-    const t0 = Math.max(0, (startIdx / count) * segLen - extend);
-    const t1 = Math.min(segLen, (endIdx / count) * segLen + extend);
-    if (t1 - t0 < 1) return;
-    out.push({
-      a: { x: cand.a.x + ux * t0, y: cand.a.y + uy * t0 },
-      b: { x: cand.a.x + ux * t1, y: cand.a.y + uy * t1 },
-    });
-  }
-
-  private static isInteriorRock(carver: StationCarver, local: Vec2): boolean {
-    const cell = carver.localToCell(local);
-    if (!carver.inBounds(cell.c, cell.r)) return false;
-    if (!carver.isCarveable(cell.c, cell.r)) return false;
-    return carver.bitmap[cell.r * carver.gridN + cell.c] !== 1;
-  }
-
-  private static wallFromSegment(seg: BoundarySegment, center: Vec2, entranceAngle: number, wallHalf: number, carver: StationCarver): StationWall {
-    const aWorld = carver.localToWorld(seg.a, center, entranceAngle);
-    const bWorld = carver.localToWorld(seg.b, center, entranceAngle);
-    const mid: Vec2 = { x: (aWorld.x + bWorld.x) / 2, y: (aWorld.y + bWorld.y) / 2 };
-    const dx = bWorld.x - aWorld.x;
-    const dy = bWorld.y - aWorld.y;
-    const halfLength = Math.max(Math.hypot(dx, dy) / 2, wallHalf * 0.5);
-    const angle = Math.atan2(dy, dx);
-    return new StationWall(mid, angle, halfLength, wallHalf);
   }
 }
