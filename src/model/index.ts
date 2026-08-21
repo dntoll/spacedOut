@@ -44,6 +44,7 @@ export type { PirateLaserShotObserver } from './PirateLaserShotObserver';
 export type { PirateCollisionObserver } from './PirateCollisionObserver';
 export { RandomSequence } from './RandomSequence';
 export { Ship, type ShipInitialLevels } from './Ship';
+export { ShieldPod } from './ShieldPod';
 export { ShipCollisionSystem } from './ShipCollisionSystem';
 export { Star, STAR_RADIUS } from './Star';
 export { StationGate } from './StationGate';

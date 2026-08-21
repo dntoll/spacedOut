@@ -7,7 +7,7 @@ import { CompositeShadowCasters } from './CompositeShadowCasters';
 import { DistanceMeter } from './DistanceMeter';
 import { Drawing } from './Drawing';
 import { DroneField } from './DroneField';
-import { ExplorationMap } from './ExplorationMap';
+import { gatherOccluderSegments } from './LineOfSight';
 import { Freighter } from './Freighter';
 import { Hud } from './Hud';
 import { IceRing } from './IceRing';
@@ -23,6 +23,7 @@ import { ParticleField } from './ParticleField';
 import { PirateField } from './PirateField';
 import { PlayerInput } from './PlayerInput';
 import { SettingsMenu } from './SettingsMenu';
+import { SeenMap } from './SeenMap';
 import { ShadowVolume } from './ShadowVolume';
 import { Ship } from './Ship';
 import { SignalIndicator } from './SignalIndicator';
@@ -59,7 +60,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   private readonly freighter = new Freighter();
   private readonly particleField = new ParticleField();
   private readonly nebulaField = new NebulaField();
-  private readonly explorationMap = new ExplorationMap();
+  private readonly seenMap = new SeenMap();
   private readonly minimap = new Minimap();
   private readonly missionOverlay = new MissionOverlay();
   private readonly missionGoals = new MissionGoals();
@@ -150,7 +151,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
   consumeMissionSelection(): MissionSelection | null { return this.missionsMenu.consumeSelection(); }
 
   reset(): void {
-    this.explorationMap.reset();
+    this.seenMap.reset();
     this.particleField.reset();
     this.nebulaField.reset();
     this.sounds.reset();
@@ -197,7 +198,12 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
     this.camera.setBaseZoom(this.settings.getDefaultZoomLevel());
     this.camera.setViewport(this.drawing.size);
     this.camera.update(model.ship.position, model.ship.velocity, dt, model.droneField.anyHunting() || model.pirateField.anyHunting(), model.mission.isTraversal);
-    this.explorationMap.observe(this.camera.getVisibleWorldBounds(this.drawing.size));
+    const cameraRadius = this.camera.getVisibleWorldRadius(this.drawing.size);
+    const gateSignature = model.station.isPlaced
+      ? `${model.station.isGateOpen(1)}:${model.station.isGateOpen(2)}:${model.station.isGateOpen(3)}`
+      : '';
+    const occluders = gatherOccluderSegments(model.station, model.massiveAsteroidField, model.ship.position, cameraRadius);
+    this.seenMap.update(model.ship.position, cameraRadius, occluders, gateSignature);
     this.particleField.update(dt, model, this.camera, this.drawing.size);
     this.nebulaField.update(dt, model, this.camera, this.drawing.size);
     this.iceRing.update(dt);
@@ -240,7 +246,7 @@ export class Game implements Model.CollisionObserver, Model.DamageObserver, Mode
       if (model.ship.isAlive) this.ship.draw(this.drawing, model.ship, this.starLight, casters);
     });
     this.background.drawVignette(this.drawing);
-    this.minimap.draw(this.drawing, this.explorationMap, model, this.camera, this.station.roof);
+    this.minimap.draw(this.drawing, this.seenMap, model, this.camera);
     this.signalIndicator.draw(this.drawing, model, this.camera);
     this.hud.updateSpeed(model.speed, model.damageSpeedThreshold);
     this.hud.updateResources(model.ship.fuel, model.ship.hp, model.ship.ammo);

@@ -14,6 +14,13 @@ const MACHINERY_BODY = '#2a1c12';
 const MACHINERY_CAP = '#4a3422';
 const MACHINERY_PIPE = 'rgba(120,78,46,.6)';
 const MACHINERY_HIGHLIGHT = '#6a4630';
+const SHIELD_POD_COLOR = '#4d9fff';
+const SHIELD_POD_DARK = '#0e2a52';
+const SHIELD_POD_RIM = '#9fc4ff';
+const SHIELD_ICON: { x: number; y: number }[] = [
+  { x: -10, y: -12 }, { x: 10, y: -12 },
+  { x: 10, y: -2 }, { x: 0, y: 14 }, { x: -10, y: -2 },
+];
 
 export class StationFixtures {
   // Drawn before the lamp darkness composite so unlit doors are hidden until
@@ -105,6 +112,10 @@ export class StationFixtures {
   }
 
   private drawCollectible(drawing: Drawing, container: Model.SupplyContainer): void {
+    if (container instanceof Model.ShieldPod) {
+      this.drawShieldPod(drawing, container);
+      return;
+    }
     const isHp = container instanceof Model.HpContainer;
     const isAmmo = container instanceof Model.AmmoContainer;
     const color = isHp ? '#7dffb0' : isAmmo ? '#c98bff' : '#ffc35c';
@@ -112,6 +123,17 @@ export class StationFixtures {
       drawing.circle(container.position, container.radius, 'rgba(255,255,255,.10)', color, 1.5);
     });
     drawing.circle(container.position, 4, color);
+  }
+
+  private drawShieldPod(drawing: Drawing, pod: Model.ShieldPod): void {
+    drawing.withShadow(SHIELD_POD_COLOR, 14, () => {
+      drawing.circle(pod.position, pod.radius, 'rgba(77,159,255,.18)', SHIELD_POD_COLOR, 1.5);
+    });
+    drawing.withTransform(pod.position, 0, () => {
+      drawing.polygon(SHIELD_ICON, SHIELD_POD_DARK, SHIELD_POD_COLOR, 1.8);
+      drawing.line({ x: 0, y: -8 }, { x: 0, y: 9 }, SHIELD_POD_RIM, 1);
+      drawing.line({ x: -6, y: -3 }, { x: 6, y: -3 }, SHIELD_POD_RIM, 1);
+    });
   }
 }
 

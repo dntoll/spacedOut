@@ -8,6 +8,7 @@ import type { CollectablePickupObserver } from './CollectablePickupObserver';
 import { AmmoContainer } from './AmmoContainer';
 import { FuelContainer } from './FuelContainer';
 import { HpContainer } from './HpContainer';
+import { ShieldPod } from './ShieldPod';
 import { boundaryRadiusAt } from './MassiveAsteroid';
 import type { DroneField } from './DroneField';
 import type { LaserField } from './LaserField';
@@ -240,6 +241,7 @@ export class Station {
   private createContainer(type: SupplyType, position: Vec2): SupplyContainer {
     if (type === SupplyType.Fuel) return new FuelContainer({ ...position });
     if (type === SupplyType.Hp) return new HpContainer({ ...position });
+    if (type === SupplyType.Shield) return new ShieldPod({ ...position });
     return new AmmoContainer({ ...position });
   }
 }

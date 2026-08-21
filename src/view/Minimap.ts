@@ -3,8 +3,7 @@ import { clamp, normalize, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { Camera } from './Camera';
 import type { Drawing, Size } from './Drawing';
-import { ExplorationMap } from './ExplorationMap';
-import type { StationRoof } from './StationRoof';
+import { SeenMap } from './SeenMap';
 
 const DEFAULT_WORLD_SPAN = 8000;
 const TRAVEL_WORLD_SPAN = 16000;
@@ -14,10 +13,9 @@ export class Minimap {
 
   draw(
     drawing: Drawing,
-    exploration: ExplorationMap,
+    seen: SeenMap,
     model: Model.Game,
     camera: Camera,
-    stationRoof?: StationRoof,
   ): void {
     const span = model.mission.isTraversal ? TRAVEL_WORLD_SPAN : DEFAULT_WORLD_SPAN;
     const compact = drawing.size.width <= 520;
@@ -34,28 +32,28 @@ export class Minimap {
     );
     drawing.rectangle(position, size, 'rgba(2,8,17,.84)');
     drawing.withClipRectangle(position, size, () => {
-      this.drawExplored(drawing, exploration, center, position, size, span);
-      this.drawMassiveAsteroids(drawing, exploration, model.massiveAsteroidField, center, position, size, span);
-      this.drawAsteroids(drawing, exploration, model.asteroidBelt, center, position, size, span);
-      this.drawSupplies(drawing, exploration, model.supplyField, center, position, size, span);
-      this.drawDrones(drawing, exploration, model.droneField, center, position, size, span);
-      this.drawPirates(drawing, exploration, model.pirateField, center, position, size, span);
-      this.drawStation(drawing, exploration, stationRoof, model, camera, center, position, size, span);
+      this.drawSeen(drawing, seen, center, position, size, span);
+      this.drawMassiveAsteroids(drawing, seen, model.massiveAsteroidField, center, position, size, span);
+      this.drawAsteroids(drawing, seen, model.asteroidBelt, center, position, size, span);
+      this.drawSupplies(drawing, seen, model.supplyField, center, position, size, span);
+      this.drawDrones(drawing, seen, model.droneField, center, position, size, span);
+      this.drawPirates(drawing, seen, model.pirateField, center, position, size, span);
+      this.drawStation(drawing, seen, model, center, position, size, span);
       this.drawShip(drawing, model.ship.angle, position, size);
       this.drawSignal(drawing, model, position, size, center);
     });
   }
 
-  private drawExplored(
+  private drawSeen(
     drawing: Drawing,
-    exploration: ExplorationMap,
+    seen: SeenMap,
     center: Vec2,
     position: Vec2,
     size: Size,
     span: number,
   ): void {
-    const cellPixels = ExplorationMap.cellSize / span * size.width;
-    exploration.forEachVisibleCell(center, span, (cell) => {
+    const cellPixels = SeenMap.cellSize / span * size.width;
+    seen.forEachSeenCellInBox(center, span, (cell) => {
       const point = this.toMap(cell, center, position, size, span);
       drawing.rectangle(point, { width: cellPixels + 0.35, height: cellPixels + 0.35 }, 'rgba(68,139,158,.22)');
     });
@@ -63,7 +61,7 @@ export class Minimap {
 
   private drawMassiveAsteroids(
     drawing: Drawing,
-    exploration: ExplorationMap,
+    seen: SeenMap,
     field: Model.MassiveAsteroidField,
     center: Vec2,
     position: Vec2,
@@ -71,27 +69,63 @@ export class Minimap {
     span: number,
   ): void {
     field.forEachKnown((asteroid) => {
-      if (!exploration.isCircleExplored(asteroid.position, asteroid.radius)) return;
+      if (!seen.isCircleSeen(asteroid.position, asteroid.radius)) return;
       if (!this.intersectsMap(asteroid.position, asteroid.radius, center, span)) return;
-      const point = this.toMap(asteroid.position, center, position, size, span);
-      const radius = clamp(asteroid.radius / span * size.width, 3, size.width * 0.18);
-      const scale = radius / asteroid.radius;
-      const outline = asteroid.vertices.map((variation, index) => {
+      const cos = Math.cos(asteroid.angle);
+      const sin = Math.sin(asteroid.angle);
+      const worldVerts = asteroid.vertices.map((variation, index) => {
         const angle = index / asteroid.vertices.length * Math.PI * 2;
-        return {
-          x: Math.cos(angle) * asteroid.radius * variation * scale,
-          y: Math.sin(angle) * asteroid.radius * variation * scale,
-        };
+        const lx = Math.cos(angle) * asteroid.radius * variation;
+        const ly = Math.sin(angle) * asteroid.radius * variation;
+        return { x: asteroid.position.x + lx * cos - ly * sin, y: asteroid.position.y + lx * sin + ly * cos };
       });
-      drawing.withTransform(point, asteroid.angle, () => {
-        drawing.polygon(outline, 'rgba(90,112,132,.74)', 'rgba(157,203,220,.82)', 1);
-      });
+      const n = worldVerts.length;
+      const pts = worldVerts.map((v) => this.toMap(v, center, position, size, span));
+      // Subdivide each outline edge into short sub-segments and test the midpoint
+      // of each against the seen map. Large bodies (massive asteroids span many
+      // cells) thus show only the seen arc of their outline; a small body whose
+      // every sub-segment is seen is filled as a fully discovered outline.
+      const step = 60;
+      const sub: { from: Vec2; to: Vec2; mapFrom: Vec2; mapTo: Vec2; seen: boolean }[] = [];
+      let allSeen = true;
+      for (let i = 0; i < n; i++) {
+        const a = worldVerts[i];
+        const b = worldVerts[(i + 1) % n];
+        const ma = pts[i];
+        const mb = pts[(i + 1) % n];
+        const len = Math.hypot(b.x - a.x, b.y - a.y);
+        const count = Math.max(1, Math.ceil(len / step));
+        for (let k = 0; k < count; k++) {
+          const t0 = k / count;
+          const t1 = (k + 1) / count;
+          const from = { x: a.x + (b.x - a.x) * t0, y: a.y + (b.y - a.y) * t0 };
+          const to = { x: a.x + (b.x - a.x) * t1, y: a.y + (b.y - a.y) * t1 };
+          const mid = { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 };
+          const s = seen.isSeen(mid);
+          if (!s) allSeen = false;
+          sub.push({
+            from,
+            to,
+            mapFrom: { x: ma.x + (mb.x - ma.x) * t0, y: ma.y + (mb.y - ma.y) * t0 },
+            mapTo: { x: ma.x + (mb.x - ma.x) * t1, y: ma.y + (mb.y - ma.y) * t1 },
+            seen: s,
+          });
+        }
+      }
+      if (allSeen) {
+        drawing.polygon(pts, 'rgba(90,112,132,.74)', 'rgba(157,203,220,.82)', 1);
+        return;
+      }
+      for (const s of sub) {
+        if (!s.seen) continue;
+        drawing.line(s.mapFrom, s.mapTo, 'rgba(157,203,220,.82)', 1);
+      }
     });
   }
 
   private drawAsteroids(
     drawing: Drawing,
-    exploration: ExplorationMap,
+    seen: SeenMap,
     belt: Model.AsteroidBelt,
     center: Vec2,
     position: Vec2,
@@ -99,8 +133,7 @@ export class Minimap {
     span: number,
   ): void {
     belt.forEach((asteroid) => {
-      if (!exploration.isExplored(asteroid.position, asteroid.radius)) return;
-      if (!this.intersectsMap(asteroid.position, asteroid.radius, center, span)) return;
+      if (!seen.isSeen(asteroid.position, asteroid.radius) || !this.intersectsMap(asteroid.position, asteroid.radius, center, span)) return;
       drawing.circle(
         this.toMap(asteroid.position, center, position, size, span),
         1.6,
@@ -111,7 +144,7 @@ export class Minimap {
 
   private drawSupplies(
     drawing: Drawing,
-    exploration: ExplorationMap,
+    seen: SeenMap,
     field: Model.SupplyField,
     center: Vec2,
     position: Vec2,
@@ -119,7 +152,7 @@ export class Minimap {
     span: number,
   ): void {
     field.forEachKnown((container) => {
-      if (!exploration.isExplored(container.position) || !this.intersectsMap(container.position, 0, center, span)) return;
+      if (!seen.isSeen(container.position) || !this.intersectsMap(container.position, 0, center, span)) return;
       drawing.circle(
         this.toMap(container.position, center, position, size, span),
         2.2,
@@ -134,7 +167,7 @@ export class Minimap {
 
   private drawDrones(
     drawing: Drawing,
-    exploration: ExplorationMap,
+    seen: SeenMap,
     field: Model.DroneField,
     center: Vec2,
     position: Vec2,
@@ -142,7 +175,7 @@ export class Minimap {
     span: number,
   ): void {
     field.forEach((drone) => {
-      if (!exploration.isExplored(drone.position) || !this.intersectsMap(drone.position, 0, center, span)) return;
+      if (!seen.isSeen(drone.position) || !this.intersectsMap(drone.position, 0, center, span)) return;
       drawing.circle(
         this.toMap(drone.position, center, position, size, span),
         2.0,
@@ -153,7 +186,7 @@ export class Minimap {
 
   private drawPirates(
     drawing: Drawing,
-    exploration: ExplorationMap,
+    seen: SeenMap,
     field: Model.PirateField,
     center: Vec2,
     position: Vec2,
@@ -161,7 +194,7 @@ export class Minimap {
     span: number,
   ): void {
     field.forEachPirate((pirate) => {
-      if (!exploration.isExplored(pirate.position) || !this.intersectsMap(pirate.position, 0, center, span)) return;
+      if (!seen.isSeen(pirate.position) || !this.intersectsMap(pirate.position, 0, center, span)) return;
       drawing.circle(
         this.toMap(pirate.position, center, position, size, span),
         2.6,
@@ -172,10 +205,8 @@ export class Minimap {
 
   private drawStation(
     drawing: Drawing,
-    exploration: ExplorationMap,
-    roof: StationRoof | undefined,
+    seen: SeenMap,
     model: Model.Game,
-    camera: Camera,
     worldCenter: Vec2,
     position: Vec2,
     size: Size,
@@ -185,34 +216,15 @@ export class Minimap {
     if (!station || !station.isPlaced) return;
     const stationCenter = station.center!;
     if (!this.intersectsMap(stationCenter, station.outerRadius, worldCenter, span)) return;
-    const mapCenter = this.toMap(stationCenter, worldCenter, position, size, span);
     const scale = size.width / span;
-    const hullRadius = station.outerRadius * scale;
-
-    // Opaque dark disc covers the coarse exploration tint inside the station.
-    if (hullRadius >= 1.5) {
-      drawing.circle(mapCenter, hullRadius, '#0c0c0e', 'rgba(150,150,160,.6)', 1);
-    }
-
-    // Use the roof's line-of-sight reveal state (not the coarse camera-bounds
-    // exploration) for station interior elements, so walls and floor only show
-    // where the ship has actually seen them. Constrain to the camera's visible
-    // range so distant revealed areas don't show on the minimap.
-    const cellSize = station.carver?.cellSize ?? 60;
-    const camRadius = camera.getVisibleWorldRadius(drawing.size);
-    const camPos = camera.worldPosition;
-    const inCameraRange = (p: Vec2): boolean => {
-      const dx = p.x - camPos.x;
-      const dy = p.y - camPos.y;
-      return dx * dx + dy * dy <= camRadius * camRadius;
-    };
-    const revealed = (worldPoint: Vec2): boolean =>
-      inCameraRange(worldPoint) &&
-      (roof ? roof.isAreaRevealed(station, worldPoint, cellSize) : exploration.isExplored(worldPoint));
+    // Reveal radius is half a seen cell so a wall vertex resting on a cell edge
+    // still counts as revealed when the adjacent floor cell has been seen.
+    const revealRadius = SeenMap.cellSize / 2;
+    const revealed = (worldPoint: Vec2): boolean => seen.isCircleSeen(worldPoint, revealRadius);
 
     // Draw revealed carved floor cells only — rock between walls stays dark.
     const carver = station.carver;
-    if (carver && hullRadius >= 1.5) {
+    if (carver) {
       const center = station.center!;
       const rotation = station.entranceAngle;
       const halfCell = carver.cellSize / 2;
@@ -238,19 +250,17 @@ export class Minimap {
       if (floorPaths.length > 0) drawing.fillPolygons(floorPaths, 'rgba(70,70,78,.45)');
     }
 
-    if (revealed(station.centralCenter!)) {
-      drawing.circle(this.toMap(station.centralCenter!, worldCenter, position, size, span), station.centralRadius * scale, 'rgba(90,90,100,.3)', 'rgba(170,170,180,.4)', 0.5);
+    if (station.centralCenter && revealed(station.centralCenter)) {
+      drawing.circle(this.toMap(station.centralCenter, worldCenter, position, size, span), station.centralRadius * scale, 'rgba(90,90,100,.3)', 'rgba(170,170,180,.4)', 0.5);
     }
-    const drawChain = (wall: Model.StationContour, fill: string, stroke: string, alwaysVisible = false): void => {
-      // A wall is visible if any of its vertices has been revealed, or if it is
-      // the exterior hull (visible from outside the station).
+    const drawChain = (wall: Model.StationContour, fill: string, stroke: string): void => {
       const cos = Math.cos(wall.angle);
       const sin = Math.sin(wall.angle);
       const worldVerts = wall.localVertices.map((v) => ({
         x: wall.position.x + v.x * cos - v.y * sin,
         y: wall.position.y + v.x * sin + v.y * cos,
       }));
-      if (!alwaysVisible && !worldVerts.some((v) => revealed(v))) return;
+      if (!worldVerts.some((v) => revealed(v))) return;
       if (!this.intersectsMap(wall.position, wall.radius, worldCenter, span)) return;
       const pts = worldVerts.map((v) => this.toMap(v, worldCenter, position, size, span));
       const n = pts.length;
@@ -262,10 +272,10 @@ export class Minimap {
         drawing.line(pts[i], pts[(i + 1) % n], stroke, 0.5);
       }
     };
-    // The outer hull is visible from outside the station, so always draw it once
-    // the station is on the minimap. Interior walls require line-of-sight reveal.
-    station.forEachHullWall((wall) => drawChain(wall, 'rgba(58,58,64,.5)', 'rgba(150,150,160,.6)', true));
-    station.forEachInteriorWall((wall) => drawChain(wall, 'rgba(58,58,64,.35)', 'rgba(120,120,130,.4)', false));
+    // The hull is gated by line of sight just like interior walls: it only
+    // appears as the ship flies around and sees it (REQ-81).
+    station.forEachHullWall((wall) => drawChain(wall, 'rgba(58,58,64,.5)', 'rgba(150,150,160,.6)'));
+    station.forEachInteriorWall((wall) => drawChain(wall, 'rgba(58,58,64,.35)', 'rgba(120,120,130,.4)'));
     station.forEachGate((gate) => {
       if (!revealed(gate.position)) return;
       const p = this.toMap(gate.position, worldCenter, position, size, span);
@@ -279,7 +289,11 @@ export class Minimap {
     station.forEachCollectible((container) => {
       if (!revealed(container.position)) return;
       const p = this.toMap(container.position, worldCenter, position, size, span);
-      drawing.circle(p, 1.6, container instanceof Model.HpContainer ? '#5dff9a' : container instanceof Model.AmmoContainer ? '#c98bff' : '#ffc35c');
+      const color = container instanceof Model.ShieldPod ? '#4d9fff'
+        : container instanceof Model.HpContainer ? '#5dff9a'
+        : container instanceof Model.AmmoContainer ? '#c98bff'
+        : '#ffc35c';
+      drawing.circle(p, 1.6, color);
     });
   }
 
@@ -296,6 +310,7 @@ export class Minimap {
   }
 
   private drawSignal(drawing: Drawing, model: Model.Game, position: Vec2, size: Size, worldCenter: Vec2): void {
+    if (!model.mission.showDirectionalSignal) return;
     const destination = model.mission.destinationPosition;
     let direction: Vec2 | null = null;
     if (destination) {

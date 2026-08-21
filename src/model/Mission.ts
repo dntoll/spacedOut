@@ -44,7 +44,7 @@ export enum MissionGoalKind {
   OpenGate1,
   OpenGate2,
   OpenGate3,
-  ReachCentralChamber,
+  RecoverShieldUpgrade,
   ReachOmegaIII,
   ReachFreighter,
 }
@@ -82,7 +82,7 @@ export class Mission {
   private gate1Opened = false;
   private gate2Opened = false;
   private gate3Opened = false;
-  private centralReached = false;
+  private shieldCollected = false;
   private omegaReached = false;
   private freighterReached = false;
 
@@ -105,6 +105,12 @@ export class Mission {
 
   get isTraversal(): boolean {
     return this.phase === MissionPhase.Mission2Active || this.phase === MissionPhase.Mission4Active;
+  }
+
+  get showDirectionalSignal(): boolean {
+    return this.phase !== MissionPhase.Mission3Intro
+      && this.phase !== MissionPhase.Mission3Active
+      && this.phase !== MissionPhase.Mission3Done;
   }
 
   get destinationPosition(): Vec2 | null { return this.destination; }
@@ -152,7 +158,7 @@ export class Mission {
         { kind: MissionGoalKind.OpenGate1, complete: this.gate1Opened },
         { kind: MissionGoalKind.OpenGate2, complete: this.gate2Opened },
         { kind: MissionGoalKind.OpenGate3, complete: this.gate3Opened },
-        { kind: MissionGoalKind.ReachCentralChamber, complete: this.centralReached },
+        { kind: MissionGoalKind.RecoverShieldUpgrade, complete: this.shieldCollected },
       ];
     }
     if (
@@ -275,9 +281,8 @@ export class Mission {
       this.gate1Opened = station.isGateOpen(1);
       this.gate2Opened = station.isGateOpen(2);
       this.gate3Opened = station.isGateOpen(3);
-      this.centralReached = station.isCentralReached(ship);
-      if (this.centralReached) {
-        ship.installShield();
+      this.shieldCollected = ship.hasShield;
+      if (this.shieldCollected) {
         this.phase = MissionPhase.Mission3Done;
       }
     } else if (this.phase === MissionPhase.Mission4Active && star && iceRing && freighter) {

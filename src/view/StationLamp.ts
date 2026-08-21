@@ -3,7 +3,7 @@ import type { Vec2 } from '../types';
 import type { Drawing, RadialPaint } from './Drawing';
 import type { StationRoof } from './StationRoof';
 import { isWallChain } from '../model/SweptCircleCollision';
-import { wallChainWorldVertices } from '../model/WallChainCollision';
+import { obstacleOutline, raySegmentT, type Segment } from './LineOfSight';
 
 // The lamp owns a single multiply-composite pass: a black disc covers the entire
 // station (so everything starts dark — roof, floor, and walls alike), then the
@@ -12,8 +12,6 @@ import { wallChainWorldVertices } from '../model/WallChainCollision';
 // so nothing beyond a wall or closed door is visible regardless of bitmap state.
 const BLACK_ALPHA = 1.0;
 const RAY_COUNT = 360;
-
-interface Segment { ax: number; ay: number; bx: number; by: number }
 
 export class StationLamp {
   private polygon: Vec2[] = [];
@@ -89,31 +87,3 @@ export class StationLamp {
     return segments;
   }
 }
-
-const obstacleOutline = (obstacle: Model.ShipObstacle): Vec2[] => {
-  if (isWallChain(obstacle)) return wallChainWorldVertices(obstacle as Model.WallChain);
-  const cos = Math.cos(obstacle.angle);
-  const sin = Math.sin(obstacle.angle);
-  const { position, radius, vertices } = obstacle as Model.PolygonObstacle;
-  const out: Vec2[] = [];
-  for (let i = 0; i < vertices.length; i++) {
-    const a = (i / vertices.length) * Math.PI * 2;
-    const lx = Math.cos(a) * radius * vertices[i];
-    const ly = Math.sin(a) * radius * vertices[i];
-    out.push({ x: position.x + lx * cos - ly * sin, y: position.y + lx * sin + ly * cos });
-  }
-  return out;
-};
-
-const raySegmentT = (ox: number, oy: number, dx: number, dy: number, s: Segment): number | null => {
-  const sx = s.bx - s.ax;
-  const sy = s.by - s.ay;
-  const denom = dx * sy - dy * sx;
-  if (denom > -1e-9 && denom < 1e-9) return null;
-  const rx = s.ax - ox;
-  const ry = s.ay - oy;
-  const t = (rx * sy - ry * sx) / denom;
-  const u = (rx * dy - ry * dx) / denom;
-  if (u < 0 || u > 1 || t < 0) return null;
-  return t;
-};

@@ -11,7 +11,7 @@ const GOAL_LABELS: ReadonlyMap<MissionGoalKind, string> = new Map([
   [MissionGoalKind.OpenGate1, 'Open gate 1 (find its switch)'],
   [MissionGoalKind.OpenGate2, 'Open gate 2 (find its switch)'],
   [MissionGoalKind.OpenGate3, 'Open gate 3 (find its switch)'],
-  [MissionGoalKind.ReachCentralChamber, 'Reach the central chamber'],
+  [MissionGoalKind.RecoverShieldUpgrade, 'Recover the shield upgrade'],
   [MissionGoalKind.ReachOmegaIII, 'Reach star Omega III'],
   [MissionGoalKind.ReachFreighter, 'Reach the drifting freighter'],
 ]);

@@ -84,6 +84,7 @@ describe('SignalIndicator', () => {
     const mission = {
       destinationPosition: { x: 100000, y: 0 },
       signalDirection: { x: 0, y: -1 },
+      showDirectionalSignal: true,
     } as unknown as Model.Mission;
     const model = stubModel({ mission });
     const camera = new Camera();
@@ -94,6 +95,21 @@ describe('SignalIndicator', () => {
     const [edge] = dashedLine.mock.calls[0];
     expect(edge.x).toBe(800);
     expect(edge.y).toBe(300);
+  });
+
+  it('REQ-76 hides the directional signal during mission 3 even with a signal set', () => {
+    const { drawing, dashedLine, arc } = stubDrawing({ width: 800, height: 600 });
+    const mission = new Mission();
+    mission.phase = MissionPhase.Mission3Active;
+    mission.signalDirection = { x: 1, y: 0 };
+    const model = stubModel({ mission });
+    const camera = new Camera();
+
+    new SignalIndicator().draw(drawing, model, camera);
+
+    expect(dashedLine).not.toHaveBeenCalled();
+    const redArcs = arc.mock.calls.filter((call) => typeof call[4] === 'string' && call[4].startsWith('rgba(255,59,59,'));
+    expect(redArcs).toHaveLength(0);
   });
 
   it('REQ-57 draws a blue wave toward an off-screen hunting drone', () => {

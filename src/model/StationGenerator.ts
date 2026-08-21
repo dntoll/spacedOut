@@ -297,7 +297,7 @@ export class StationGenerator {
       { position: localToWorld(this.roomJitter(sw3, jitter)), type: SupplyType.Hp },
       { position: localToWorld(this.roomJitter(cab0 ?? centralPlacement, jitter)), type: SupplyType.Ammo },
       { position: localToWorld(this.roomJitter(cab1 ?? centralPlacement, jitter)), type: SupplyType.Fuel },
-      { position: localToWorld({ ...centralPlacement.local }), type: SupplyType.Hp },
+      { position: localToWorld({ ...centralPlacement.local }), type: SupplyType.Shield },
     ];
 
     // --- Walls ---------------------------------------------------------------

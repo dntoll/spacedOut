@@ -17,12 +17,14 @@ export class SignalIndicator {
   draw(drawing: Drawing, model: Model.Game, camera: Camera): void {
     const size = drawing.size;
     const center = { x: size.width / 2, y: size.height / 2 };
-    const direction = this.aimDirection(model, camera);
-    if (direction) {
-      const edge = this.edgePoint(center, direction, size);
-      const inner = { x: edge.x - direction.x * SEGMENT_LENGTH, y: edge.y - direction.y * SEGMENT_LENGTH };
-      drawing.dashedLine(edge, inner, SIGNAL_COLOR, 3);
-      this.drawWave(drawing, edge, direction, SIGNAL_COLOR, model.elapsed, WAVE_MAX_RADIUS);
+    if (model.mission.showDirectionalSignal) {
+      const direction = this.aimDirection(model, camera);
+      if (direction) {
+        const edge = this.edgePoint(center, direction, size);
+        const inner = { x: edge.x - direction.x * SEGMENT_LENGTH, y: edge.y - direction.y * SEGMENT_LENGTH };
+        drawing.dashedLine(edge, inner, SIGNAL_COLOR, 3);
+        this.drawWave(drawing, edge, direction, SIGNAL_COLOR, model.elapsed, WAVE_MAX_RADIUS);
+      }
     }
 
     const bounds = camera.getVisibleWorldBounds(size);

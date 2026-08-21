@@ -364,7 +364,31 @@ describe('Mission', () => {
     expect(length(sub(station.center!, ship.position))).toBeLessThan(station.outerRadius * 2);
   });
 
-  it('REQ-76 starts mission 3 inside the station with gate and central-chamber goals', () => {
+  it('REQ-76 hides the directional signal throughout mission 3', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    const station = emptyStation();
+    const ship = new Ship();
+    mission.jumpToMission3Briefing(ship, station);
+    expect(mission.showDirectionalSignal).toBe(false);
+    mission.advance(visited);
+    expect(mission.showDirectionalSignal).toBe(false);
+    ship.installShield();
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), station, visited, SCREEN_RADIUS);
+    expect(mission.phase).toBe(MissionPhase.Mission3Done);
+    expect(mission.showDirectionalSignal).toBe(false);
+  });
+
+  it('REQ-76 shows the directional signal outside mission 3', () => {
+    const mission = new Mission();
+    expect(mission.showDirectionalSignal).toBe(true);
+    mission.phase = MissionPhase.Mission2Active;
+    expect(mission.showDirectionalSignal).toBe(true);
+    mission.phase = MissionPhase.Mission4Active;
+    expect(mission.showDirectionalSignal).toBe(true);
+  });
+
+  it('REQ-76 starts mission 3 inside the station with gate and shield-upgrade goals', () => {
     const mission = new Mission();
     const visited = new VisitedMap();
     const station = emptyStation();
@@ -379,12 +403,12 @@ describe('Mission', () => {
       MissionGoalKind.OpenGate1,
       MissionGoalKind.OpenGate2,
       MissionGoalKind.OpenGate3,
-      MissionGoalKind.ReachCentralChamber,
+      MissionGoalKind.RecoverShieldUpgrade,
     ]);
     expect(mission.currentGoals.every((g) => !g.complete)).toBe(true);
   });
 
-  it('REQ-91 awards the shield upgrade when the central chamber is reached', () => {
+  it('REQ-91 completes mission 3 once the shield-upgrade collectible is collected', () => {
     const mission = new Mission();
     const visited = new VisitedMap();
     const station = emptyStation();
@@ -392,12 +416,31 @@ describe('Mission', () => {
     mission.jumpToMission3Briefing(ship, station);
     mission.advance(visited);
     expect(ship.hasShield).toBe(false);
-    vi.spyOn(station, 'isCentralReached').mockReturnValue(true);
 
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), station, visited, SCREEN_RADIUS);
+    expect(mission.phase).toBe(MissionPhase.Mission3Active);
+
+    ship.installShield();
     mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), station, visited, SCREEN_RADIUS);
 
     expect(ship.hasShield).toBe(true);
     expect(mission.phase).toBe(MissionPhase.Mission3Done);
+  });
+
+  it('REQ-91 reaching the central chamber alone no longer completes mission 3', () => {
+    const mission = new Mission();
+    const visited = new VisitedMap();
+    const station = emptyStation();
+    const ship = new Ship();
+    mission.jumpToMission3Briefing(ship, station);
+    mission.advance(visited);
+
+    ship.position = { ...station.centralCenter! };
+    mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), station, visited, SCREEN_RADIUS);
+
+    expect(station.isCentralReached(ship)).toBe(true);
+    expect(ship.hasShield).toBe(false);
+    expect(mission.phase).toBe(MissionPhase.Mission3Active);
   });
 
   it('REQ-76 proceeds from mission 3 completion to the mission 4 briefing', () => {
@@ -407,7 +450,7 @@ describe('Mission', () => {
     const ship = new Ship();
     mission.jumpToMission3Briefing(ship, station);
     mission.advance(visited);
-    vi.spyOn(station, 'isCentralReached').mockReturnValue(true);
+    ship.installShield();
     mission.update(0, ship, emptyDroneField(), emptyBelt(), emptyField(), station, visited, SCREEN_RADIUS);
 
     mission.advance(visited);

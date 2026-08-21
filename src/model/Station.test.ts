@@ -6,6 +6,7 @@ import { LaserField } from './LaserField';
 import { boundaryRadiusAt } from './MassiveAsteroid';
 import { PirateField } from './PirateField';
 import { Ship } from './Ship';
+import { ShieldPod } from './ShieldPod';
 import { Station } from './Station';
 import { pointOnCircle } from './StationGeometry';
 import { isCapsuleObstacle, isWallChain } from './SweptCircleCollision';
@@ -240,6 +241,18 @@ describe('Station', () => {
     let remaining = 0;
     station.forEachCollectible(() => remaining++);
     expect(remaining).toBe(before - 1);
+  });
+
+  it('REQ-91 spawns a shield-upgrade collectible in the central chamber', () => {
+    const station = placeStation();
+    const pods: ShieldPod[] = [];
+    station.forEachCollectible((container) => {
+      if (container instanceof ShieldPod) pods.push(container as ShieldPod);
+    });
+    expect(pods.length).toBe(1);
+    expect(station.centralCenter).not.toBeNull();
+    const dist = length(sub(pods[0].position, station.centralCenter!));
+    expect(dist).toBeLessThanOrEqual(station.centralRadius);
   });
 
   it('REQ-79 the maze layout varies between seeds', () => {
