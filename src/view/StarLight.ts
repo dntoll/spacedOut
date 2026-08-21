@@ -1,4 +1,4 @@
-import { clamp, length } from '../math';
+import { clamp, length, normalize, sub } from '../math';
 import type { Vec2 } from '../types';
 import type { LinearPaint } from './Drawing';
 
@@ -31,6 +31,7 @@ export interface OutlinedShadowCasters extends ShadowCasters {
 export class StarLight {
   private readonly lightDir: Vec2;
   private readonly shadowLength: number;
+  private pointSource: Vec2 | null = null;
 
   constructor(lightDirection: Vec2 = DEFAULT_LIGHT_DIRECTION, shadowLength = 2400) {
     const l = length(lightDirection);
@@ -42,21 +43,34 @@ export class StarLight {
   getShadowLength(): number { return this.shadowLength; }
   shadowLengthFor(radius: number): number { return Math.min(this.shadowLength, radius * SHADOW_LENGTH_PER_RADIUS); }
 
-  localDirection(angle: number): Vec2 {
+  setPointSource(position: Vec2 | null): void {
+    this.pointSource = position ? { ...position } : null;
+  }
+
+  directionAt(position: Vec2): Vec2 {
+    if (!this.pointSource) return { ...this.lightDir };
+    const away = sub(position, this.pointSource);
+    const dir = normalize(away);
+    return length(dir) > 0 ? dir : { ...this.lightDir };
+  }
+
+  localDirection(angle: number, worldPosition?: Vec2): Vec2 {
+    const world = worldPosition ? this.directionAt(worldPosition) : this.lightDir;
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
     return {
-      x: this.lightDir.x * cos + this.lightDir.y * sin,
-      y: -this.lightDir.x * sin + this.lightDir.y * cos,
+      x: world.x * cos + world.y * sin,
+      y: -world.x * sin + world.y * cos,
     };
   }
 
   shadowFactor(position: Vec2, radius: number, casters: ShadowCasters | null): number {
     if (!casters) return 0;
-    const dx = this.lightDir.x;
-    const dy = this.lightDir.y;
     let maxFactor = 0;
     const visit = (occluder: ShadowCaster): void => {
+      const light = this.directionAt(occluder.position);
+      const dx = light.x;
+      const dy = light.y;
       const rx = position.x - occluder.position.x;
       const ry = position.y - occluder.position.y;
       const along = rx * dx + ry * dy;

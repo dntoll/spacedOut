@@ -30,6 +30,7 @@ header { display: flex; align-items: center; justify-content: space-between; col
 .resource.fuel .resource-track i { background: #ffc35c; box-shadow: 0 0 7px #ffc35c; }
 .resource.hp .resource-track i { background: #5dff9a; box-shadow: 0 0 7px #5dff9a; }
 .resource.ammo .resource-track i { background: #c98bff; box-shadow: 0 0 7px #c98bff; }
+.resource.shield .resource-track i { background: #7ee9ff; box-shadow: 0 0 7px #7ee9ff; }
 .hint { position: absolute; left: 50%; bottom: clamp(30px, 7vh, 70px); translate: -50% 0; min-width: 250px; text-align: center; transition: opacity .5s, translate .5s; }
 .hint::before { content: ''; display: block; width: 1px; height: 28px; margin: 0 auto 13px; background: linear-gradient(transparent, rgba(95,229,255,.75)); }
 .hint strong { display: block; color: rgba(218,248,255,.78); font: 700 10px/1.6 Space Mono, monospace; letter-spacing: .18em; }

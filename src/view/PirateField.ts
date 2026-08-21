@@ -42,7 +42,7 @@ export class PirateField {
   private drawPirate(drawing: Drawing, pirate: Model.Pirate, zoom: number, starLight: StarLight, casters: ShadowCasters | null): void {
     drawing.withTransform(pirate.position, pirate.angle, () => {
       const r = pirate.radius;
-      const localLight = starLight.localDirection(pirate.angle);
+      const localLight = starLight.localDirection(pirate.angle, pirate.position);
       const shadow = starLight.shadowFactor(pirate.position, r, casters);
       const hull = starLight.bodyPaint(localLight, r, '#ffb0a0', '#5e1c14', shadow);
       const hullPoints = [

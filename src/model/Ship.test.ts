@@ -203,6 +203,89 @@ describe('Ship controls', () => {
     expect(ship.weaponLevel).toBe(2);
   });
 
+  it('REQ-89 charges the shield from fuel only while idle, five full shields per tank', () => {
+    const ship = new Ship();
+    expect(ship.hasShield).toBe(false);
+    ship.updateShieldCharge(10);
+    expect(ship.shield).toBe(0);
+    expect(ship.fuel).toBe(100);
+
+    ship.installShield();
+    expect(ship.hasShield).toBe(true);
+
+    let restores = 0;
+    for (let i = 0; i < 5; i++) {
+      for (let step = 0; step < 100 && ship.shield < ship.shieldCapacity; step++) ship.updateShieldCharge(0.1);
+      expect(ship.shield).toBe(ship.shieldCapacity);
+      restores++;
+      ship.takeDamage(ship.shieldCapacity);
+      ship.updateShieldCharge(2);
+    }
+    expect(restores).toBe(5);
+    expect(ship.fuel).toBe(0);
+  });
+
+  it('REQ-89 pauses shield charging while the ship is thrusting', () => {
+    const ship = new Ship();
+    ship.installShield();
+    ship.velocity = { x: 200, y: 0 };
+    ship.aimAt({ x: 500, y: 0 });
+    ship.startThrust();
+    ship.applyControls(0.1);
+    ship.updateShieldCharge(1);
+    expect(ship.shield).toBe(0);
+
+    ship.stopThrust();
+    ship.setDirectionalThrust(null);
+    ship.applyControls(0.5);
+    ship.updateShieldCharge(1);
+    expect(ship.shield).toBeGreaterThan(0);
+  });
+
+  it('REQ-89 absorbs damage in the shield and spills the excess into the hull', () => {
+    const ship = new Ship();
+    ship.installShield();
+    ship.updateShieldCharge(4);
+    expect(ship.shield).toBe(100);
+
+    ship.takeDamage(30);
+    expect(ship.shield).toBe(70);
+    expect(ship.hp).toBe(100);
+
+    ship.takeDamage(90);
+    expect(ship.shield).toBe(0);
+    expect(ship.hp).toBe(80);
+  });
+
+  it('REQ-89 waits before recharging after a shielded hit and never eats the emergency fuel', () => {
+    const ship = new Ship();
+    ship.installShield();
+    ship.updateShieldCharge(4);
+    ship.takeDamage(50);
+    expect(ship.shield).toBe(50);
+    ship.updateShieldCharge(1);
+    expect(ship.shield).toBe(50);
+    ship.updateShieldCharge(1);
+    expect(ship.shield).toBeGreaterThan(50);
+
+    ship.setControlTuning({ dampening: 1.5, thrustAccel: 170, maxSpeed: 100000 });
+    ship.aimAt({ x: 100000, y: 0 });
+    ship.startThrust();
+    for (let i = 0; i < 300 && ship.fuel > 0; i++) ship.applyControls(0.1);
+    expect(ship.fuel).toBe(0);
+    ship.stopThrust();
+    ship.setDirectionalThrust(null);
+    ship.applyControls(0.5);
+    ship.updateEmergencyReload(2.1);
+    expect(ship.fuel).toBe(1);
+    ship.updateShieldCharge(2);
+    expect(ship.fuel).toBe(1);
+
+    ship.collectFuel(20);
+    ship.updateShieldCharge(2);
+    expect(ship.fuel).toBeLessThan(21);
+  });
+
   it('REQ-82 thrust is free below speed 100 and flags free thrust', () => {
     const ship = new Ship();
     ship.velocity = { x: 50, y: 0 };

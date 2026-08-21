@@ -25,7 +25,7 @@ export class MassiveAsteroidField {
           y: Math.sin(angle) * asteroid.radius * variation,
         };
       });
-      const localLight = starLight.localDirection(asteroid.angle);
+      const localLight = starLight.localDirection(asteroid.angle, asteroid.position);
       const lit = asteroid.shade > 0.5 ? '#35465a' : '#303c50';
       const rock = starLight.bodyPaint(localLight, asteroid.radius, lit, '#070b12', 0);
       drawing.polygon(points, rock, 'rgba(132,170,205,.34)', 2 / zoom);

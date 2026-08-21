@@ -30,7 +30,7 @@ export class AsteroidBelt {
         const radius = asteroid.radius * variation;
         return { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius };
       });
-      const localLight = starLight.localDirection(asteroid.angle);
+      const localLight = starLight.localDirection(asteroid.angle, asteroid.position);
       const shadow = starLight.shadowFactor(asteroid.position, asteroid.radius, casters);
       const lit = asteroid.shade > 0.5 ? '#536175' : '#424d5f';
       const rock = starLight.bodyPaint(localLight, asteroid.radius, lit, '#0b101b', shadow);

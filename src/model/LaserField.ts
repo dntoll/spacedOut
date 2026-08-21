@@ -6,6 +6,9 @@ import { Collision } from './Collision';
 import type { CollisionObserver } from './CollisionObserver';
 import type { Drone } from './Drone';
 import type { DroneField } from './DroneField';
+import type { Freighter } from './Freighter';
+import type { IceBlock } from './IceBlock';
+import type { IceRing } from './IceRing';
 import type { LaserImpactObserver } from './LaserImpactObserver';
 import { Laser } from './Laser';
 import { LaserShot } from './LaserShot';
@@ -83,6 +86,8 @@ export class LaserField {
     droneField?: DroneField,
     pirateField?: PirateField,
     station?: StationObstacleSource,
+    iceRing?: IceRing,
+    freighter?: Freighter,
   ): void {
     this.cooldown = Math.max(0, this.cooldown - dt);
     const maxRange = cullRadius + CULL_MARGIN;
@@ -134,6 +139,23 @@ export class LaserField {
           continue;
         }
       }
+
+      if (iceRing) {
+        const ice = this.iceHit(laser, iceRing);
+        if (ice) {
+          this.emitSpark(laser.position, normalize(sub(laser.position, ice.position)));
+          this.lasers.splice(i, 1);
+          continue;
+        }
+      }
+
+      if (freighter?.isPlaced) {
+        if (length(sub(freighter.position, laser.position)) <= freighter.radius + laser.radius) {
+          this.emitSpark(laser.position, normalize(sub(laser.position, freighter.position)));
+          this.lasers.splice(i, 1);
+          continue;
+        }
+      }
     }
   }
 
@@ -147,6 +169,19 @@ export class LaserField {
       }
       const boundary = boundaryRadiusAt(obstacle as PolygonObstacle, laser.position);
       if (length(sub(obstacle.position, laser.position)) <= boundary + laser.radius) hit = obstacle;
+    });
+    return hit;
+  }
+
+  private iceHit(laser: Laser, iceRing: IceRing): IceBlock | null {
+    let hit: IceBlock | null = null;
+    let bestDistance = Number.POSITIVE_INFINITY;
+    iceRing.forEach((block) => {
+      const distance = length(sub(block.position, laser.position));
+      if (distance <= block.radius + laser.radius && distance < bestDistance) {
+        bestDistance = distance;
+        hit = block;
+      }
     });
     return hit;
   }

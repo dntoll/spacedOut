@@ -129,6 +129,27 @@ describe('MissionOverlay', () => {
     expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
   });
 
+  it('REQ-92 shows the mission 4 briefing toward Omega III', () => {
+    const nodes = stubNodes();
+    const overlay = new MissionOverlay();
+
+    overlay.show(MissionPhase.Mission4Intro);
+
+    expect(nodes.get('#mission-title')?.textContent).toBe('Mission 4: Space station computer records show last human entry five years ago travelled to star Omega III.');
+    expect(nodes.get('#mission-signal')?.textContent).toBe('Lets go to see what happened to them...');
+    expect(nodes.get('#mission-detail')?.textContent).toBe('Click to continue.');
+    expect(nodes.get('#mission')?.classList.remove).toHaveBeenCalledWith('hidden');
+  });
+
+  it('hides the overlay during the mission 4 traversal', () => {
+    const nodes = stubNodes();
+    const overlay = new MissionOverlay();
+
+    overlay.show(MissionPhase.Mission4Active);
+
+    expect(nodes.get('#mission')?.classList.add).toHaveBeenCalledWith('hidden');
+  });
+
   it('REQ-52 consumes a continue click once', () => {
     const nodes = stubNodes();
     const overlay = new MissionOverlay();

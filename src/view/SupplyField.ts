@@ -22,7 +22,7 @@ export class SupplyField {
       const color = isHp ? '#7dffb0' : isAmmo ? '#c98bff' : '#ffc35c';
       const dark = isHp ? '#0f3d24' : isAmmo ? '#2a1a3d' : '#3d2a0f';
       const shadow = starLight.shadowFactor(container.position, container.radius, casters);
-      const body = starLight.bodyPaint(starLight.localDirection(0), container.radius, color, dark, shadow);
+      const body = starLight.bodyPaint(starLight.localDirection(0, container.position), container.radius, color, dark, shadow);
       drawing.withShadow(color, 12, () => {
         drawing.withTransform(container.position, 0, () => {
           drawing.circle({ x: 0, y: 0 }, container.radius, body, color, 1.5);
@@ -38,7 +38,7 @@ export class SupplyField {
       drawing.circle(pod.position, pod.radius, 'rgba(126,233,255,.18)', color, 1.5);
     });
     const shadow = starLight.shadowFactor(pod.position, pod.radius, casters);
-    const body = starLight.bodyPaint(starLight.localDirection(WEAPON_POD_ANGLE), pod.radius, '#2c5d7a', '#06121c', shadow);
+    const body = starLight.bodyPaint(starLight.localDirection(WEAPON_POD_ANGLE, pod.position), pod.radius, '#2c5d7a', '#06121c', shadow);
     drawing.withTransform(pod.position, WEAPON_POD_ANGLE, () => {
       drawing.polygon(BLASTER, body, color, 1.8);
       drawing.circle({ x: 18, y: 0 }, 4, color);
